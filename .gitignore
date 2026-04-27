@@ -57,8 +57,7 @@ CodeCoverage/
 TestResult.xml
 nunit-*.xml
 
-bin/
-obj/
 /packages/
 riderModule.iml
 /_ReSharper.Caches/
+/.idea
