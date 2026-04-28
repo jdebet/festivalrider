@@ -1,0 +1,304 @@
+@page "/settings"
+@implements IDisposable
+@inject IBandService BandService
+@inject IStorageService Storage
+@inject IExportService Export
+@inject IToastService Toasts
+@inject IJSRuntime JS
+
+<PageTitle>Settings · FestivalRider</PageTitle>
+
+<h1 class="h3 mb-3">Settings</h1>
+
+<RiderSection Title="Show details">
+    <EditForm Model="_show" OnValidSubmit="SaveShow">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <div class="row g-2 mb-2">
+            <div class="col-md-6">
+                <label class="form-label">Name</label>
+                <InputText class="form-control" @bind-Value="_show.Name" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Address</label>
+                <InputText class="form-control" @bind-Value="_show.Address" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Date of opening</label>
+                <InputDate class="form-control" @bind-Value="_dateOfOpening" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Show day count</label>
+                <InputNumber class="form-control" @bind-Value="_show.ShowDayCount" />
+            </div>
+        </div>
+
+        <h6>Stages</h6>
+        @if (_show.Stages.Count == 0)
+        {
+            <div class="text-muted small mb-2">No stages yet.</div>
+        }
+        else
+        {
+            @for (var i = 0; i < _show.Stages.Count; i++)
+            {
+                var idx = i;
+                var s = _show.Stages[idx];
+                <div class="row g-2 align-items-end mb-2" @key="s.Id">
+                    <div class="col-md-1"><span class="badge bg-secondary">#@s.Id</span></div>
+                    <div class="col-md-8">
+                        <InputText class="form-control" @bind-Value="s.Name" />
+                    </div>
+                    <div class="col-md-3">
+                        <button type="button" class="btn btn-outline-danger w-100"
+                                @onclick="() => RequestDeleteStage(s.Id)">Delete</button>
+                    </div>
+                </div>
+            }
+        }
+        <div class="row g-2 align-items-end mb-2">
+            <div class="col-md-9">
+                <input class="form-control" placeholder="New stage name" @bind="_newStageName" />
+            </div>
+            <div class="col-md-3">
+                <button type="button" class="btn btn-outline-primary w-100" @onclick="AddStage">+ Add stage</button>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save show details</button>
+    </EditForm>
+</RiderSection>
+
+<RiderSection Title="Show CSV">
+    <p class="text-muted small">Export or import the show's metadata and stage list (separate from per-band CSVs).</p>
+    <div class="d-flex flex-wrap gap-2 mb-2">
+        <button type="button" class="btn btn-outline-primary" @onclick="ExportShowCsv">Export show CSV</button>
+        <label class="btn btn-outline-secondary mb-0">
+            Import show CSV
+            <InputFile OnChange="ImportShowCsv" accept=".csv" class="d-none" />
+        </label>
+    </div>
+</RiderSection>
+
+<RiderSection Title="Bands CSV">
+    <p class="text-muted small">Export each band as long-format CSV, or import a band CSV (creates a new band; ID conflicts overwrite).</p>
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        <label class="btn btn-outline-secondary mb-0">
+            Import band CSV
+            <InputFile OnChange="ImportBandCsv" accept=".csv" class="d-none" />
+        </label>
+    </div>
+    @if (BandService.Bands.Count == 0)
+    {
+        <div class="text-muted small">No bands to export.</div>
+    }
+    else
+    {
+        <ul class="list-group">
+            @foreach (var band in BandService.Bands)
+            {
+                <li class="list-group-item d-flex justify-content-between align-items-center" @key="band.Id">
+                    <span>@band.Name</span>
+                    <button type="button" class="btn btn-sm btn-outline-primary"
+                            @onclick="() => ExportBandCsv(band)">Export CSV</button>
+                </li>
+            }
+        </ul>
+    }
+</RiderSection>
+
+<RiderSection Title="Storage">
+    <p class="text-muted small">
+        Schema version: <strong>@_snapshot.SchemaVersion</strong>
+        · Bands: <strong>@_snapshot.Bands.Count</strong>
+        · Running orders: <strong>@_snapshot.RunningOrders.Count</strong>
+    </p>
+    <div class="d-flex flex-wrap gap-2">
+        <button type="button" class="btn btn-outline-primary" @onclick="ForceSave">Force save</button>
+        <button type="button" class="btn btn-outline-danger" @onclick="() => _confirmClear = true">Clear all data</button>
+    </div>
+</RiderSection>
+
+<ConfirmDialog Show="_confirmClear"
+               Title="Clear all data"
+               Message="Erase all bands, running orders, and show data from this browser? This cannot be undone."
+               ConfirmLabel="Clear"
+               OnConfirm="ConfirmClear"
+               OnCancel="() => _confirmClear = false" />
+
+<ConfirmDialog Show="_pendingDeleteStageId.HasValue"
+               Title="Delete stage"
+               Message="@_deleteStageMessage"
+               ConfirmLabel="Delete"
+               OnConfirm="ConfirmDeleteStage"
+               OnCancel="() => _pendingDeleteStageId = null" />
+
+@code {
+    private ShowData _show = new();
+    private DateTime _dateOfOpening = DateTime.Today;
+    private string _newStageName = string.Empty;
+    private bool _confirmClear;
+    private int? _pendingDeleteStageId;
+    private string _deleteStageMessage = string.Empty;
+    private AppState _snapshot = new();
+
+    protected override void OnInitialized()
+    {
+        BandService.OnChange += HandleChange;
+        Reload();
+    }
+
+    private void HandleChange()
+    {
+        Reload();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void Reload()
+    {
+        _snapshot = BandService.Snapshot();
+        _show = _snapshot.ShowData;
+        _dateOfOpening = _show.DateOfOpening == default
+            ? DateTime.Today
+            : _show.DateOfOpening.ToDateTime(TimeOnly.MinValue);
+    }
+
+    private void SaveShow()
+    {
+        _show.DateOfOpening = DateOnly.FromDateTime(_dateOfOpening);
+        // ShowData is mutated in place inside the live AppState (Snapshot returns the same instance reference today),
+        // but to be defensive, re-apply via ReplaceState to ensure OnChange fires and listeners persist.
+        var state = BandService.Snapshot();
+        state.ShowData = _show;
+        BandService.ReplaceState(state);
+        Toasts.Show("Show details saved.", ToastLevel.Success);
+    }
+
+    private void AddStage()
+    {
+        var name = _newStageName.Trim();
+        if (string.IsNullOrEmpty(name)) return;
+        var id = BandService.AddStage(name);
+        _newStageName = string.Empty;
+        Toasts.Show($"Stage \"{name}\" added (#{id}).", ToastLevel.Success);
+    }
+
+    private void RequestDeleteStage(int id)
+    {
+        var stage = BandService.FindStage(id);
+        _pendingDeleteStageId = id;
+        _deleteStageMessage = $"Delete stage \"{stage?.Name ?? id.ToString()}\"? Existing slots referencing it become \"Unknown stage\".";
+    }
+
+    private void ConfirmDeleteStage()
+    {
+        if (_pendingDeleteStageId is { } id)
+        {
+            BandService.DeleteStage(id);
+            Toasts.Show("Stage deleted.", ToastLevel.Info);
+        }
+        _pendingDeleteStageId = null;
+    }
+
+    private async Task ForceSave()
+    {
+        await Storage.FlushAsync();
+        Toasts.Show("State flushed to local storage.", ToastLevel.Success);
+    }
+
+    private async Task ConfirmClear()
+    {
+        _confirmClear = false;
+        await Storage.ClearAsync();
+        Toasts.Show("All data cleared.", ToastLevel.Warning);
+    }
+
+    private async Task ExportShowCsv()
+    {
+        var csv = Export.ExportShowCsv(_show);
+        var fname = $"show-{Sanitize(_show.Name)}.csv";
+        await Download(csv, fname);
+    }
+
+    private async Task ExportBandCsv(Band band)
+    {
+        var csv = Export.ExportBandCsv(band);
+        var fname = $"band-{Sanitize(band.Name)}.csv";
+        await Download(csv, fname);
+    }
+
+    private async Task ImportShowCsv(InputFileChangeEventArgs e)
+    {
+        var csv = await ReadAllAsync(e.File);
+        if (csv is null) return;
+        try
+        {
+            var show = Export.ImportShowCsv(csv);
+            var state = BandService.Snapshot();
+            state.ShowData = show;
+            BandService.ReplaceState(state);
+            Toasts.Show($"Imported show \"{show.Name}\" with {show.Stages.Count} stage(s).", ToastLevel.Success);
+        }
+        catch (Exception ex)
+        {
+            Toasts.Show($"Import failed: {ex.Message}", ToastLevel.Error);
+        }
+    }
+
+    private async Task ImportBandCsv(InputFileChangeEventArgs e)
+    {
+        var csv = await ReadAllAsync(e.File);
+        if (csv is null) return;
+        try
+        {
+            var band = Export.ImportBandCsv(csv);
+            var existing = BandService.FindBand(band.Id);
+            if (existing is null)
+            {
+                BandService.AddBand(band);
+                Toasts.Show($"Imported band \"{band.Name}\".", ToastLevel.Success);
+            }
+            else
+            {
+                BandService.DeleteBand(existing.Id);
+                BandService.AddBand(band);
+                Toasts.Show($"Replaced band \"{band.Name}\".", ToastLevel.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            Toasts.Show($"Import failed: {ex.Message}", ToastLevel.Error);
+        }
+    }
+
+    private static async Task<string?> ReadAllAsync(IBrowserFile file)
+    {
+        const long maxSize = 5 * 1024 * 1024;
+        try
+        {
+            await using var s = file.OpenReadStream(maxSize);
+            using var reader = new StreamReader(s);
+            return await reader.ReadToEndAsync();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private async Task Download(string text, string filename)
+    {
+        await JS.InvokeVoidAsync("festivalRiderCsv.downloadText", filename, "text/csv;charset=utf-8", text);
+    }
+
+    private static string Sanitize(string s)
+    {
+        var safe = new string((s ?? "untitled").Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());
+        return string.IsNullOrWhiteSpace(safe) ? "untitled" : safe.Trim('-');
+    }
+
+    public void Dispose()
+    {
+        BandService.OnChange -= HandleChange;
+    }
+}

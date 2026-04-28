@@ -1,6 +1,9 @@
 @page "/band/{Id:guid}"
 @implements IDisposable
 @inject IBandService BandService
+@inject IExportService Export
+@inject IToastService Toasts
+@inject IJSRuntime JS
 @inject NavigationManager Nav
 
 <PageTitle>@(_band?.Name ?? "Band") · FestivalRider</PageTitle>
@@ -18,8 +21,13 @@ else
             <a href="/" class="text-decoration-none">&larr; Bands</a>
             <h1 class="h3 m-0">@_band.Name</h1>
         </div>
-        <div class="btn-group">
+        <div class="d-flex flex-wrap gap-2">
             <button class="btn btn-primary" @onclick="Save">Save</button>
+            <button class="btn btn-outline-secondary" @onclick="ExportCsv">Export CSV</button>
+            <label class="btn btn-outline-secondary mb-0">
+                Replace from CSV
+                <InputFile OnChange="ImportCsv" accept=".csv" class="d-none" />
+            </label>
             <button class="btn btn-outline-secondary" @onclick="GoBack">Back</button>
         </div>
     </div>
@@ -602,6 +610,37 @@ else
     {
         if (_band is null) return;
         BandService.UpdateBand(_band);
+    }
+
+    private async Task ExportCsv()
+    {
+        if (_band is null) return;
+        var csv = Export.ExportBandCsv(_band);
+        var safe = new string((_band.Name ?? "band").Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');
+        if (string.IsNullOrEmpty(safe)) safe = "band";
+        await JS.InvokeVoidAsync("festivalRiderCsv.downloadText", $"band-{safe}.csv", "text/csv;charset=utf-8", csv);
+    }
+
+    private async Task ImportCsv(InputFileChangeEventArgs e)
+    {
+        if (_band is null) return;
+        try
+        {
+            await using var s = e.File.OpenReadStream(5 * 1024 * 1024);
+            using var reader = new StreamReader(s);
+            var csv = await reader.ReadToEndAsync();
+            var imported = Export.ImportBandCsv(csv);
+            // Preserve the route's band id so the page stays on the same record.
+            imported.Id = _band.Id;
+            imported.UpdatedAt = DateTimeOffset.UtcNow;
+            BandService.UpdateBand(imported);
+            _band = BandService.FindBand(_band.Id);
+            Toasts.Show($"Imported \"{imported.Name}\" from CSV.", ToastLevel.Success);
+        }
+        catch (Exception ex)
+        {
+            Toasts.Show($"Import failed: {ex.Message}", ToastLevel.Error);
+        }
     }
 
     private void GoBack() => Nav.NavigateTo("/");
