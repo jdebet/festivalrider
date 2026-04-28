@@ -6,7 +6,11 @@ public interface IExportService
 {
     string ExportBandCsv(Band band);
     Band ImportBandCsv(string csv);
+
+    string ExportShowCsv(ShowData show);
+    ShowData ImportShowCsv(string csv);
+
     string ExportRunningOrderCsv(RunningOrder order);
-    string ExportRunningOrderByStageCsv(RunningOrder order, string stage);
+    string ExportRunningOrderByStageCsv(RunningOrder order, int stageId);
     string ExportRunningOrderByBandCsv(RunningOrder order, Guid bandId);
 }

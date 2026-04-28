@@ -1,3 +1,6 @@
+using System.Globalization;
+using CsvHelper;
+using CsvHelper.Configuration;
 using FestivalRider.Models;
 using Microsoft.Extensions.Logging;
 
@@ -6,15 +9,565 @@ namespace FestivalRider.Services;
 public class ExportService : IExportService
 {
     private readonly ILogger<ExportService> _logger;
+    private readonly IBandService _bands;
 
-    public ExportService(ILogger<ExportService> logger)
+    private static readonly CsvConfiguration Config = new(CultureInfo.InvariantCulture)
+    {
+        HasHeaderRecord = true,
+        NewLine = "\n",
+    };
+
+    public ExportService(ILogger<ExportService> logger, IBandService bands)
     {
         _logger = logger;
+        _bands = bands;
     }
 
-    public string ExportBandCsv(Band band) => throw new NotImplementedException();
-    public Band ImportBandCsv(string csv) => throw new NotImplementedException();
-    public string ExportRunningOrderCsv(RunningOrder order) => throw new NotImplementedException();
-    public string ExportRunningOrderByStageCsv(RunningOrder order, string stage) => throw new NotImplementedException();
-    public string ExportRunningOrderByBandCsv(RunningOrder order, Guid bandId) => throw new NotImplementedException();
+    private sealed class Row
+    {
+        public string Section { get; set; } = string.Empty;
+        public string Key { get; set; } = string.Empty;
+        public string Value { get; set; } = string.Empty;
+        public string Index { get; set; } = string.Empty;
+        public string Notes { get; set; } = string.Empty;
+    }
+
+    // ---- low-level CSV ----
+
+    private static string Write(IEnumerable<Row> rows)
+    {
+        using var sw = new StringWriter { NewLine = "\n" };
+        using (var csv = new CsvWriter(sw, Config))
+        {
+            csv.WriteHeader<Row>();
+            csv.NextRecord();
+            foreach (var r in rows)
+            {
+                csv.WriteRecord(r);
+                csv.NextRecord();
+            }
+        }
+        return sw.ToString();
+    }
+
+    private static List<Row> Read(string csv)
+    {
+        using var sr = new StringReader(csv);
+        using var rd = new CsvReader(sr, Config);
+        return rd.GetRecords<Row>().ToList();
+    }
+
+    // ---- helpers ----
+
+    private static string Inv(decimal d) => d.ToString(CultureInfo.InvariantCulture);
+    private static string Inv(decimal? d) => d?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+    private static string Inv(int i) => i.ToString(CultureInfo.InvariantCulture);
+    private static string IsoDateTime(DateTimeOffset d) => d.ToString("o", CultureInfo.InvariantCulture);
+    private static string IsoDate(DateOnly d) => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    private static string? NullIfEmpty(string s) => string.IsNullOrEmpty(s) ? null : s;
+
+    private static int ParseInt(string s, int fallback = 0) =>
+        int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) ? v : fallback;
+
+    private static decimal ParseDec(string s, decimal fallback = 0m) =>
+        decimal.TryParse(s, NumberStyles.Number, CultureInfo.InvariantCulture, out var v) ? v : fallback;
+
+    private static decimal? ParseDecNullable(string s) =>
+        string.IsNullOrEmpty(s) ? null :
+            decimal.TryParse(s, NumberStyles.Number, CultureInfo.InvariantCulture, out var v) ? v : null;
+
+    private static bool ParseBool(string s) =>
+        bool.TryParse(s, out var v) && v;
+
+    private static T ParseEnum<T>(string s, T fallback) where T : struct, Enum =>
+        Enum.TryParse<T>(s, ignoreCase: true, out var v) ? v : fallback;
+
+    private static Guid ParseGuid(string s, Guid fallback) =>
+        Guid.TryParse(s, out var v) ? v : fallback;
+
+    private static DateTimeOffset ParseDateTimeOffset(string s, DateTimeOffset fallback) =>
+        DateTimeOffset.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var v)
+            ? v : fallback;
+
+    private static DateOnly ParseDateOnly(string s, DateOnly fallback) =>
+        DateOnly.TryParseExact(s, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var v)
+            ? v : fallback;
+
+    private sealed class RowIndex
+    {
+        public Dictionary<string, List<Row>> BySection { get; } = new();
+        public RowIndex(IEnumerable<Row> rows)
+        {
+            foreach (var r in rows)
+            {
+                if (!BySection.TryGetValue(r.Section, out var list))
+                    BySection[r.Section] = list = new List<Row>();
+                list.Add(r);
+            }
+        }
+        public string Scalar(string section, string key)
+            => BySection.TryGetValue(section, out var list)
+                ? list.FirstOrDefault(r => r.Key == key && string.IsNullOrEmpty(r.Index))?.Value ?? string.Empty
+                : string.Empty;
+        public IEnumerable<IGrouping<string, Row>> Indexed(string section)
+            => BySection.TryGetValue(section, out var list)
+                ? list.Where(r => !string.IsNullOrEmpty(r.Index))
+                      .GroupBy(r => r.Index)
+                      .OrderBy(g => ParseInt(g.Key))
+                : Enumerable.Empty<IGrouping<string, Row>>();
+        public IEnumerable<Row> Repeated(string section, string key)
+            => BySection.TryGetValue(section, out var list)
+                ? list.Where(r => r.Key == key)
+                      .OrderBy(r => ParseInt(r.Index))
+                : Enumerable.Empty<Row>();
+    }
+
+    private static string GroupVal(IGrouping<string, Row> g, string key)
+        => g.FirstOrDefault(r => r.Key == key)?.Value ?? string.Empty;
+
+    // ---- Band CSV ----
+
+    public string ExportBandCsv(Band b)
+    {
+        var rows = new List<Row>();
+        void S(string section, string key, string value, string index = "")
+            => rows.Add(new Row { Section = section, Key = key, Value = value, Index = index });
+
+        // Band
+        S("Band", "Id", b.Id.ToString());
+        S("Band", "Name", b.Name);
+        S("Band", "Notes", b.Notes ?? string.Empty);
+        S("Band", "CreatedAt", IsoDateTime(b.CreatedAt));
+        S("Band", "UpdatedAt", IsoDateTime(b.UpdatedAt));
+
+        // Contact
+        for (var i = 0; i < b.Contacts.Count; i++)
+        {
+            var c = b.Contacts[i]; var idx = Inv(i);
+            S("Contact", "Role", c.Role.ToString(), idx);
+            S("Contact", "Name", c.Name, idx);
+            S("Contact", "Email", c.Email ?? string.Empty, idx);
+            S("Contact", "Phone", c.Phone ?? string.Empty, idx);
+        }
+
+        // TravelParty
+        for (var i = 0; i < b.TravelParty.Members.Count; i++)
+        {
+            var p = b.TravelParty.Members[i]; var idx = Inv(i);
+            S("TravelParty", "Type", p.Type.ToString(), idx);
+            S("TravelParty", "Role", p.Role, idx);
+            S("TravelParty", "Name", p.Name, idx);
+        }
+
+        var t = b.Rider.Tech;
+
+        // Tech.Cable
+        for (var i = 0; i < t.Cables.Count; i++)
+        {
+            var c = t.Cables[i]; var idx = Inv(i);
+            S("Tech.Cable", "Source", c.Source.ToString(), idx);
+            if (c.Source == CablePoint.Other)
+                S("Tech.Cable", "SourceOther", c.SourceOther ?? string.Empty, idx);
+            S("Tech.Cable", "Target", c.Target.ToString(), idx);
+            if (c.Target == CablePoint.Other)
+                S("Tech.Cable", "TargetOther", c.TargetOther ?? string.Empty, idx);
+            S("Tech.Cable", "Type", c.Type.ToString(), idx);
+            if (c.Type == CableType.Other)
+                S("Tech.Cable", "TypeOther", c.TypeOther ?? string.Empty, idx);
+            S("Tech.Cable", "CategoryOrSpec", c.CategoryOrSpec ?? string.Empty, idx);
+            S("Tech.Cable", "MinLengthMeters", Inv(c.MinLengthMeters), idx);
+            S("Tech.Cable", "Provider", c.Provider.ToString(), idx);
+        }
+
+        // Tech.Lighting
+        var l = t.Lighting;
+        S("Tech.Lighting", "OwnConsoleModel", l.OwnConsoleModel ?? string.Empty);
+        S("Tech.Lighting", "BackdropWidthMeters", Inv(l.BackdropWidthMeters));
+        S("Tech.Lighting", "BackdropHeightMeters", Inv(l.BackdropHeightMeters));
+
+        // Tech.LightingMachine
+        for (var i = 0; i < l.FloorMachines.Count; i++)
+        {
+            var m = l.FloorMachines[i]; var idx = Inv(i);
+            S("Tech.LightingMachine", "Name", m.Name, idx);
+            S("Tech.LightingMachine", "Count", Inv(m.Count), idx);
+        }
+
+        // Tech.Power
+        var pw = t.Power;
+        S("Tech.Power", "Amperage", pw.Amperage.ToString());
+        S("Tech.Power", "Phase", pw.Phase.ToString());
+        S("Tech.Power", "AdapterNotes", pw.AdapterNotes ?? string.Empty);
+
+        // Tech.Foh
+        var f = t.Foh;
+        S("Tech.Foh", "OwnConsoleModel", f.OwnConsoleModel ?? string.Empty);
+        S("Tech.Foh", "OutputProtocol", f.OutputProtocol.ToString());
+        S("Tech.Foh", "OutputLocation", f.OutputLocation.ToString());
+        S("Tech.Foh", "OutputNotes", f.OutputNotes ?? string.Empty);
+        S("Tech.Foh", "AdditionalHardware", f.AdditionalHardware ?? string.Empty);
+        S("Tech.Foh", "StageToFohSendCount", Inv(f.StageToFohSendCount));
+        S("Tech.Foh", "StageToFohRoundTrip", f.StageToFohRoundTrip.ToString());
+        S("Tech.Foh", "FootprintWidthMeters", Inv(f.FootprintWidthMeters));
+        S("Tech.Foh", "FootprintLengthMeters", Inv(f.FootprintLengthMeters));
+        S("Tech.Foh", "Notes", f.Notes ?? string.Empty);
+
+        // Tech.Monitors
+        var mo = t.Monitors;
+        S("Tech.Monitors", "SourceMode", mo.SourceMode.ToString());
+        S("Tech.Monitors", "OwnConsoleModel", mo.OwnConsoleModel ?? string.Empty);
+        S("Tech.Monitors", "OwnConsoleLocation", mo.OwnConsoleLocation.ToString());
+        S("Tech.Monitors", "Notes", mo.Notes ?? string.Empty);
+
+        // Tech.MonitorWedge
+        for (var i = 0; i < mo.Wedges.Count; i++)
+        {
+            var w = mo.Wedges[i]; var idx = Inv(i);
+            S("Tech.MonitorWedge", "Where", w.Where, idx);
+            S("Tech.MonitorWedge", "DualLinked", w.DualLinked.ToString(), idx);
+            S("Tech.MonitorWedge", "Stereo", w.Stereo.ToString(), idx);
+            S("Tech.MonitorWedge", "DrumFill", w.DrumFill.ToString(), idx);
+        }
+
+        // Tech.InEar
+        for (var i = 0; i < mo.InEars.Count; i++)
+        {
+            var e = mo.InEars[i]; var idx = Inv(i);
+            S("Tech.InEar", "Where", e.Where, idx);
+            S("Tech.InEar", "IsWireless", e.IsWireless.ToString(), idx);
+            S("Tech.InEar", "Provider", e.Provider.ToString(), idx);
+            S("Tech.InEar", "Model", e.Model ?? string.Empty, idx);
+            S("Tech.InEar", "Frequency", e.Frequency ?? string.Empty, idx);
+        }
+
+        // Tech.Stage
+        var st = t.Stage;
+        S("Tech.Stage", "BringsOwnMics", st.BringsOwnMics.ToString());
+        S("Tech.Stage", "Notes", st.Notes ?? string.Empty);
+
+        // Tech.Riser
+        for (var i = 0; i < st.Risers.Count; i++)
+        {
+            var r = st.Risers[i]; var idx = Inv(i);
+            S("Tech.Riser", "Where", r.Where, idx);
+            S("Tech.Riser", "WidthMeters", Inv(r.WidthMeters), idx);
+            S("Tech.Riser", "LengthMeters", Inv(r.LengthMeters), idx);
+            S("Tech.Riser", "HeightCm", Inv(r.HeightCm), idx);
+        }
+
+        // Tech.OtherRiser
+        for (var i = 0; i < st.OtherRisers.Count; i++)
+        {
+            var o = st.OtherRisers[i]; var idx = Inv(i);
+            S("Tech.OtherRiser", "Where", o.Where, idx);
+            S("Tech.OtherRiser", "Type", o.Type.ToString(), idx);
+            if (o.Type == OtherRiserType.Custom)
+                S("Tech.OtherRiser", "Description", o.Description ?? string.Empty, idx);
+        }
+
+        // Tech.WirelessMic
+        for (var i = 0; i < st.WirelessMics.Count; i++)
+        {
+            var w = st.WirelessMics[i]; var idx = Inv(i);
+            S("Tech.WirelessMic", "Where", w.Where, idx);
+            S("Tech.WirelessMic", "Count", Inv(w.Count), idx);
+            S("Tech.WirelessMic", "Provider", w.Provider.ToString(), idx);
+            S("Tech.WirelessMic", "Model", w.Model ?? string.Empty, idx);
+            S("Tech.WirelessMic", "Frequency", w.Frequency ?? string.Empty, idx);
+        }
+
+        // Tech (root scalar)
+        S("Tech", "Notes", t.Notes ?? string.Empty);
+
+        // Hospitality
+        var h = b.Rider.Hospitality;
+        S("Hospitality", "DressingRoomNotes", h.DressingRoomNotes ?? string.Empty);
+        S("Hospitality", "CateringNotes", h.CateringNotes ?? string.Empty);
+        S("Hospitality", "DietaryRestrictions", h.DietaryRestrictions ?? string.Empty);
+        S("Hospitality", "TowelCount", Inv(h.TowelCount));
+        S("Hospitality", "ParkingSpaces", Inv(h.ParkingSpaces));
+        S("Hospitality", "Accommodations", h.Accommodations ?? string.Empty);
+        for (var i = 0; i < h.DrinksRequests.Count; i++)
+            S("Hospitality", "Drink", h.DrinksRequests[i], Inv(i));
+
+        return Write(rows);
+    }
+
+    public Band ImportBandCsv(string csv)
+    {
+        var idx = new RowIndex(Read(csv));
+        var band = new Band();
+
+        // Band
+        band.Id = ParseGuid(idx.Scalar("Band", "Id"), Guid.NewGuid());
+        band.Name = idx.Scalar("Band", "Name");
+        band.Notes = NullIfEmpty(idx.Scalar("Band", "Notes"));
+        band.CreatedAt = ParseDateTimeOffset(idx.Scalar("Band", "CreatedAt"), DateTimeOffset.UtcNow);
+        band.UpdatedAt = ParseDateTimeOffset(idx.Scalar("Band", "UpdatedAt"), DateTimeOffset.UtcNow);
+
+        // Contact
+        foreach (var g in idx.Indexed("Contact"))
+        {
+            band.Contacts.Add(new Contact
+            {
+                Role = ParseEnum(GroupVal(g, "Role"), ContactRole.Other),
+                Name = GroupVal(g, "Name"),
+                Email = NullIfEmpty(GroupVal(g, "Email")),
+                Phone = NullIfEmpty(GroupVal(g, "Phone")),
+            });
+        }
+
+        // TravelParty
+        foreach (var g in idx.Indexed("TravelParty"))
+        {
+            band.TravelParty.Members.Add(new Party
+            {
+                Type = ParseEnum(GroupVal(g, "Type"), PartyType.BandMember),
+                Role = GroupVal(g, "Role"),
+                Name = GroupVal(g, "Name"),
+            });
+        }
+
+        var t = band.Rider.Tech;
+
+        // Tech.Cable
+        foreach (var g in idx.Indexed("Tech.Cable"))
+        {
+            t.Cables.Add(new Cable
+            {
+                Source = ParseEnum(GroupVal(g, "Source"), CablePoint.SoundFoh),
+                SourceOther = NullIfEmpty(GroupVal(g, "SourceOther")),
+                Target = ParseEnum(GroupVal(g, "Target"), CablePoint.SoundFoh),
+                TargetOther = NullIfEmpty(GroupVal(g, "TargetOther")),
+                Type = ParseEnum(GroupVal(g, "Type"), CableType.RJ45),
+                TypeOther = NullIfEmpty(GroupVal(g, "TypeOther")),
+                CategoryOrSpec = NullIfEmpty(GroupVal(g, "CategoryOrSpec")),
+                MinLengthMeters = ParseDecNullable(GroupVal(g, "MinLengthMeters")),
+                Provider = ParseEnum(GroupVal(g, "Provider"), CableProvider.Venue),
+            });
+        }
+
+        // Tech.Lighting
+        t.Lighting.OwnConsoleModel = NullIfEmpty(idx.Scalar("Tech.Lighting", "OwnConsoleModel"));
+        t.Lighting.BackdropWidthMeters = ParseDecNullable(idx.Scalar("Tech.Lighting", "BackdropWidthMeters"));
+        t.Lighting.BackdropHeightMeters = ParseDecNullable(idx.Scalar("Tech.Lighting", "BackdropHeightMeters"));
+
+        foreach (var g in idx.Indexed("Tech.LightingMachine"))
+        {
+            t.Lighting.FloorMachines.Add(new LightingMachine
+            {
+                Name = GroupVal(g, "Name"),
+                Count = ParseInt(GroupVal(g, "Count")),
+            });
+        }
+
+        // Tech.Power
+        t.Power.Amperage = ParseEnum(idx.Scalar("Tech.Power", "Amperage"), PowerAmperage._16_A);
+        t.Power.Phase = ParseEnum(idx.Scalar("Tech.Power", "Phase"), PowerPhase.SinglePhase);
+        t.Power.AdapterNotes = NullIfEmpty(idx.Scalar("Tech.Power", "AdapterNotes"));
+
+        // Tech.Foh
+        var f = t.Foh;
+        f.OwnConsoleModel = NullIfEmpty(idx.Scalar("Tech.Foh", "OwnConsoleModel"));
+        f.OutputProtocol = ParseEnum(idx.Scalar("Tech.Foh", "OutputProtocol"), OutputProtocol.Aes);
+        f.OutputLocation = ParseEnum(idx.Scalar("Tech.Foh", "OutputLocation"), OutputLocation.Foh);
+        f.OutputNotes = NullIfEmpty(idx.Scalar("Tech.Foh", "OutputNotes"));
+        f.AdditionalHardware = NullIfEmpty(idx.Scalar("Tech.Foh", "AdditionalHardware"));
+        f.StageToFohSendCount = ParseInt(idx.Scalar("Tech.Foh", "StageToFohSendCount"));
+        f.StageToFohRoundTrip = ParseBool(idx.Scalar("Tech.Foh", "StageToFohRoundTrip"));
+        f.FootprintWidthMeters = ParseDecNullable(idx.Scalar("Tech.Foh", "FootprintWidthMeters"));
+        f.FootprintLengthMeters = ParseDecNullable(idx.Scalar("Tech.Foh", "FootprintLengthMeters"));
+        f.Notes = NullIfEmpty(idx.Scalar("Tech.Foh", "Notes"));
+
+        // Tech.Monitors
+        var mo = t.Monitors;
+        mo.SourceMode = ParseEnum(idx.Scalar("Tech.Monitors", "SourceMode"), MonitorSourceMode.None);
+        mo.OwnConsoleModel = NullIfEmpty(idx.Scalar("Tech.Monitors", "OwnConsoleModel"));
+        mo.OwnConsoleLocation = ParseEnum(idx.Scalar("Tech.Monitors", "OwnConsoleLocation"), MonitorTechLocation.OnStage);
+        mo.Notes = NullIfEmpty(idx.Scalar("Tech.Monitors", "Notes"));
+
+        foreach (var g in idx.Indexed("Tech.MonitorWedge"))
+        {
+            mo.Wedges.Add(new MonitorWedge
+            {
+                Where = GroupVal(g, "Where"),
+                DualLinked = ParseBool(GroupVal(g, "DualLinked")),
+                Stereo = ParseBool(GroupVal(g, "Stereo")),
+                DrumFill = ParseBool(GroupVal(g, "DrumFill")),
+            });
+        }
+
+        foreach (var g in idx.Indexed("Tech.InEar"))
+        {
+            mo.InEars.Add(new InEarMonitor
+            {
+                Where = GroupVal(g, "Where"),
+                IsWireless = ParseBool(GroupVal(g, "IsWireless")),
+                Provider = ParseEnum(GroupVal(g, "Provider"), CableProvider.Venue),
+                Model = NullIfEmpty(GroupVal(g, "Model")),
+                Frequency = NullIfEmpty(GroupVal(g, "Frequency")),
+            });
+        }
+
+        // Tech.Stage
+        var st = t.Stage;
+        st.BringsOwnMics = ParseBool(idx.Scalar("Tech.Stage", "BringsOwnMics"));
+        st.Notes = NullIfEmpty(idx.Scalar("Tech.Stage", "Notes"));
+
+        foreach (var g in idx.Indexed("Tech.Riser"))
+        {
+            st.Risers.Add(new Riser
+            {
+                Where = GroupVal(g, "Where"),
+                WidthMeters = ParseDec(GroupVal(g, "WidthMeters")),
+                LengthMeters = ParseDec(GroupVal(g, "LengthMeters")),
+                HeightCm = ParseInt(GroupVal(g, "HeightCm")),
+            });
+        }
+
+        foreach (var g in idx.Indexed("Tech.OtherRiser"))
+        {
+            st.OtherRisers.Add(new OtherRiser
+            {
+                Where = GroupVal(g, "Where"),
+                Type = ParseEnum(GroupVal(g, "Type"), OtherRiserType.EgoRiser),
+                Description = NullIfEmpty(GroupVal(g, "Description")),
+            });
+        }
+
+        foreach (var g in idx.Indexed("Tech.WirelessMic"))
+        {
+            st.WirelessMics.Add(new WirelessMic
+            {
+                Where = GroupVal(g, "Where"),
+                Count = ParseInt(GroupVal(g, "Count")),
+                Provider = ParseEnum(GroupVal(g, "Provider"), CableProvider.Venue),
+                Model = NullIfEmpty(GroupVal(g, "Model")),
+                Frequency = NullIfEmpty(GroupVal(g, "Frequency")),
+            });
+        }
+
+        // Tech root
+        t.Notes = NullIfEmpty(idx.Scalar("Tech", "Notes"));
+
+        // Hospitality
+        var h = band.Rider.Hospitality;
+        h.DressingRoomNotes = NullIfEmpty(idx.Scalar("Hospitality", "DressingRoomNotes"));
+        h.CateringNotes = NullIfEmpty(idx.Scalar("Hospitality", "CateringNotes"));
+        h.DietaryRestrictions = NullIfEmpty(idx.Scalar("Hospitality", "DietaryRestrictions"));
+        h.TowelCount = ParseInt(idx.Scalar("Hospitality", "TowelCount"));
+        h.ParkingSpaces = ParseInt(idx.Scalar("Hospitality", "ParkingSpaces"));
+        h.Accommodations = NullIfEmpty(idx.Scalar("Hospitality", "Accommodations"));
+        foreach (var r in idx.Repeated("Hospitality", "Drink"))
+            h.DrinksRequests.Add(r.Value);
+
+        return band;
+    }
+
+    // ---- Show CSV ----
+
+    public string ExportShowCsv(ShowData show)
+    {
+        var rows = new List<Row>();
+        void S(string section, string key, string value, string index = "")
+            => rows.Add(new Row { Section = section, Key = key, Value = value, Index = index });
+
+        S("Show", "Name", show.Name);
+        S("Show", "Address", show.Address ?? string.Empty);
+        S("Show", "DateOfOpening", IsoDate(show.DateOfOpening));
+        S("Show", "ShowDayCount", Inv(show.ShowDayCount));
+
+        for (var i = 0; i < show.Stages.Count; i++)
+        {
+            var s = show.Stages[i]; var idx = Inv(i);
+            S("Show.Stage", "Id", Inv(s.Id), idx);
+            S("Show.Stage", "Name", s.Name, idx);
+        }
+
+        return Write(rows);
+    }
+
+    public ShowData ImportShowCsv(string csv)
+    {
+        var idx = new RowIndex(Read(csv));
+        var show = new ShowData
+        {
+            Name = idx.Scalar("Show", "Name"),
+            Address = NullIfEmpty(idx.Scalar("Show", "Address")),
+            DateOfOpening = ParseDateOnly(idx.Scalar("Show", "DateOfOpening"), DateOnly.FromDateTime(DateTime.UtcNow)),
+            ShowDayCount = ParseInt(idx.Scalar("Show", "ShowDayCount"), 1),
+        };
+        foreach (var g in idx.Indexed("Show.Stage"))
+        {
+            show.Stages.Add(new Stage
+            {
+                Id = ParseInt(GroupVal(g, "Id")),
+                Name = GroupVal(g, "Name"),
+            });
+        }
+        return show;
+    }
+
+    // ---- Running order CSV ----
+
+    private sealed class SlotRow
+    {
+        public string Stage { get; set; } = string.Empty;
+        public string StartTime { get; set; } = string.Empty;
+        public string BandName { get; set; } = string.Empty;
+        public string SetLengthMinutes { get; set; } = string.Empty;
+        public string ChangeoverMinutes { get; set; } = string.Empty;
+        public string Notes { get; set; } = string.Empty;
+    }
+
+    private static readonly CsvConfiguration SlotConfig = new(CultureInfo.InvariantCulture)
+    {
+        HasHeaderRecord = true,
+        NewLine = "\n",
+    };
+
+    private string ResolveStageName(int stageId) =>
+        _bands.FindStage(stageId)?.Name ?? "Unknown stage";
+
+    private string ResolveBandName(Guid bandId) =>
+        _bands.FindBand(bandId)?.Name ?? "Unknown band";
+
+    private string WriteSlotRows(IEnumerable<RunningOrderSlot> slots)
+    {
+        // Stable ordering: by start time then stage name so diffs stay readable.
+        var ordered = slots
+            .OrderBy(s => s.StartTime)
+            .ThenBy(s => ResolveStageName(s.StageId), StringComparer.Ordinal);
+
+        using var sw = new StringWriter { NewLine = "\n" };
+        using (var csv = new CsvWriter(sw, SlotConfig))
+        {
+            csv.WriteHeader<SlotRow>();
+            csv.NextRecord();
+            foreach (var s in ordered)
+            {
+                csv.WriteRecord(new SlotRow
+                {
+                    Stage = ResolveStageName(s.StageId),
+                    StartTime = s.StartTime.ToString("HH:mm", CultureInfo.InvariantCulture),
+                    BandName = ResolveBandName(s.BandId),
+                    SetLengthMinutes = Inv(s.SetLengthMinutes),
+                    ChangeoverMinutes = Inv(s.ChangeoverMinutes),
+                    Notes = s.Notes ?? string.Empty,
+                });
+                csv.NextRecord();
+            }
+        }
+        return sw.ToString();
+    }
+
+    public string ExportRunningOrderCsv(RunningOrder order)
+        => WriteSlotRows(order.Slots);
+
+    public string ExportRunningOrderByStageCsv(RunningOrder order, int stageId)
+        => WriteSlotRows(order.Slots.Where(s => s.StageId == stageId));
+
+    public string ExportRunningOrderByBandCsv(RunningOrder order, Guid bandId)
+        => WriteSlotRows(order.Slots.Where(s => s.BandId == bandId));
 }

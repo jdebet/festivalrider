@@ -1,0 +1,361 @@
+@page "/running-order"
+@using RoModel = FestivalRider.Models.RunningOrder
+@implements IDisposable
+@inject IBandService BandService
+@inject IExportService Export
+@inject IToastService Toasts
+@inject IJSRuntime JS
+
+<PageTitle>Running order · FestivalRider</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 m-0">Running order</h1>
+    <button class="btn btn-primary" @onclick="AddRunningOrder">+ New running order</button>
+</div>
+
+@if (_show.Stages.Count == 0)
+{
+    <div class="alert alert-warning">
+        No stages defined. Add stages in <a href="settings">Settings</a> before scheduling slots.
+    </div>
+}
+@if (BandService.Bands.Count == 0)
+{
+    <div class="alert alert-warning">
+        No bands yet. Add bands on the <a href="">Bands</a> page before scheduling slots.
+    </div>
+}
+
+@if (BandService.RunningOrders.Count == 0)
+{
+    <div class="alert alert-info">No running orders yet. Click <strong>New running order</strong> to add one.</div>
+}
+else
+{
+    @foreach (var order in BandService.RunningOrders.OrderBy(o => o.ShowDayNumber))
+    {
+        <RiderSection Title="@TitleFor(order)">
+            @{ var ro = order; }
+            <div class="row g-2 align-items-end mb-3">
+                <div class="col-md-3">
+                    <label class="form-label">Show day number</label>
+                    <input type="number" min="1" max="@_show.ShowDayCount" class="form-control"
+                           value="@ro.ShowDayNumber"
+                           @onchange="e => OnDayChanged(ro, e)" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Computed date</label>
+                    <input class="form-control" readonly value="@FormatDate(ro)" />
+                </div>
+                <div class="col-md-5 text-md-end">
+                    <button class="btn btn-outline-primary me-2"
+                            @onclick="() => ExportFull(ro)">Export CSV</button>
+                    <button class="btn btn-outline-danger"
+                            @onclick="() => RequestDelete(ro.Id)">Delete</button>
+                </div>
+            </div>
+
+            @if (ro.Slots.Count == 0)
+            {
+                <div class="text-muted small mb-2">No slots yet.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th style="width: 18%">Stage</th>
+                                <th style="width: 12%">Start</th>
+                                <th style="width: 22%">Band</th>
+                                <th style="width: 10%">Set min</th>
+                                <th style="width: 10%">Changeover</th>
+                                <th>Notes</th>
+                                <th style="width: 60px"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (var i = 0; i < ro.Slots.Count; i++)
+                            {
+                                var idx = i;
+                                var slot = ro.Slots[idx];
+                                <tr @key="(ro.Id, idx)">
+                                    <td>
+                                        <select class="form-select form-select-sm"
+                                                value="@slot.StageId"
+                                                @onchange="e => UpdateSlot(ro, idx, s => s with { StageId = ParseInt(e.Value) })">
+                                            @if (BandService.FindStage(slot.StageId) is null)
+                                            {
+                                                <option value="@slot.StageId" selected>Unknown stage (#@slot.StageId)</option>
+                                            }
+                                            @foreach (var st in _show.Stages)
+                                            {
+                                                <option value="@st.Id">@st.Name (#@st.Id)</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input type="time" class="form-control form-control-sm"
+                                               value="@slot.StartTime.ToString("HH:mm")"
+                                               @onchange="e => UpdateSlot(ro, idx, s => s with { StartTime = ParseTime(e.Value, s.StartTime) })" />
+                                    </td>
+                                    <td>
+                                        <select class="form-select form-select-sm"
+                                                value="@slot.BandId"
+                                                @onchange="e => UpdateSlot(ro, idx, s => s with { BandId = ParseGuid(e.Value, s.BandId) })">
+                                            @if (BandService.FindBand(slot.BandId) is null)
+                                            {
+                                                <option value="@slot.BandId" selected>Unknown band</option>
+                                            }
+                                            @foreach (var b in BandService.Bands)
+                                            {
+                                                <option value="@b.Id">@b.Name</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input type="number" min="0" class="form-control form-control-sm"
+                                               value="@slot.SetLengthMinutes"
+                                               @onchange="e => UpdateSlot(ro, idx, s => s with { SetLengthMinutes = ParseInt(e.Value) })" />
+                                    </td>
+                                    <td>
+                                        <input type="number" min="0" class="form-control form-control-sm"
+                                               value="@slot.ChangeoverMinutes"
+                                               @onchange="e => UpdateSlot(ro, idx, s => s with { ChangeoverMinutes = ParseInt(e.Value) })" />
+                                    </td>
+                                    <td>
+                                        <input class="form-control form-control-sm"
+                                               value="@(slot.Notes ?? string.Empty)"
+                                               @onchange="e => UpdateSlot(ro, idx, s => s with { Notes = NullIfEmpty((string?)e.Value) })" />
+                                    </td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-danger"
+                                                @onclick="() => RemoveSlot(ro, idx)" title="Remove slot">×</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+
+            <div class="d-flex flex-wrap gap-2 align-items-end">
+                <button class="btn btn-outline-primary" @onclick="() => AddSlot(ro)"
+                        disabled="@(BandService.Bands.Count == 0 || _show.Stages.Count == 0)">+ Add slot</button>
+
+                @{
+                    var stagesUsed = ro.Slots.Select(s => s.StageId).Distinct().ToList();
+                    var bandsUsed = ro.Slots.Select(s => s.BandId).Distinct().ToList();
+                }
+
+                @if (stagesUsed.Count > 0)
+                {
+                    <div class="input-group" style="max-width: 320px;">
+                        <span class="input-group-text">Stage</span>
+                        <select class="form-select" @bind="_byStageSelection[ro.Id]">
+                            <option value="0">— pick stage —</option>
+                            @foreach (var sid in stagesUsed)
+                            {
+                                <option value="@sid">@(BandService.FindStage(sid)?.Name ?? $"Unknown #{sid}")</option>
+                            }
+                        </select>
+                        <button class="btn btn-outline-secondary"
+                                @onclick="() => ExportByStage(ro)">Export</button>
+                    </div>
+                }
+
+                @if (bandsUsed.Count > 0)
+                {
+                    <div class="input-group" style="max-width: 360px;">
+                        <span class="input-group-text">Band</span>
+                        <select class="form-select" @bind="_byBandSelection[ro.Id]">
+                            <option value="@Guid.Empty">— pick band —</option>
+                            @foreach (var bid in bandsUsed)
+                            {
+                                <option value="@bid">@(BandService.FindBand(bid)?.Name ?? "Unknown band")</option>
+                            }
+                        </select>
+                        <button class="btn btn-outline-secondary"
+                                @onclick="() => ExportByBand(ro)">Export</button>
+                    </div>
+                }
+            </div>
+        </RiderSection>
+    }
+}
+
+<ConfirmDialog Show="_pendingDeleteId.HasValue"
+               Title="Delete running order"
+               Message="@_deleteMessage"
+               ConfirmLabel="Delete"
+               OnConfirm="ConfirmDelete"
+               OnCancel="() => _pendingDeleteId = null" />
+
+@code {
+    private ShowData _show = new();
+    private Guid? _pendingDeleteId;
+    private string _deleteMessage = string.Empty;
+
+    private readonly Dictionary<Guid, int> _byStageSelection = new();
+    private readonly Dictionary<Guid, Guid> _byBandSelection = new();
+
+    protected override void OnInitialized()
+    {
+        BandService.OnChange += HandleChange;
+        Reload();
+    }
+
+    private void HandleChange()
+    {
+        Reload();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void Reload()
+    {
+        _show = BandService.Snapshot().ShowData;
+        foreach (var o in BandService.RunningOrders)
+        {
+            _byStageSelection.TryAdd(o.Id, 0);
+            _byBandSelection.TryAdd(o.Id, Guid.Empty);
+        }
+    }
+
+    private string TitleFor(RoModel ro)
+    {
+        var date = FormatDate(ro);
+        var slotWord = ro.Slots.Count == 1 ? "slot" : "slots";
+        return string.IsNullOrEmpty(date)
+            ? $"Day {ro.ShowDayNumber} ({ro.Slots.Count} {slotWord})"
+            : $"Day {ro.ShowDayNumber} · {date} ({ro.Slots.Count} {slotWord})";
+    }
+
+    private string FormatDate(RoModel ro)
+    {
+        if (_show.DateOfOpening == default) return string.Empty;
+        var date = _show.DateOfOpening.AddDays(ro.ShowDayNumber - 1);
+        return date.ToString("ddd dd MMM yyyy");
+    }
+
+    private void AddRunningOrder()
+    {
+        var nextDay = BandService.RunningOrders.Count == 0
+            ? 1
+            : Math.Min(_show.ShowDayCount, BandService.RunningOrders.Max(o => o.ShowDayNumber) + 1);
+        var ro = new RoModel { ShowDayNumber = Math.Max(1, nextDay) };
+        BandService.AddRunningOrder(ro);
+    }
+
+    private void OnDayChanged(RoModel ro, ChangeEventArgs e)
+    {
+        var v = ParseInt(e.Value);
+        if (v < 1) v = 1;
+        if (v > _show.ShowDayCount) v = _show.ShowDayCount;
+        ro.ShowDayNumber = v;
+        BandService.UpdateRunningOrder(ro);
+    }
+
+    private void AddSlot(RoModel ro)
+    {
+        var stageId = _show.Stages.FirstOrDefault()?.Id ?? 0;
+        var bandId = BandService.Bands.FirstOrDefault()?.Id ?? Guid.Empty;
+        ro.Slots.Add(new RunningOrderSlot(bandId, stageId, new TimeOnly(12, 0), 45, 15, null));
+        BandService.UpdateRunningOrder(ro);
+    }
+
+    private void RemoveSlot(RoModel ro, int idx)
+    {
+        if (idx < 0 || idx >= ro.Slots.Count) return;
+        ro.Slots.RemoveAt(idx);
+        BandService.UpdateRunningOrder(ro);
+    }
+
+    private void UpdateSlot(RoModel ro, int idx, Func<RunningOrderSlot, RunningOrderSlot> mutator)
+    {
+        if (idx < 0 || idx >= ro.Slots.Count) return;
+        ro.Slots[idx] = mutator(ro.Slots[idx]);
+        BandService.UpdateRunningOrder(ro);
+    }
+
+    private void RequestDelete(Guid id)
+    {
+        var ro = BandService.FindRunningOrder(id);
+        _pendingDeleteId = id;
+        _deleteMessage = ro is null
+            ? "Delete this running order?"
+            : $"Delete running order for day {ro.ShowDayNumber} ({ro.Slots.Count} slot(s))? This cannot be undone.";
+    }
+
+    private void ConfirmDelete()
+    {
+        if (_pendingDeleteId is { } id)
+        {
+            BandService.DeleteRunningOrder(id);
+            _byStageSelection.Remove(id);
+            _byBandSelection.Remove(id);
+        }
+        _pendingDeleteId = null;
+    }
+
+    private async Task ExportFull(RoModel ro)
+    {
+        var csv = Export.ExportRunningOrderCsv(ro);
+        await Download(csv, $"running-order-day{ro.ShowDayNumber}.csv");
+    }
+
+    private async Task ExportByStage(RoModel ro)
+    {
+        if (!_byStageSelection.TryGetValue(ro.Id, out var sid) || sid <= 0)
+        {
+            Toasts.Show("Pick a stage first.", ToastLevel.Info);
+            return;
+        }
+        var csv = Export.ExportRunningOrderByStageCsv(ro, sid);
+        var stageName = BandService.FindStage(sid)?.Name ?? $"stage-{sid}";
+        await Download(csv, $"running-order-day{ro.ShowDayNumber}-{Sanitize(stageName)}.csv");
+    }
+
+    private async Task ExportByBand(RoModel ro)
+    {
+        if (!_byBandSelection.TryGetValue(ro.Id, out var bid) || bid == Guid.Empty)
+        {
+            Toasts.Show("Pick a band first.", ToastLevel.Info);
+            return;
+        }
+        var csv = Export.ExportRunningOrderByBandCsv(ro, bid);
+        var bandName = BandService.FindBand(bid)?.Name ?? "band";
+        await Download(csv, $"running-order-day{ro.ShowDayNumber}-{Sanitize(bandName)}.csv");
+    }
+
+    private async Task Download(string text, string filename)
+    {
+        await JS.InvokeVoidAsync("festivalRiderCsv.downloadText", filename, "text/csv;charset=utf-8", text);
+    }
+
+    private static int ParseInt(object? value)
+    {
+        if (value is null) return 0;
+        return int.TryParse(value.ToString(), System.Globalization.NumberStyles.Integer,
+            System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 0;
+    }
+
+    private static Guid ParseGuid(object? value, Guid fallback)
+        => Guid.TryParse(value?.ToString(), out var g) ? g : fallback;
+
+    private static TimeOnly ParseTime(object? value, TimeOnly fallback)
+        => TimeOnly.TryParse(value?.ToString(), out var t) ? t : fallback;
+
+    private static string? NullIfEmpty(string? s)
+        => string.IsNullOrWhiteSpace(s) ? null : s;
+
+    private static string Sanitize(string s)
+    {
+        var safe = new string((s ?? "untitled").Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());
+        return string.IsNullOrWhiteSpace(safe) ? "untitled" : safe.Trim('-');
+    }
+
+    public void Dispose()
+    {
+        BandService.OnChange -= HandleChange;
+    }
+}
