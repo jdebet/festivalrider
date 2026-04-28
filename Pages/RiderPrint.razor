@@ -1,0 +1,77 @@
+@page "/print/{StrategyKey}/{ContextId}"
+@layout EmptyLayout
+@inject IEnumerable<IPrintStrategy> Strategies
+@inject IStorageService Storage
+@inject IPdfExportService Pdf
+@inject NavigationManager Nav
+
+@if (!_ready)
+{
+    <p class="p-3">Loading…</p>
+}
+else if (_strategy is null || _context is null)
+{
+    <div class="p-4">
+        <h1 class="h4">Not found</h1>
+        <p>No printable view for <code>@StrategyKey</code> / <code>@ContextId</code>.</p>
+        <button class="btn btn-outline-secondary" @onclick="GoBack">Back</button>
+    </div>
+}
+else
+{
+    <PageTitle>@_strategy.GetTitle(_context) · FestivalRider</PageTitle>
+    <div class="container py-3">
+        <div class="d-flex justify-content-between align-items-center mb-3 no-print">
+            <h1 class="h4 m-0">@_strategy.GetTitle(_context)</h1>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" @onclick="Print">Print</button>
+                <button class="btn btn-outline-secondary" @onclick="GoBack">Back</button>
+            </div>
+        </div>
+        @_strategy.Render(_context)
+    </div>
+}
+
+@code {
+    [Parameter] public string StrategyKey { get; set; } = string.Empty;
+    [Parameter] public string ContextId { get; set; } = string.Empty;
+
+    private bool _ready;
+    private IPrintStrategy? _strategy;
+    private object? _context;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _ready = false;
+        _strategy = null;
+        _context = null;
+
+        await Storage.EnsureLoadedAsync();
+
+        _strategy = Strategies.FirstOrDefault(s => string.Equals(s.Key, StrategyKey, StringComparison.OrdinalIgnoreCase));
+        _context = _strategy is null ? null : ParseContext(_strategy.Key, ContextId);
+
+        // Validate strategy can resolve the context (e.g., band exists). Strategies throw on miss.
+        if (_strategy is not null && _context is not null)
+        {
+            try { _strategy.GetTitle(_context); }
+            catch { _strategy = null; _context = null; }
+        }
+
+        _ready = true;
+    }
+
+    private static object? ParseContext(string key, string raw) => key switch
+    {
+        "band" => Guid.TryParse(raw, out var id) ? id : null,
+        _ => null,
+    };
+
+    private async Task Print()
+    {
+        if (_strategy is null || _context is null) return;
+        await Pdf.PrintAsync(_strategy, _context);
+    }
+
+    private void GoBack() => Nav.NavigateTo("/");
+}

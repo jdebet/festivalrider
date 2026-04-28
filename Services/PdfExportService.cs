@@ -1,18 +1,26 @@
 using FestivalRider.PrintStrategies;
 using Microsoft.Extensions.Logging;
+using Microsoft.JSInterop;
 
 namespace FestivalRider.Services;
 
 public class PdfExportService : IPdfExportService
 {
+    private readonly IJSRuntime _js;
     private readonly ILogger<PdfExportService> _logger;
 
-    public PdfExportService(ILogger<PdfExportService> logger)
+    public PdfExportService(IJSRuntime js, ILogger<PdfExportService> logger)
     {
+        _js = js;
         _logger = logger;
     }
 
-    public Task PrintAsync(IPrintStrategy strategy, object context) => Task.CompletedTask;
+    // Caller is responsible for navigating to /print/{strategy.Key}/{contextId} and awaiting render
+    // before invoking PrintAsync (e.g., RiderPrint.razor wires this to a visible "Print" button).
+    public async Task PrintAsync(IPrintStrategy strategy, object context)
+    {
+        await _js.InvokeVoidAsync("festivalRiderPrint.triggerPrint");
+    }
 
     public Task<byte[]?> RenderToPdfAsync(IPrintStrategy strategy, object context)
     {

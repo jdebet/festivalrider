@@ -1,0 +1,64 @@
+/* Print rules: hide nav and buttons, page-break per rider section, monochrome-friendly tables. */
+@media print {
+    nav,
+    .navbar,
+    .sidebar,
+    .navmenu,
+    .btn,
+    button,
+    .no-print,
+    #blazor-error-ui {
+        display: none !important;
+    }
+
+    body,
+    main,
+    .page,
+    .content,
+    article {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        color: #000 !important;
+    }
+
+    a {
+        color: #000 !important;
+        text-decoration: none !important;
+    }
+
+    .print-section {
+        page-break-inside: avoid;
+        break-inside: avoid;
+        margin-bottom: 1rem;
+    }
+
+    .print-section + .print-section {
+        page-break-before: auto;
+    }
+
+    h1, h2, h3, h4 {
+        page-break-after: avoid;
+        break-after: avoid;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        page-break-inside: auto;
+    }
+
+    table, th, td {
+        border: 1px solid #000 !important;
+        background: #fff !important;
+        color: #000 !important;
+    }
+
+    th, td {
+        padding: 2px 6px;
+    }
+
+    tr {
+        page-break-inside: avoid;
+    }
+}
