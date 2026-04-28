@@ -5,6 +5,7 @@
 @inject IExportService Export
 @inject IToastService Toasts
 @inject IJSRuntime JS
+@inject NavigationManager Nav
 
 <PageTitle>Running order · FestivalRider</PageTitle>
 
@@ -161,6 +162,8 @@ else
                         </select>
                         <button class="btn btn-outline-secondary"
                                 @onclick="() => ExportByStage(ro)">Export</button>
+                        <button class="btn btn-outline-secondary"
+                                @onclick="() => PrintStage(ro)">Print</button>
                     </div>
                 }
 
@@ -179,6 +182,18 @@ else
                                 @onclick="() => ExportByBand(ro)">Export</button>
                     </div>
                 }
+
+                <div class="input-group" style="max-width: 360px;">
+                    <span class="input-group-text">Role</span>
+                    <select class="form-select" @bind="_byRoleSelection[ro.Id]">
+                        @foreach (var r in Enum.GetValues<ContactRole>())
+                        {
+                            <option value="@r">@r</option>
+                        }
+                    </select>
+                    <button class="btn btn-outline-secondary"
+                            @onclick="() => PrintRole(ro)">Print</button>
+                </div>
             </div>
         </RiderSection>
     }
@@ -198,6 +213,7 @@ else
 
     private readonly Dictionary<Guid, int> _byStageSelection = new();
     private readonly Dictionary<Guid, Guid> _byBandSelection = new();
+    private readonly Dictionary<Guid, ContactRole> _byRoleSelection = new();
 
     protected override void OnInitialized()
     {
@@ -218,6 +234,7 @@ else
         {
             _byStageSelection.TryAdd(o.Id, 0);
             _byBandSelection.TryAdd(o.Id, Guid.Empty);
+            _byRoleSelection.TryAdd(o.Id, ContactRole.FOHEngineer);
         }
     }
 
@@ -293,6 +310,7 @@ else
             BandService.DeleteRunningOrder(id);
             _byStageSelection.Remove(id);
             _byBandSelection.Remove(id);
+            _byRoleSelection.Remove(id);
         }
         _pendingDeleteId = null;
     }
@@ -325,6 +343,22 @@ else
         var csv = Export.ExportRunningOrderByBandCsv(ro, bid);
         var bandName = BandService.FindBand(bid)?.Name ?? "band";
         await Download(csv, $"running-order-day{ro.ShowDayNumber}-{Sanitize(bandName)}.csv");
+    }
+
+    private void PrintStage(RoModel ro)
+    {
+        if (!_byStageSelection.TryGetValue(ro.Id, out var sid) || sid <= 0)
+        {
+            Toasts.Show("Pick a stage first.", ToastLevel.Info);
+            return;
+        }
+        Nav.NavigateTo($"print/stage/{ro.Id}:{sid}");
+    }
+
+    private void PrintRole(RoModel ro)
+    {
+        if (!_byRoleSelection.TryGetValue(ro.Id, out var role)) role = ContactRole.FOHEngineer;
+        Nav.NavigateTo($"print/role/{ro.Id}:{role}");
     }
 
     private async Task Download(string text, string filename)

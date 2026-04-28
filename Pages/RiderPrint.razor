@@ -64,8 +64,28 @@ else
     private static object? ParseContext(string key, string raw) => key switch
     {
         "band" => Guid.TryParse(raw, out var id) ? id : null,
+        "stage" => ParseStage(raw),
+        "role" => ParseRole(raw),
         _ => null,
     };
+
+    private static object? ParseStage(string raw)
+    {
+        var parts = raw.Split(':', 2);
+        if (parts.Length != 2) return null;
+        return Guid.TryParse(parts[0], out var id) && int.TryParse(parts[1], out var sid)
+            ? new FestivalRider.PrintStrategies.StageContext(id, sid)
+            : null;
+    }
+
+    private static object? ParseRole(string raw)
+    {
+        var parts = raw.Split(':', 2);
+        if (parts.Length != 2) return null;
+        return Guid.TryParse(parts[0], out var id) && Enum.TryParse<FestivalRider.Models.ContactRole>(parts[1], ignoreCase: true, out var role)
+            ? new FestivalRider.PrintStrategies.RoleContext(id, role)
+            : null;
+    }
 
     private async Task Print()
     {

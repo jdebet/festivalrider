@@ -18,5 +18,7 @@ builder.Services.AddScoped<IBundleService, BundleService>();
 builder.Services.AddScoped<IPdfExportService, PdfExportService>();
 
 builder.Services.AddScoped<IPrintStrategy, BandRiderPrintStrategy>();
+builder.Services.AddScoped<IPrintStrategy, StagePrintStrategy>();
+builder.Services.AddScoped<IPrintStrategy, RolePrintStrategy>();
 
 await builder.Build().RunAsync();
