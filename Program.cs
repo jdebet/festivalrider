@@ -13,6 +13,7 @@ builder.Services.AddScoped<IBandService, BandService>();
 builder.Services.AddScoped<IToastService, ToastService>();
 builder.Services.AddScoped<IStorageService, StorageService>();
 builder.Services.AddScoped<IExportService, ExportService>();
+builder.Services.AddScoped<IBundleService, BundleService>();
 builder.Services.AddScoped<IPdfExportService, PdfExportService>();
 
 await builder.Build().RunAsync();

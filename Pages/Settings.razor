@@ -1,8 +1,10 @@
 @page "/settings"
+@using System.Globalization
 @implements IDisposable
 @inject IBandService BandService
 @inject IStorageService Storage
 @inject IExportService Export
+@inject IBundleService Bundle
 @inject IToastService Toasts
 @inject IJSRuntime JS
 
@@ -107,6 +109,24 @@
     }
 </RiderSection>
 
+<RiderSection Title="Bundle">
+    <p class="text-muted small">Download a single <code>.zip</code> bundling the show, every band, and every running order. Importing replaces all current data.</p>
+    <div class="d-flex flex-wrap gap-2 mb-2">
+        <button type="button" class="btn btn-outline-primary" @onclick="ExportBundle">Export bundle</button>
+        <label class="btn btn-outline-secondary mb-0">
+            Import bundle
+            <InputFile OnChange="StageBundleImport" accept=".zip" class="d-none" />
+        </label>
+    </div>
+</RiderSection>
+
+<ConfirmDialog Show="_pendingBundle is not null"
+               Title="Replace all data"
+               Message="@_bundleConfirmMessage"
+               ConfirmLabel="Replace"
+               OnConfirm="ConfirmBundleImport"
+               OnCancel="() => _pendingBundle = null" />
+
 <RiderSection Title="Storage">
     <p class="text-muted small">
         Schema version: <strong>@_snapshot.SchemaVersion</strong>
@@ -141,6 +161,8 @@
     private int? _pendingDeleteStageId;
     private string _deleteStageMessage = string.Empty;
     private AppState _snapshot = new();
+    private BundleImportResult? _pendingBundle;
+    private string _bundleConfirmMessage = string.Empty;
 
     protected override void OnInitialized()
     {
@@ -289,6 +311,68 @@
     private async Task Download(string text, string filename)
     {
         await JS.InvokeVoidAsync("festivalRiderCsv.downloadText", filename, "text/csv;charset=utf-8", text);
+    }
+
+    private async Task ExportBundle()
+    {
+        var bytes = Bundle.ExportBundle(BandService.Snapshot());
+        var stamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+        var fname = $"festivalrider-{Sanitize(_show.Name)}-{stamp}.zip";
+        await JS.InvokeVoidAsync("festivalRiderCsv.downloadBytes", fname, "application/zip", bytes);
+        Toasts.Show($"Bundle exported ({bytes.Length / 1024} KB).", ToastLevel.Success);
+    }
+
+    private async Task StageBundleImport(InputFileChangeEventArgs e)
+    {
+        const long maxSize = 20L * 1024 * 1024;
+        BundleImportResult result;
+        try
+        {
+            await using var s = e.File.OpenReadStream(maxSize);
+            using var ms = new MemoryStream();
+            await s.CopyToAsync(ms);
+            ms.Position = 0;
+            result = Bundle.ImportBundle(ms);
+        }
+        catch (IOException)
+        {
+            Toasts.Show($"Bundle exceeds the {maxSize / (1024 * 1024)} MB limit.", ToastLevel.Error);
+            return;
+        }
+        catch (Exception ex)
+        {
+            Toasts.Show($"Bundle read failed: {ex.Message}", ToastLevel.Error);
+            return;
+        }
+
+        if (result.Error is not null || result.State is null)
+        {
+            Toasts.Show($"Bundle rejected: {result.Error}", ToastLevel.Error);
+            return;
+        }
+
+        _pendingBundle = result;
+        _bundleConfirmMessage =
+            $"Replace all current data with {result.BandCount} band(s) and {result.RunningOrderCount} running order(s) from the bundle?";
+    }
+
+    private void ConfirmBundleImport()
+    {
+        var result = _pendingBundle;
+        _pendingBundle = null;
+        if (result?.State is null) return;
+        BandService.ReplaceState(result.State);
+
+        var summary = $"Imported {result.BandCount} band(s), {result.RunningOrderCount} running order(s).";
+        if (result.Warnings.Count == 0)
+        {
+            Toasts.Show(summary, ToastLevel.Success);
+        }
+        else
+        {
+            var head = string.Join(" ", result.Warnings.Take(2));
+            Toasts.Show($"{summary} {head}", ToastLevel.Warning);
+        }
     }
 
     private static string Sanitize(string s)

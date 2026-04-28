@@ -570,4 +570,35 @@ public class ExportService : IExportService
 
     public string ExportRunningOrderByBandCsv(RunningOrder order, Guid bandId)
         => WriteSlotRows(order.Slots.Where(s => s.BandId == bandId));
+
+    public RunningOrder ImportRunningOrderCsv(string csv, ShowData show, IReadOnlyList<Band> bands)
+    {
+        using var sr = new StringReader(csv);
+        using var rd = new CsvReader(sr, SlotConfig);
+        var rows = rd.GetRecords<SlotRow>().ToList();
+
+        var stageByName = show.Stages
+            .GroupBy(s => s.Name, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.Ordinal);
+        var bandByName = bands
+            .GroupBy(b => b.Name, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.Ordinal);
+
+        var order = new RunningOrder();
+        foreach (var r in rows)
+        {
+            var stageId = stageByName.TryGetValue(r.Stage, out var sid) ? sid : 0;
+            var bandId = bandByName.TryGetValue(r.BandName, out var bid) ? bid : Guid.Empty;
+            var startTime = TimeOnly.TryParseExact(r.StartTime, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var t)
+                ? t : default;
+            order.Slots.Add(new RunningOrderSlot(
+                bandId,
+                stageId,
+                startTime,
+                ParseInt(r.SetLengthMinutes),
+                ParseInt(r.ChangeoverMinutes),
+                NullIfEmpty(r.Notes ?? string.Empty)));
+        }
+        return order;
+    }
 }

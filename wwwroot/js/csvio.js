@@ -1,7 +1,6 @@
 // Pure shims for CSV download. No logic.
 window.festivalRiderCsv = (function () {
-    function downloadText(filename, mime, text) {
-        const blob = new Blob([text], { type: mime || 'text/csv;charset=utf-8' });
+    function trigger(blob, filename) {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -11,5 +10,11 @@ window.festivalRiderCsv = (function () {
         a.remove();
         setTimeout(function () { URL.revokeObjectURL(url); }, 0);
     }
-    return { downloadText };
+    function downloadText(filename, mime, text) {
+        trigger(new Blob([text], { type: mime || 'text/csv;charset=utf-8' }), filename);
+    }
+    function downloadBytes(filename, mime, bytes) {
+        trigger(new Blob([bytes], { type: mime || 'application/octet-stream' }), filename);
+    }
+    return { downloadText, downloadBytes };
 })();
