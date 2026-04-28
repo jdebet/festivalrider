@@ -1,0 +1,46 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Publish
+        run: dotnet publish FestivalRider.csproj -c Release -o publish -p:BlazorWebAssemblyBaseHref=/FestivalRider/
+
+      # `BlazorWebAssemblyBaseHref` only rewrites index.html. Mirror the result
+      # into 404.html so GitHub Pages' SPA fallback boots Blazor with the
+      # correct <base href>.
+      - name: Build SPA 404 fallback
+        run: cp publish/wwwroot/index.html publish/wwwroot/404.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: publish/wwwroot
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

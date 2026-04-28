@@ -1,0 +1,48 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@if (_visible)
+{
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1090;">
+        <div class="toast show align-items-center text-bg-info border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    A new version of FestivalRider is available.
+                </div>
+                <button type="button" class="btn btn-sm btn-light me-2 my-auto" @onclick="Reload">Reload</button>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" aria-label="Dismiss" @onclick="Dismiss"></button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _visible;
+    private DotNetObjectReference<UpdateAvailableToast>? _ref;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _ref = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("swUpdate.register", _ref);
+        }
+    }
+
+    [JSInvokable]
+    public Task OnUpdateAvailable()
+    {
+        _visible = true;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private async Task Reload() => await JS.InvokeVoidAsync("swUpdate.reload");
+
+    private void Dismiss() => _visible = false;
+
+    public ValueTask DisposeAsync()
+    {
+        _ref?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

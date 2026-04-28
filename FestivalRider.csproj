@@ -17,4 +17,22 @@
         <ServiceWorker Include="wwwroot\service-worker.js" PublishedContent="wwwroot\service-worker.published.js"/>
     </ItemGroup>
 
+    <!--
+        Rewrites <base href="/"> in the published index.html and 404.html when
+        $(BlazorWebAssemblyBaseHref) is supplied (e.g. CI: -p:BlazorWebAssemblyBaseHref=/FestivalRider/).
+        Local dev publishes leave the base href untouched.
+    -->
+    <Target Name="RewriteBlazorWebAssemblyBaseHref" AfterTargets="Publish" Condition="'$(BlazorWebAssemblyBaseHref)' != ''">
+        <ItemGroup>
+            <_BaseHrefRewriteTargets Include="$(PublishDir)wwwroot\index.html" Condition="Exists('$(PublishDir)wwwroot\index.html')"/>
+            <_BaseHrefRewriteTargets Include="$(PublishDir)wwwroot\404.html" Condition="Exists('$(PublishDir)wwwroot\404.html')"/>
+        </ItemGroup>
+        <WriteLinesToFile
+            File="%(_BaseHrefRewriteTargets.Identity)"
+            Lines="$([System.IO.File]::ReadAllText('%(_BaseHrefRewriteTargets.Identity)').Replace('&lt;base href=&quot;/&quot; /&gt;', '&lt;base href=&quot;$(BlazorWebAssemblyBaseHref)&quot; /&gt;'))"
+            Overwrite="true"
+            Encoding="UTF-8"/>
+        <Message Importance="high" Text="Rewrote &lt;base href&gt; to '$(BlazorWebAssemblyBaseHref)' in %(_BaseHrefRewriteTargets.Identity)"/>
+    </Target>
+
 </Project>
