@@ -14,7 +14,8 @@ Versioned design documents for FestivalRider. Each plan captures locked decision
 
 | #   | Title                                  | Status | Summary                                                                                  |
 | --- | -------------------------------------- | ------ | ---------------------------------------------------------------------------------------- |
-| 001 | [Initial plan](./001-initial-plan.md)  | Active | Static Blazor WASM 9 PWA on GitHub Pages — bands, riders, running order, print pipeline. |
+| 001 | [Initial plan](./001-initial-plan.md)                   | Superseded by 002 (partial) | Static Blazor WASM 9 PWA on GitHub Pages — bands, riders, running order, print pipeline. Model spec + CSV sections superseded by 002; all other sections authoritative. |
+| 002 | [Domain model revision](./002-domain-model-revision.md) | Active | Refines models: single `ShowData` root, normalized `TravelParty`, structured `TechRider` (cables / lighting / power / FOH / monitors / stage). Drops `Genre`, `InputChannel`, `BacklineItem`. |
 
 ## Template
 

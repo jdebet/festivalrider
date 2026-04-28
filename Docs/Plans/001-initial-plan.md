@@ -2,7 +2,7 @@
 
 ## Status
 
-`Active`
+`Superseded by 002` (partial) — model file-by-file scope and CSV section list superseded by [002-domain-model-revision.md](./002-domain-model-revision.md); all other sections (architecture, services, persistence, print pipeline, deployment, testing) remain authoritative.
 
 ## Context
 

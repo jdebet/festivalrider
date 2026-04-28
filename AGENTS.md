@@ -27,9 +27,9 @@
 
 ## Mutability
 
-- USE `class { get; set; }` for UI-mutated entities: `Band`, `Contact`, `Rider`, `TechRider`, `HospitalityRider`, `InputChannel`, `BacklineItem`, `RunningOrder`, `AppState`.
+- USE `class { get; set; }` for UI-mutated entities (anything bound via `EditForm` or mutated from a page, e.g. `Band`, `ShowData`, `Stage`, `Rider`, `TechRider` and every sub-model under it, `TravelParty`, `Party`, `RunningOrder`, `AppState`).
 - USE `record` only for immutable value leaves (`RunningOrderSlot`).
-- USE `enum` only for closed sets (`ContactRole`, `BacklineCategory`).
+- USE `enum` only for closed sets of finite, stable values (e.g. `ContactRole`, `PartyType`, `CableType`, `PowerPhase`, `MonitorSourceMode`).
 - NEVER convert a UI-mutated entity to `record`.
 
 ## Async, logging, validation
@@ -52,7 +52,8 @@
 ## CSV
 
 - Band CSV header MUST be `Section,Key,Value,Index,Notes`.
-- Section order MUST be `Band, Contact, Tech, Input, Backline, Hospitality`. Keys MUST emit in declaration order.
+- Per-band CSV section order MUST match the `Active` plan's `## CSV format` section list. Keys MUST emit in declaration order. `ShowData`/`Stage` export as a separate "show" CSV; NEVER inline them in per-band CSVs.
+- Closed-set enums with an `Other`/`Custom` value MUST round-trip the paired `*Other` override string.
 - Running-order CSV columns MUST be `Stage,StartTime,BandName,SetLengthMinutes,ChangeoverMinutes,Notes`.
 - USE CsvHelper. NEVER hand-roll CSV string concatenation.
 - Round-trip MUST be byte-stable. Adding a field MUST update writer, reader, and `ExportServiceTests` together.
