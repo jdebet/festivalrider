@@ -1,0 +1,24 @@
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
+    @foreach (var t in Toasts)
+    {
+        <div class="toast show align-items-center text-bg-@CssLevel(t.Level) border-0 mb-2" role="alert" @key="t.Id">
+            <div class="d-flex">
+                <div class="toast-body">@t.Text</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" aria-label="Close" @onclick="() => OnDismiss.InvokeAsync(t.Id)"></button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<ToastMessage> Toasts { get; set; } = Array.Empty<ToastMessage>();
+    [Parameter] public EventCallback<Guid> OnDismiss { get; set; }
+
+    private static string CssLevel(ToastLevel level) => level switch
+    {
+        ToastLevel.Success => "success",
+        ToastLevel.Warning => "warning",
+        ToastLevel.Error => "danger",
+        _ => "primary"
+    };
+}

@@ -6,7 +6,7 @@ public class Cable
     public string? SourceOther { get; set; }
     public CablePoint Target { get; set; }
     public string? TargetOther { get; set; }
-    public CableType Type { get; set; } = CableType.Rj45;
+    public CableType Type { get; set; } = CableType.RJ45;
     public string? TypeOther { get; set; }
     public string? CategoryOrSpec { get; set; }
     public decimal? MinLengthMeters { get; set; }

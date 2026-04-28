@@ -2,7 +2,7 @@ namespace FestivalRider.Models;
 
 public enum PowerAmperage
 {
-    A16,
-    A32,
-    A63,
+    _16_A,
+    _32_A,
+    _63_A,
 }

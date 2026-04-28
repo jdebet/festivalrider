@@ -10,6 +10,7 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
 
 builder.Services.AddScoped<IBandService, BandService>();
+builder.Services.AddScoped<IToastService, ToastService>();
 builder.Services.AddScoped<IStorageService, StorageService>();
 builder.Services.AddScoped<IExportService, ExportService>();
 builder.Services.AddScoped<IPdfExportService, PdfExportService>();
