@@ -1,0 +1,25 @@
+@* Collapsible labelled section. Pure presentational; owns only its expand/collapse state. *@
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center" role="button" @onclick="Toggle">
+        <strong>@Title</strong>
+        <span aria-hidden="true">@(_expanded ? "▾" : "▸")</span>
+    </div>
+    @if (_expanded)
+    {
+        <div class="card-body">
+            @ChildContent
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public bool InitiallyExpanded { get; set; } = true;
+
+    private bool _expanded;
+
+    protected override void OnInitialized() => _expanded = InitiallyExpanded;
+
+    private void Toggle() => _expanded = !_expanded;
+}

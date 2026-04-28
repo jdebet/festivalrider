@@ -19,6 +19,11 @@ public interface IBandService
     void DeleteRunningOrder(Guid id);
     RunningOrder? FindRunningOrder(Guid id);
 
+    int AddStage(string name);
+    void UpdateStage(Stage stage);
+    void DeleteStage(int id);
+    Stage? FindStage(int id);
+
     void ReplaceState(AppState state);
     AppState Snapshot();
 }

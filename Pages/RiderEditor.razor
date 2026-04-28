@@ -1,0 +1,613 @@
+@page "/band/{Id:guid}"
+@implements IDisposable
+@inject IBandService BandService
+@inject NavigationManager Nav
+
+<PageTitle>@(_band?.Name ?? "Band") · FestivalRider</PageTitle>
+
+@if (_band is null)
+{
+    <div class="alert alert-warning">
+        Band not found. <a href="/">Back to list</a>.
+    </div>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <a href="/" class="text-decoration-none">&larr; Bands</a>
+            <h1 class="h3 m-0">@_band.Name</h1>
+        </div>
+        <div class="btn-group">
+            <button class="btn btn-primary" @onclick="Save">Save</button>
+            <button class="btn btn-outline-secondary" @onclick="GoBack">Back</button>
+        </div>
+    </div>
+
+    <EditForm Model="_band" OnValidSubmit="Save">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <RiderSection Title="Band">
+            <div class="mb-2">
+                <label class="form-label">Name</label>
+                <InputText class="form-control" @bind-Value="_band.Name" />
+            </div>
+            <div class="mb-2">
+                <label class="form-label">Notes</label>
+                <InputTextArea class="form-control" rows="2" @bind-Value="_band.Notes" />
+            </div>
+        </RiderSection>
+
+        <RiderSection Title="Contacts">
+            @for (var i = 0; i < _band.Contacts.Count; i++)
+            {
+                var idx = i;
+                var contact = _band.Contacts[idx];
+                <div class="row g-2 align-items-end mb-2" @key="idx">
+                    <div class="col-md-3">
+                        <label class="form-label">Role</label>
+                        <InputSelect class="form-select" @bind-Value="contact.Role">
+                            @foreach (var r in Enum.GetValues<ContactRole>())
+                            {
+                                <option value="@r">@r</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Name</label>
+                        <InputText class="form-control" @bind-Value="contact.Name" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Email</label>
+                        <InputText class="form-control" @bind-Value="contact.Email" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Phone</label>
+                        <InputText class="form-control" @bind-Value="contact.Phone" />
+                    </div>
+                    <div class="col-md-1">
+                        <button type="button" class="btn btn-outline-danger w-100" @onclick="() => _band.Contacts.RemoveAt(idx)">×</button>
+                    </div>
+                </div>
+            }
+            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => _band.Contacts.Add(new Contact())">+ Add contact</button>
+        </RiderSection>
+
+        <RiderSection Title="Travel party">
+            @for (var i = 0; i < _band.TravelParty.Members.Count; i++)
+            {
+                var idx = i;
+                var party = _band.TravelParty.Members[idx];
+                <div class="row g-2 align-items-end mb-2" @key="idx">
+                    <div class="col-md-3">
+                        <label class="form-label">Type</label>
+                        <InputSelect class="form-select" @bind-Value="party.Type">
+                            @foreach (var t in Enum.GetValues<PartyType>())
+                            {
+                                <option value="@t">@t</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Role</label>
+                        <InputText class="form-control" @bind-Value="party.Role" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Name</label>
+                        <InputText class="form-control" @bind-Value="party.Name" />
+                    </div>
+                    <div class="col-md-1">
+                        <button type="button" class="btn btn-outline-danger w-100" @onclick="() => _band.TravelParty.Members.RemoveAt(idx)">×</button>
+                    </div>
+                </div>
+            }
+            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => _band.TravelParty.Members.Add(new Party())">+ Add member</button>
+        </RiderSection>
+
+        <h2 class="h4 mt-4">Tech rider</h2>
+
+        <RiderSection Title="Cabling" InitiallyExpanded="false">
+            @for (var i = 0; i < _band.Rider.Tech.Cables.Count; i++)
+            {
+                var idx = i;
+                var cable = _band.Rider.Tech.Cables[idx];
+                <div class="border rounded p-2 mb-2" @key="idx">
+                    <div class="row g-2">
+                        <div class="col-md-3">
+                            <label class="form-label">Source</label>
+                            <InputSelect class="form-select" @bind-Value="cable.Source">
+                                @foreach (var p in Enum.GetValues<CablePoint>())
+                                {
+                                    <option value="@p">@p</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        @if (cable.Source == CablePoint.Other)
+                        {
+                            <div class="col-md-3">
+                                <label class="form-label">Source (other)</label>
+                                <InputText class="form-control" @bind-Value="cable.SourceOther" />
+                            </div>
+                        }
+                        <div class="col-md-3">
+                            <label class="form-label">Target</label>
+                            <InputSelect class="form-select" @bind-Value="cable.Target">
+                                @foreach (var p in Enum.GetValues<CablePoint>())
+                                {
+                                    <option value="@p">@p</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        @if (cable.Target == CablePoint.Other)
+                        {
+                            <div class="col-md-3">
+                                <label class="form-label">Target (other)</label>
+                                <InputText class="form-control" @bind-Value="cable.TargetOther" />
+                            </div>
+                        }
+                        <div class="col-md-2">
+                            <label class="form-label">Type</label>
+                            <InputSelect class="form-select" @bind-Value="cable.Type">
+                                @foreach (var t in Enum.GetValues<CableType>())
+                                {
+                                    <option value="@t">@t</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        @if (cable.Type == CableType.Other)
+                        {
+                            <div class="col-md-2">
+                                <label class="form-label">Type (other)</label>
+                                <InputText class="form-control" @bind-Value="cable.TypeOther" />
+                            </div>
+                        }
+                        <div class="col-md-3">
+                            <label class="form-label">Spec</label>
+                            <InputText class="form-control" @bind-Value="cable.CategoryOrSpec" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Min length (m)</label>
+                            <InputNumber class="form-control" @bind-Value="cable.MinLengthMeters" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Provider</label>
+                            <InputSelect class="form-select" @bind-Value="cable.Provider">
+                                @foreach (var p in Enum.GetValues<CableProvider>())
+                                {
+                                    <option value="@p">@p</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-md-1 d-flex align-items-end">
+                            <button type="button" class="btn btn-outline-danger w-100" @onclick="() => _band.Rider.Tech.Cables.RemoveAt(idx)">×</button>
+                        </div>
+                    </div>
+                </div>
+            }
+            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => _band.Rider.Tech.Cables.Add(new Cable())">+ Add cable</button>
+        </RiderSection>
+
+        <RiderSection Title="Lighting" InitiallyExpanded="false">
+            <div class="row g-2 mb-2">
+                <div class="col-md-6">
+                    <label class="form-label">Own console model</label>
+                    <InputText class="form-control" @bind-Value="_band.Rider.Tech.Lighting.OwnConsoleModel" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Backdrop width (m)</label>
+                    <InputNumber class="form-control" @bind-Value="_band.Rider.Tech.Lighting.BackdropWidthMeters" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Backdrop height (m)</label>
+                    <InputNumber class="form-control" @bind-Value="_band.Rider.Tech.Lighting.BackdropHeightMeters" />
+                </div>
+            </div>
+            <h6>Floor machines</h6>
+            @for (var i = 0; i < _band.Rider.Tech.Lighting.FloorMachines.Count; i++)
+            {
+                var idx = i;
+                var m = _band.Rider.Tech.Lighting.FloorMachines[idx];
+                <div class="row g-2 align-items-end mb-2" @key="idx">
+                    <div class="col-md-7">
+                        <label class="form-label">Name</label>
+                        <InputText class="form-control" @bind-Value="m.Name" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Count</label>
+                        <InputNumber class="form-control" @bind-Value="m.Count" />
+                    </div>
+                    <div class="col-md-2">
+                        <button type="button" class="btn btn-outline-danger w-100" @onclick="() => _band.Rider.Tech.Lighting.FloorMachines.RemoveAt(idx)">×</button>
+                    </div>
+                </div>
+            }
+            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => _band.Rider.Tech.Lighting.FloorMachines.Add(new LightingMachine())">+ Add machine</button>
+        </RiderSection>
+
+        <RiderSection Title="Power" InitiallyExpanded="false">
+            <div class="row g-2">
+                <div class="col-md-3">
+                    <label class="form-label">Amperage</label>
+                    <InputSelect class="form-select" @bind-Value="_band.Rider.Tech.Power.Amperage">
+                        @foreach (var a in Enum.GetValues<PowerAmperage>())
+                        {
+                            <option value="@a">@a</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Phase</label>
+                    <InputSelect class="form-select" @bind-Value="_band.Rider.Tech.Power.Phase">
+                        @foreach (var p in Enum.GetValues<PowerPhase>())
+                        {
+                            <option value="@p">@p</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Adapter notes</label>
+                    <InputText class="form-control" @bind-Value="_band.Rider.Tech.Power.AdapterNotes" />
+                </div>
+            </div>
+        </RiderSection>
+
+        <RiderSection Title="FOH sound" InitiallyExpanded="false">
+            <div class="row g-2 mb-2">
+                <div class="col-md-6">
+                    <label class="form-label">Own console model</label>
+                    <InputText class="form-control" @bind-Value="_band.Rider.Tech.Foh.OwnConsoleModel" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Output protocol</label>
+                    <InputSelect class="form-select" @bind-Value="_band.Rider.Tech.Foh.OutputProtocol">
+                        @foreach (var p in Enum.GetValues<OutputProtocol>())
+                        {
+                            <option value="@p">@p</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Output location</label>
+                    <InputSelect class="form-select" @bind-Value="_band.Rider.Tech.Foh.OutputLocation">
+                        @foreach (var l in Enum.GetValues<OutputLocation>())
+                        {
+                            <option value="@l">@l</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Output notes</label>
+                    <InputText class="form-control" @bind-Value="_band.Rider.Tech.Foh.OutputNotes" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Additional hardware</label>
+                    <InputText class="form-control" @bind-Value="_band.Rider.Tech.Foh.AdditionalHardware" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Stage→FOH sends</label>
+                    <InputNumber class="form-control" @bind-Value="_band.Rider.Tech.Foh.StageToFohSendCount" />
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <div class="form-check">
+                        <InputCheckbox class="form-check-input" @bind-Value="_band.Rider.Tech.Foh.StageToFohRoundTrip" />
+                        <label class="form-check-label">Round trip</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Footprint width (m)</label>
+                    <InputNumber class="form-control" @bind-Value="_band.Rider.Tech.Foh.FootprintWidthMeters" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Footprint length (m)</label>
+                    <InputNumber class="form-control" @bind-Value="_band.Rider.Tech.Foh.FootprintLengthMeters" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Notes</label>
+                    <InputTextArea class="form-control" rows="2" @bind-Value="_band.Rider.Tech.Foh.Notes" />
+                </div>
+            </div>
+        </RiderSection>
+
+        <RiderSection Title="Monitors" InitiallyExpanded="false">
+            <div class="row g-2 mb-2">
+                <div class="col-md-3">
+                    <label class="form-label">Source mode</label>
+                    <InputSelect class="form-select" @bind-Value="_band.Rider.Tech.Monitors.SourceMode">
+                        @foreach (var m in Enum.GetValues<MonitorSourceMode>())
+                        {
+                            <option value="@m">@m</option>
+                        }
+                    </InputSelect>
+                </div>
+                @if (_band.Rider.Tech.Monitors.SourceMode == MonitorSourceMode.OwnConsole)
+                {
+                    <div class="col-md-5">
+                        <label class="form-label">Own console model</label>
+                        <InputText class="form-control" @bind-Value="_band.Rider.Tech.Monitors.OwnConsoleModel" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Console location</label>
+                        <InputSelect class="form-select" @bind-Value="_band.Rider.Tech.Monitors.OwnConsoleLocation">
+                            @foreach (var l in Enum.GetValues<MonitorTechLocation>())
+                            {
+                                <option value="@l">@l</option>
+                            }
+                        </InputSelect>
+                    </div>
+                }
+            </div>
+
+            <h6>Wedges</h6>
+            @for (var i = 0; i < _band.Rider.Tech.Monitors.Wedges.Count; i++)
+            {
+                var idx = i;
+                var w = _band.Rider.Tech.Monitors.Wedges[idx];
+                <div class="row g-2 align-items-end mb-2" @key="idx">
+                    <div class="col-md-4">
+                        <label class="form-label">Where</label>
+                        <InputText class="form-control" @bind-Value="w.Where" />
+                    </div>
+                    <div class="col-md-2 form-check">
+                        <InputCheckbox class="form-check-input" @bind-Value="w.DualLinked" />
+                        <label class="form-check-label">Dual</label>
+                    </div>
+                    <div class="col-md-2 form-check">
+                        <InputCheckbox class="form-check-input" @bind-Value="w.Stereo" />
+                        <label class="form-check-label">Stereo</label>
+                    </div>
+                    <div class="col-md-2 form-check">
+                        <InputCheckbox class="form-check-input" @bind-Value="w.DrumFill" />
+                        <label class="form-check-label">Drumfill</label>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="button" class="btn btn-outline-danger w-100" @onclick="() => _band.Rider.Tech.Monitors.Wedges.RemoveAt(idx)">×</button>
+                    </div>
+                </div>
+            }
+            <button type="button" class="btn btn-sm btn-outline-primary mb-3" @onclick="() => _band.Rider.Tech.Monitors.Wedges.Add(new MonitorWedge())">+ Add wedge</button>
+
+            <h6>In-ear monitors</h6>
+            @for (var i = 0; i < _band.Rider.Tech.Monitors.InEars.Count; i++)
+            {
+                var idx = i;
+                var iem = _band.Rider.Tech.Monitors.InEars[idx];
+                <div class="row g-2 align-items-end mb-2" @key="idx">
+                    <div class="col-md-3">
+                        <label class="form-label">Where</label>
+                        <InputText class="form-control" @bind-Value="iem.Where" />
+                    </div>
+                    <div class="col-md-2 form-check">
+                        <InputCheckbox class="form-check-input" @bind-Value="iem.IsWireless" />
+                        <label class="form-check-label">Wireless</label>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Provider</label>
+                        <InputSelect class="form-select" @bind-Value="iem.Provider">
+                            @foreach (var p in Enum.GetValues<CableProvider>())
+                            {
+                                <option value="@p">@p</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    @if (iem.IsWireless && iem.Provider == CableProvider.Brought)
+                    {
+                        <div class="col-md-2">
+                            <label class="form-label">Model</label>
+                            <InputText class="form-control" @bind-Value="iem.Model" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Frequency</label>
+                            <InputText class="form-control" @bind-Value="iem.Frequency" />
+                        </div>
+                    }
+                    <div class="col-md-1">
+                        <button type="button" class="btn btn-outline-danger w-100" @onclick="() => _band.Rider.Tech.Monitors.InEars.RemoveAt(idx)">×</button>
+                    </div>
+                </div>
+            }
+            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => _band.Rider.Tech.Monitors.InEars.Add(new InEarMonitor())">+ Add IEM</button>
+
+            <div class="mt-3">
+                <label class="form-label">Notes</label>
+                <InputTextArea class="form-control" rows="2" @bind-Value="_band.Rider.Tech.Monitors.Notes" />
+            </div>
+        </RiderSection>
+
+        <RiderSection Title="Stage" InitiallyExpanded="false">
+            <h6>Risers</h6>
+            @for (var i = 0; i < _band.Rider.Tech.Stage.Risers.Count; i++)
+            {
+                var idx = i;
+                var r = _band.Rider.Tech.Stage.Risers[idx];
+                <div class="row g-2 align-items-end mb-2" @key="idx">
+                    <div class="col-md-3">
+                        <label class="form-label">Where</label>
+                        <InputText class="form-control" @bind-Value="r.Where" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Width (m)</label>
+                        <InputNumber class="form-control" @bind-Value="r.WidthMeters" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Length (m)</label>
+                        <InputNumber class="form-control" @bind-Value="r.LengthMeters" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Height (cm)</label>
+                        <InputNumber class="form-control" @bind-Value="r.HeightCm" />
+                    </div>
+                    <div class="col-md-1">
+                        <button type="button" class="btn btn-outline-danger w-100" @onclick="() => _band.Rider.Tech.Stage.Risers.RemoveAt(idx)">×</button>
+                    </div>
+                </div>
+            }
+            <button type="button" class="btn btn-sm btn-outline-primary mb-3" @onclick="() => _band.Rider.Tech.Stage.Risers.Add(new Riser())">+ Add riser</button>
+
+            <h6>Other risers</h6>
+            @for (var i = 0; i < _band.Rider.Tech.Stage.OtherRisers.Count; i++)
+            {
+                var idx = i;
+                var o = _band.Rider.Tech.Stage.OtherRisers[idx];
+                <div class="row g-2 align-items-end mb-2" @key="idx">
+                    <div class="col-md-4">
+                        <label class="form-label">Where</label>
+                        <InputText class="form-control" @bind-Value="o.Where" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Type</label>
+                        <InputSelect class="form-select" @bind-Value="o.Type">
+                            @foreach (var t in Enum.GetValues<OtherRiserType>())
+                            {
+                                <option value="@t">@t</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Description</label>
+                        <InputText class="form-control" @bind-Value="o.Description" />
+                    </div>
+                    <div class="col-md-1">
+                        <button type="button" class="btn btn-outline-danger w-100" @onclick="() => _band.Rider.Tech.Stage.OtherRisers.RemoveAt(idx)">×</button>
+                    </div>
+                </div>
+            }
+            <button type="button" class="btn btn-sm btn-outline-primary mb-3" @onclick="() => _band.Rider.Tech.Stage.OtherRisers.Add(new OtherRiser())">+ Add other riser</button>
+
+            <h6>Wireless mics</h6>
+            @for (var i = 0; i < _band.Rider.Tech.Stage.WirelessMics.Count; i++)
+            {
+                var idx = i;
+                var w = _band.Rider.Tech.Stage.WirelessMics[idx];
+                <div class="row g-2 align-items-end mb-2" @key="idx">
+                    <div class="col-md-3">
+                        <label class="form-label">Where</label>
+                        <InputText class="form-control" @bind-Value="w.Where" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Count</label>
+                        <InputNumber class="form-control" @bind-Value="w.Count" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Provider</label>
+                        <InputSelect class="form-select" @bind-Value="w.Provider">
+                            @foreach (var p in Enum.GetValues<CableProvider>())
+                            {
+                                <option value="@p">@p</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    @if (w.Provider == CableProvider.Brought)
+                    {
+                        <div class="col-md-2">
+                            <label class="form-label">Model</label>
+                            <InputText class="form-control" @bind-Value="w.Model" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Frequency</label>
+                            <InputText class="form-control" @bind-Value="w.Frequency" />
+                        </div>
+                    }
+                    <div class="col-md-1">
+                        <button type="button" class="btn btn-outline-danger w-100" @onclick="() => _band.Rider.Tech.Stage.WirelessMics.RemoveAt(idx)">×</button>
+                    </div>
+                </div>
+            }
+            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => _band.Rider.Tech.Stage.WirelessMics.Add(new WirelessMic())">+ Add wireless mic</button>
+
+            <div class="form-check mt-3">
+                <InputCheckbox class="form-check-input" @bind-Value="_band.Rider.Tech.Stage.BringsOwnMics" />
+                <label class="form-check-label">Brings own mics</label>
+            </div>
+            <div class="mt-2">
+                <label class="form-label">Notes</label>
+                <InputTextArea class="form-control" rows="2" @bind-Value="_band.Rider.Tech.Stage.Notes" />
+            </div>
+        </RiderSection>
+
+        <RiderSection Title="Tech notes" InitiallyExpanded="false">
+            <InputTextArea class="form-control" rows="3" @bind-Value="_band.Rider.Tech.Notes" />
+        </RiderSection>
+
+        <h2 class="h4 mt-4">Hospitality</h2>
+        <RiderSection Title="Hospitality" InitiallyExpanded="false">
+            <div class="row g-2 mb-2">
+                <div class="col-md-6">
+                    <label class="form-label">Dressing room notes</label>
+                    <InputTextArea class="form-control" rows="2" @bind-Value="_band.Rider.Hospitality.DressingRoomNotes" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Catering notes</label>
+                    <InputTextArea class="form-control" rows="2" @bind-Value="_band.Rider.Hospitality.CateringNotes" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Dietary restrictions</label>
+                    <InputText class="form-control" @bind-Value="_band.Rider.Hospitality.DietaryRestrictions" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Towel count</label>
+                    <InputNumber class="form-control" @bind-Value="_band.Rider.Hospitality.TowelCount" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Parking spaces</label>
+                    <InputNumber class="form-control" @bind-Value="_band.Rider.Hospitality.ParkingSpaces" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Accommodations</label>
+                    <InputTextArea class="form-control" rows="2" @bind-Value="_band.Rider.Hospitality.Accommodations" />
+                </div>
+            </div>
+            <h6>Drinks requests</h6>
+            @for (var i = 0; i < _band.Rider.Hospitality.DrinksRequests.Count; i++)
+            {
+                var idx = i;
+                <div class="row g-2 align-items-end mb-2" @key="idx">
+                    <div class="col-md-10">
+                        <input class="form-control" value="@_band.Rider.Hospitality.DrinksRequests[idx]"
+                               @oninput="e => _band.Rider.Hospitality.DrinksRequests[idx] = e.Value?.ToString() ?? string.Empty" />
+                    </div>
+                    <div class="col-md-2">
+                        <button type="button" class="btn btn-outline-danger w-100" @onclick="() => _band.Rider.Hospitality.DrinksRequests.RemoveAt(idx)">×</button>
+                    </div>
+                </div>
+            }
+            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => _band.Rider.Hospitality.DrinksRequests.Add(string.Empty)">+ Add drink</button>
+        </RiderSection>
+
+        <div class="d-flex justify-content-end gap-2 my-3">
+            <button type="button" class="btn btn-outline-secondary" @onclick="GoBack">Back</button>
+            <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private Band? _band;
+
+    protected override void OnInitialized()
+    {
+        BandService.OnChange += HandleChange;
+        Load();
+    }
+
+    protected override void OnParametersSet() => Load();
+
+    private void Load() => _band = BandService.FindBand(Id);
+
+    private void HandleChange() => InvokeAsync(StateHasChanged);
+
+    private void Save()
+    {
+        if (_band is null) return;
+        BandService.UpdateBand(_band);
+    }
+
+    private void GoBack() => Nav.NavigateTo("/");
+
+    public void Dispose()
+    {
+        BandService.OnChange -= HandleChange;
+    }
+}
