@@ -85,9 +85,11 @@ public class BundleService : IBundleService
         s.Flush();
     }
 
-    public BundleImportResult ImportBundle(Stream zipStream)
+    public BundleImportResult ImportBundle(Stream zipStream, BundleImportMode mode = BundleImportMode.Replace, AppState? currentState = null)
     {
         if (zipStream is null) throw new ArgumentNullException(nameof(zipStream));
+        if (mode == BundleImportMode.Merge && currentState is null)
+            throw new ArgumentNullException(nameof(currentState), "currentState is required for Merge mode.");
         var warnings = new List<string>();
         try
         {
@@ -161,15 +163,27 @@ public class BundleService : IBundleService
                 orders.Add(order);
             }
 
-            var state = new AppState
+            if (mode == BundleImportMode.Replace)
             {
-                SchemaVersion = manifest.SchemaVersion,
-                ShowData = show,
-                Bands = bands,
-                RunningOrders = orders,
-            };
+                var state = new AppState
+                {
+                    SchemaVersion = manifest.SchemaVersion,
+                    ShowData = show,
+                    Bands = bands,
+                    RunningOrders = orders,
+                };
+                return new BundleImportResult(state, bands.Count, orders.Count, warnings, null);
+            }
 
-            return new BundleImportResult(state, bands.Count, orders.Count, warnings, null);
+            // Merge
+            var (merged, stats) = MergeInto(currentState!, show, bands, orders, warnings);
+            return new BundleImportResult(
+                merged,
+                stats.BandsAdded + stats.BandsUpdated,
+                stats.RunningOrdersAdded + stats.RunningOrdersUpdated,
+                warnings,
+                null,
+                stats);
         }
         catch (InvalidDataException ex)
         {
@@ -198,6 +212,122 @@ public class BundleService : IBundleService
         using var reader = new StreamReader(s, Utf8NoBom);
         return reader.ReadToEnd();
     }
+
+    private static (AppState State, MergeStats Stats) MergeInto(
+        AppState currentState,
+        ShowData bundleShow,
+        IReadOnlyList<Band> incomingBands,
+        IReadOnlyList<RunningOrder> incomingOrders,
+        List<string> warnings)
+    {
+        // Bands: upsert by Guid, last-write-wins by UpdatedAt.
+        var bandsById = currentState.Bands.ToDictionary(b => b.Id);
+        int bAdded = 0, bUpdated = 0, bSkipped = 0;
+        foreach (var inc in incomingBands)
+        {
+            if (bandsById.TryGetValue(inc.Id, out var existing))
+            {
+                if (inc.UpdatedAt > existing.UpdatedAt)
+                {
+                    bandsById[inc.Id] = inc;
+                    bUpdated++;
+                }
+                else
+                {
+                    bSkipped++;
+                    warnings.Add(
+                        $"Band \"{inc.Name}\" ({inc.Id}) skipped: incoming UpdatedAt {inc.UpdatedAt:o} is not newer than local {existing.UpdatedAt:o}.");
+                }
+            }
+            else
+            {
+                bandsById[inc.Id] = inc;
+                bAdded++;
+            }
+        }
+
+        // Stage remap by name (case-insensitive, trimmed). Local duplicate names are ambiguous.
+        var localStageByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var ambiguousLocalNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var stage in currentState.ShowData.Stages)
+        {
+            var key = StageKey(stage.Name);
+            if (key.Length == 0) continue;
+            if (!localStageByName.TryAdd(key, stage.Id))
+                ambiguousLocalNames.Add(key);
+        }
+
+        // The bundle decoder assigned each slot.StageId from the bundle's own ShowData,
+        // so we look up the sender's stage *name* via the bundle ShowData.
+        var bundleStageNameById = bundleShow.Stages.ToDictionary(s => s.Id, s => s.Name ?? string.Empty);
+
+        var ordersById = currentState.RunningOrders.ToDictionary(o => o.Id);
+        int oAdded = 0, oUpdated = 0, oSkipped = 0;
+        foreach (var inc in incomingOrders)
+        {
+            var remapped = new List<RunningOrderSlot>(inc.Slots.Count);
+            var missing = new List<string>();
+            var ambiguous = new List<string>();
+            foreach (var slot in inc.Slots)
+            {
+                var senderName = bundleStageNameById.TryGetValue(slot.StageId, out var n) ? n : string.Empty;
+                var key = StageKey(senderName);
+                if (key.Length == 0)
+                {
+                    missing.Add($"#{slot.StageId}");
+                    continue;
+                }
+                if (ambiguousLocalNames.Contains(key))
+                {
+                    ambiguous.Add(senderName);
+                    continue;
+                }
+                if (!localStageByName.TryGetValue(key, out var localId))
+                {
+                    missing.Add(senderName);
+                    continue;
+                }
+                remapped.Add(slot with { StageId = localId });
+            }
+
+            if (missing.Count > 0 || ambiguous.Count > 0)
+            {
+                oSkipped++;
+                var parts = new List<string>();
+                if (missing.Count > 0) parts.Add($"missing local stage(s): {string.Join(", ", missing.Distinct())}");
+                if (ambiguous.Count > 0) parts.Add($"ambiguous local stage name(s): {string.Join(", ", ambiguous.Distinct())}");
+                warnings.Add($"Running order {inc.Id} (day {inc.ShowDayNumber}) skipped: {string.Join("; ", parts)}.");
+                continue;
+            }
+
+            var ro = new RunningOrder { Id = inc.Id, ShowDayNumber = inc.ShowDayNumber, Slots = remapped };
+            if (ordersById.ContainsKey(inc.Id))
+            {
+                warnings.Add($"Running order {inc.Id} replaced an existing entry with the same id.");
+                ordersById[inc.Id] = ro;
+                oUpdated++;
+            }
+            else
+            {
+                ordersById[inc.Id] = ro;
+                oAdded++;
+            }
+        }
+
+        var mergedBands = bandsById.Values.OrderBy(b => b.Id).ToList();
+        var mergedOrders = ordersById.Values.OrderBy(o => o.Id).ToList();
+
+        var merged = new AppState
+        {
+            SchemaVersion = currentState.SchemaVersion,
+            ShowData = currentState.ShowData, // never modified on Merge
+            Bands = mergedBands,
+            RunningOrders = mergedOrders,
+        };
+        return (merged, new MergeStats(bAdded, bUpdated, bSkipped, oAdded, oUpdated, oSkipped));
+    }
+
+    private static string StageKey(string? name) => (name ?? string.Empty).Trim();
 
     private static Guid? ParseIdFromPath(string path, string prefix)
     {

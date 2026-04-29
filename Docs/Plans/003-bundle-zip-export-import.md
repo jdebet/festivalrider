@@ -2,7 +2,7 @@
 
 ## Status
 
-`Active`
+`Superseded by 005 (partial)`
 
 ## Context
 

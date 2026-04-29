@@ -7,5 +7,6 @@ public record BundleImportResult(
     int BandCount,
     int RunningOrderCount,
     IReadOnlyList<string> Warnings,
-    string? Error);
+    string? Error,
+    MergeStats? Merge = null);
 

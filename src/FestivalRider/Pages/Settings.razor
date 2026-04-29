@@ -110,7 +110,21 @@
 </RiderSection>
 
 <RiderSection Title="Bundle">
-    <p class="text-muted small">Download a single <code>.zip</code> bundling the show, every band, and every running order. Importing replaces all current data.</p>
+    <p class="text-muted small">Download a single <code>.zip</code> bundling the show, every band, and every running order. Replace overwrites everything; Merge upserts bands and running orders by id.</p>
+    <div class="mb-2">
+        <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" id="bundleModeReplace"
+                   checked="@(_bundleImportMode == BundleImportMode.Replace)"
+                   @onchange="() => _bundleImportMode = BundleImportMode.Replace" />
+            <label class="form-check-label" for="bundleModeReplace">Replace</label>
+        </div>
+        <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" id="bundleModeMerge"
+                   checked="@(_bundleImportMode == BundleImportMode.Merge)"
+                   @onchange="() => _bundleImportMode = BundleImportMode.Merge" />
+            <label class="form-check-label" for="bundleModeMerge">Merge</label>
+        </div>
+    </div>
     <div class="d-flex flex-wrap gap-2 mb-2">
         <button type="button" class="btn btn-outline-primary" @onclick="ExportBundle">Export bundle</button>
         <label class="btn btn-outline-secondary mb-0">
@@ -121,9 +135,9 @@
 </RiderSection>
 
 <ConfirmDialog Show="_pendingBundle is not null"
-               Title="Replace all data"
+               Title="@_bundleConfirmTitle"
                Message="@_bundleConfirmMessage"
-               ConfirmLabel="Replace"
+               ConfirmLabel="@_bundleConfirmLabel"
                OnConfirm="ConfirmBundleImport"
                OnCancel="() => _pendingBundle = null" />
 
@@ -162,7 +176,11 @@
     private string _deleteStageMessage = string.Empty;
     private AppState _snapshot = new();
     private BundleImportResult? _pendingBundle;
+    private BundleImportMode _bundleImportMode = BundleImportMode.Replace;
+    private BundleImportMode _pendingBundleMode = BundleImportMode.Replace;
+    private string _bundleConfirmTitle = string.Empty;
     private string _bundleConfirmMessage = string.Empty;
+    private string _bundleConfirmLabel = string.Empty;
 
     protected override void OnInitialized()
     {
@@ -325,6 +343,7 @@
     private async Task StageBundleImport(InputFileChangeEventArgs e)
     {
         const long maxSize = 20L * 1024 * 1024;
+        var mode = _bundleImportMode;
         BundleImportResult result;
         try
         {
@@ -332,7 +351,8 @@
             using var ms = new MemoryStream();
             await s.CopyToAsync(ms);
             ms.Position = 0;
-            result = Bundle.ImportBundle(ms);
+            var current = mode == BundleImportMode.Merge ? BandService.Snapshot() : null;
+            result = Bundle.ImportBundle(ms, mode, current);
         }
         catch (IOException)
         {
@@ -352,18 +372,42 @@
         }
 
         _pendingBundle = result;
-        _bundleConfirmMessage =
-            $"Replace all current data with {result.BandCount} band(s) and {result.RunningOrderCount} running order(s) from the bundle?";
+        _pendingBundleMode = mode;
+        if (mode == BundleImportMode.Merge)
+        {
+            _bundleConfirmTitle = "Merge bundle";
+            _bundleConfirmLabel = "Merge";
+            _bundleConfirmMessage =
+                $"Merge {result.BandCount} band(s) and {result.RunningOrderCount} running order(s) into the current data? Existing entries with newer timestamps will be kept.";
+        }
+        else
+        {
+            _bundleConfirmTitle = "Replace all data";
+            _bundleConfirmLabel = "Replace";
+            _bundleConfirmMessage =
+                $"Replace all current data with {result.BandCount} band(s) and {result.RunningOrderCount} running order(s) from the bundle?";
+        }
     }
 
     private void ConfirmBundleImport()
     {
         var result = _pendingBundle;
+        var mode = _pendingBundleMode;
         _pendingBundle = null;
         if (result?.State is null) return;
         BandService.ReplaceState(result.State);
 
-        var summary = $"Imported {result.BandCount} band(s), {result.RunningOrderCount} running order(s).";
+        string summary;
+        if (mode == BundleImportMode.Merge && result.Merge is { } m)
+        {
+            summary =
+                $"Merge applied: +{m.BandsAdded} bands, ~{m.BandsUpdated} updated, {m.BandsSkipped} skipped; +{m.RunningOrdersAdded} running orders, ~{m.RunningOrdersUpdated} updated, {m.RunningOrdersSkipped} skipped.";
+        }
+        else
+        {
+            summary = $"Imported {result.BandCount} band(s), {result.RunningOrderCount} running order(s).";
+        }
+
         if (result.Warnings.Count == 0)
         {
             Toasts.Show(summary, ToastLevel.Success);
