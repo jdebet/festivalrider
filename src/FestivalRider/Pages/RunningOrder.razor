@@ -27,13 +27,13 @@
     </div>
 }
 
-@if (BandService.RunningOrders.Count == 0)
+@if (!BandService.RunningOrdersForActiveShow.Any())
 {
     <div class="alert alert-info">No running orders yet. Click <strong>New running order</strong> to add one.</div>
 }
 else
 {
-    @foreach (var order in BandService.RunningOrders.OrderBy(o => o.ShowDayNumber))
+    @foreach (var order in BandService.RunningOrdersForActiveShow.OrderBy(o => o.ShowDayNumber))
     {
         <RiderSection Title="@TitleFor(order)">
             @{ var ro = order; }
@@ -229,7 +229,7 @@ else
 
     private void Reload()
     {
-        _show = BandService.Snapshot().ShowData;
+        _show = BandService.FindShow(BandService.ActiveShowId) ?? new ShowData();
         foreach (var o in BandService.RunningOrders)
         {
             _byStageSelection.TryAdd(o.Id, 0);
@@ -256,10 +256,15 @@ else
 
     private void AddRunningOrder()
     {
-        var nextDay = BandService.RunningOrders.Count == 0
+        var scoped = BandService.RunningOrdersForActiveShow.ToList();
+        var nextDay = scoped.Count == 0
             ? 1
-            : Math.Min(_show.ShowDayCount, BandService.RunningOrders.Max(o => o.ShowDayNumber) + 1);
-        var ro = new RoModel { ShowDayNumber = Math.Max(1, nextDay) };
+            : Math.Min(_show.ShowDayCount, scoped.Max(o => o.ShowDayNumber) + 1);
+        var ro = new RoModel
+        {
+            ShowId = BandService.ActiveShowId,
+            ShowDayNumber = Math.Max(1, nextDay),
+        };
         BandService.AddRunningOrder(ro);
     }
 

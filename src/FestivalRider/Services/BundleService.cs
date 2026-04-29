@@ -11,7 +11,7 @@ public class BundleService : IBundleService
 {
     public const string Format = "festivalrider-bundle";
     public const string ManifestEntry = "manifest.json";
-    public const string ShowEntry = "show.csv";
+    public const string ShowsPrefix = "shows/";
     public const string BandsPrefix = "bands/";
     public const string RunningOrdersPrefix = "running-orders/";
 
@@ -38,7 +38,8 @@ public class BundleService : IBundleService
         public string Format { get; set; } = BundleService.Format;
         public int SchemaVersion { get; set; }
         public DateTimeOffset ExportedAt { get; set; }
-        public string Show { get; set; } = ShowEntry;
+        public List<string> Shows { get; set; } = new();
+        public Guid ActiveShowId { get; set; }
         public List<string> Bands { get; set; } = new();
         public List<string> RunningOrders { get; set; } = new();
     }
@@ -47,6 +48,7 @@ public class BundleService : IBundleService
     {
         if (state is null) throw new ArgumentNullException(nameof(state));
 
+        var showsSorted = state.Shows.OrderBy(s => s.Id).ToList();
         var bandsSorted = state.Bands.OrderBy(b => b.Id).ToList();
         var ordersSorted = state.RunningOrders.OrderBy(o => o.Id).ToList();
 
@@ -55,7 +57,8 @@ public class BundleService : IBundleService
             Format = Format,
             SchemaVersion = state.SchemaVersion,
             ExportedAt = DateTimeOffset.UtcNow,
-            Show = ShowEntry,
+            Shows = showsSorted.Select(s => $"{ShowsPrefix}{s.Id}.csv").ToList(),
+            ActiveShowId = state.ActiveShowId,
             Bands = bandsSorted.Select(b => $"{BandsPrefix}{b.Id}.csv").ToList(),
             RunningOrders = ordersSorted.Select(o => $"{RunningOrdersPrefix}{o.Id}.csv").ToList(),
         };
@@ -63,7 +66,8 @@ public class BundleService : IBundleService
         using var ms = new MemoryStream();
         using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
         {
-            WriteEntry(zip, ShowEntry, _export.ExportShowCsv(state.ShowData));
+            foreach (var show in showsSorted)
+                WriteEntry(zip, $"{ShowsPrefix}{show.Id}.csv", _export.ExportShowCsv(show));
             foreach (var band in bandsSorted)
                 WriteEntry(zip, $"{BandsPrefix}{band.Id}.csv", _export.ExportBandCsv(band));
             foreach (var order in ordersSorted)
@@ -119,7 +123,9 @@ public class BundleService : IBundleService
                 _logger.LogWarning(
                     "Bundle schemaVersion {Found} does not match {Expected}; refusing import.",
                     manifest.SchemaVersion, current.SchemaVersion);
-                return Fail($"Bundle schemaVersion {manifest.SchemaVersion} does not match expected {current.SchemaVersion}.");
+                return Fail(manifest.SchemaVersion < current.SchemaVersion
+                    ? $"Bundle schemaVersion {manifest.SchemaVersion} is too old; regenerate from v{current.SchemaVersion}."
+                    : $"Bundle schemaVersion {manifest.SchemaVersion} does not match expected {current.SchemaVersion}.");
             }
 
             foreach (var path in EnumerateListedPaths(manifest))
@@ -137,10 +143,19 @@ public class BundleService : IBundleService
                     warnings.Add($"Ignored unlisted entry \"{entry.FullName}\".");
             }
 
-            // Show
-            var showEntry = archive.GetEntry(manifest.Show);
-            if (showEntry is null) return Fail($"Bundle missing show entry \"{manifest.Show}\".");
-            var show = _export.ImportShowCsv(ReadAll(showEntry));
+            // Shows
+            if (manifest.Shows.Count == 0)
+                return Fail("Bundle manifest has no shows.");
+            var shows = new List<ShowData>();
+            foreach (var showPath in manifest.Shows)
+            {
+                var entry = archive.GetEntry(showPath);
+                if (entry is null) return Fail($"Bundle missing show entry \"{showPath}\".");
+                var show = _export.ImportShowCsv(ReadAll(entry));
+                var pathId = ParseIdFromPath(showPath, ShowsPrefix);
+                if (pathId is { } g) show.Id = g;
+                shows.Add(show);
+            }
 
             // Bands
             var bands = new List<Band>();
@@ -151,15 +166,21 @@ public class BundleService : IBundleService
                 bands.Add(_export.ImportBandCsv(ReadAll(entry)));
             }
 
-            // Running orders
+            // Running orders — each decoded against the show recorded in its CSV rows.
+            var showsById = shows.ToDictionary(s => s.Id);
             var orders = new List<RunningOrder>();
             foreach (var orderPath in manifest.RunningOrders)
             {
                 var entry = archive.GetEntry(orderPath);
                 if (entry is null) return Fail($"Bundle missing running order entry \"{orderPath}\".");
 
-                var order = _export.ImportRunningOrderCsv(ReadAll(entry), show, bands);
+                var csv = ReadAll(entry);
+                var showForDecode = PeekShowIdFromCsv(csv) is { } sid && showsById.TryGetValue(sid, out var s)
+                    ? s
+                    : shows[0];
+                var order = _export.ImportRunningOrderCsv(csv, showForDecode, bands);
                 order.Id = ParseIdFromPath(orderPath, RunningOrdersPrefix) ?? order.Id;
+                if (order.ShowId == Guid.Empty) order.ShowId = showForDecode.Id;
                 orders.Add(order);
             }
 
@@ -168,7 +189,8 @@ public class BundleService : IBundleService
                 var state = new AppState
                 {
                     SchemaVersion = manifest.SchemaVersion,
-                    ShowData = show,
+                    Shows = shows,
+                    ActiveShowId = shows.Any(s => s.Id == manifest.ActiveShowId) ? manifest.ActiveShowId : shows[0].Id,
                     Bands = bands,
                     RunningOrders = orders,
                 };
@@ -176,7 +198,7 @@ public class BundleService : IBundleService
             }
 
             // Merge
-            var (merged, stats) = MergeInto(currentState!, show, bands, orders, warnings);
+            var (merged, stats) = MergeInto(currentState!, shows, bands, orders, warnings);
             return new BundleImportResult(
                 merged,
                 stats.BandsAdded + stats.BandsUpdated,
@@ -201,7 +223,7 @@ public class BundleService : IBundleService
 
     private static IEnumerable<string> EnumerateListedPaths(Manifest m)
     {
-        yield return m.Show;
+        foreach (var s in m.Shows) yield return s;
         foreach (var b in m.Bands) yield return b;
         foreach (var r in m.RunningOrders) yield return r;
     }
@@ -213,9 +235,21 @@ public class BundleService : IBundleService
         return reader.ReadToEnd();
     }
 
+    // Parse the ShowId column out of the first data row without re-implementing CSV parsing:
+    // header line is `ShowId,Stage,StartTime,...`; the first field of the next row is the Guid.
+    private static Guid? PeekShowIdFromCsv(string csv)
+    {
+        using var sr = new StringReader(csv);
+        _ = sr.ReadLine(); // header
+        var first = sr.ReadLine();
+        if (string.IsNullOrEmpty(first)) return null;
+        var firstField = first.Split(',', 2)[0].Trim('"');
+        return Guid.TryParse(firstField, out var g) ? g : null;
+    }
+
     private static (AppState State, MergeStats Stats) MergeInto(
         AppState currentState,
-        ShowData bundleShow,
+        IReadOnlyList<ShowData> bundleShows,
         IReadOnlyList<Band> incomingBands,
         IReadOnlyList<RunningOrder> incomingOrders,
         List<string> warnings)
@@ -246,38 +280,68 @@ public class BundleService : IBundleService
             }
         }
 
-        // Stage remap by name (case-insensitive, trimmed). Local duplicate names are ambiguous.
-        var localStageByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        var ambiguousLocalNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var stage in currentState.ShowData.Stages)
+        // Per-show stage remap. Each incoming (ShowId, StageId) must remap to a local show
+        // (matched by ShowData.Name) and that show's local stage (matched by Stage.Name).
+        var bundleShowById = bundleShows.ToDictionary(s => s.Id);
+        var localShowByName = new Dictionary<string, ShowData>(StringComparer.OrdinalIgnoreCase);
+        var ambiguousLocalShowNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var s in currentState.Shows)
         {
-            var key = StageKey(stage.Name);
+            var key = NameKey(s.Name);
             if (key.Length == 0) continue;
-            if (!localStageByName.TryAdd(key, stage.Id))
-                ambiguousLocalNames.Add(key);
+            if (!localShowByName.TryAdd(key, s))
+                ambiguousLocalShowNames.Add(key);
         }
-
-        // The bundle decoder assigned each slot.StageId from the bundle's own ShowData,
-        // so we look up the sender's stage *name* via the bundle ShowData.
-        var bundleStageNameById = bundleShow.Stages.ToDictionary(s => s.Id, s => s.Name ?? string.Empty);
 
         var ordersById = currentState.RunningOrders.ToDictionary(o => o.Id);
         int oAdded = 0, oUpdated = 0, oSkipped = 0;
+
         foreach (var inc in incomingOrders)
         {
+            // Resolve the sender's show by the bundle's Shows list, then match to a local show by name.
+            if (!bundleShowById.TryGetValue(inc.ShowId, out var senderShow))
+            {
+                oSkipped++;
+                warnings.Add(
+                    $"Running order {inc.Id} (day {inc.ShowDayNumber}) skipped: bundle show {inc.ShowId} not found.");
+                continue;
+            }
+            var senderShowKey = NameKey(senderShow.Name);
+            if (senderShowKey.Length == 0 ||
+                ambiguousLocalShowNames.Contains(senderShowKey) ||
+                !localShowByName.TryGetValue(senderShowKey, out var localShow))
+            {
+                oSkipped++;
+                warnings.Add(
+                    $"Running order {inc.Id} (day {inc.ShowDayNumber}) skipped: no unambiguous local show matches \"{senderShow.Name}\".");
+                continue;
+            }
+
+            // Build per-show local stage name lookup.
+            var localStageByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var ambiguousLocalStageNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var stage in localShow.Stages)
+            {
+                var key = NameKey(stage.Name);
+                if (key.Length == 0) continue;
+                if (!localStageByName.TryAdd(key, stage.Id))
+                    ambiguousLocalStageNames.Add(key);
+            }
+            var senderStageNameById = senderShow.Stages.ToDictionary(s => s.Id, s => s.Name ?? string.Empty);
+
             var remapped = new List<RunningOrderSlot>(inc.Slots.Count);
             var missing = new List<string>();
             var ambiguous = new List<string>();
             foreach (var slot in inc.Slots)
             {
-                var senderName = bundleStageNameById.TryGetValue(slot.StageId, out var n) ? n : string.Empty;
-                var key = StageKey(senderName);
+                var senderName = senderStageNameById.TryGetValue(slot.StageId, out var n) ? n : string.Empty;
+                var key = NameKey(senderName);
                 if (key.Length == 0)
                 {
                     missing.Add($"#{slot.StageId}");
                     continue;
                 }
-                if (ambiguousLocalNames.Contains(key))
+                if (ambiguousLocalStageNames.Contains(key))
                 {
                     ambiguous.Add(senderName);
                     continue;
@@ -300,7 +364,13 @@ public class BundleService : IBundleService
                 continue;
             }
 
-            var ro = new RunningOrder { Id = inc.Id, ShowDayNumber = inc.ShowDayNumber, Slots = remapped };
+            var ro = new RunningOrder
+            {
+                Id = inc.Id,
+                ShowId = localShow.Id,
+                ShowDayNumber = inc.ShowDayNumber,
+                Slots = remapped,
+            };
             if (ordersById.ContainsKey(inc.Id))
             {
                 warnings.Add($"Running order {inc.Id} replaced an existing entry with the same id.");
@@ -320,14 +390,15 @@ public class BundleService : IBundleService
         var merged = new AppState
         {
             SchemaVersion = currentState.SchemaVersion,
-            ShowData = currentState.ShowData, // never modified on Merge
+            Shows = currentState.Shows, // never modified on Merge
+            ActiveShowId = currentState.ActiveShowId,
             Bands = mergedBands,
             RunningOrders = mergedOrders,
         };
         return (merged, new MergeStats(bAdded, bUpdated, bSkipped, oAdded, oUpdated, oSkipped));
     }
 
-    private static string StageKey(string? name) => (name ?? string.Empty).Trim();
+    private static string NameKey(string? name) => (name ?? string.Empty).Trim();
 
     private static Guid? ParseIdFromPath(string path, string prefix)
     {

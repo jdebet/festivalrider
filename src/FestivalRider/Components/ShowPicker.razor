@@ -1,0 +1,29 @@
+@using FestivalRider.Models
+
+@if (Shows is not null && Shows.Count > 0)
+{
+    <div class="input-group input-group-sm">
+        <span class="input-group-text" id="show-picker-label">Show</span>
+        <select class="form-select form-select-sm"
+                aria-labelledby="show-picker-label"
+                value="@ActiveShowId"
+                @onchange="OnSelect">
+            @foreach (var s in Shows)
+            {
+                <option value="@s.Id">@(string.IsNullOrWhiteSpace(s.Name) ? "Untitled show" : s.Name)</option>
+            }
+        </select>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ShowData> Shows { get; set; } = Array.Empty<ShowData>();
+    [Parameter] public Guid ActiveShowId { get; set; }
+    [Parameter] public EventCallback<Guid> OnChange { get; set; }
+
+    private async Task OnSelect(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var id) && id != ActiveShowId)
+            await OnChange.InvokeAsync(id);
+    }
+}

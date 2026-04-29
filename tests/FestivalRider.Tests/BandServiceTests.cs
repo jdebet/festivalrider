@@ -160,7 +160,7 @@ public sealed class BandServiceTests
 
         var replacement = new AppState();
         replacement.Bands.Add(new Band { Id = Guid.NewGuid(), Name = "B" });
-        replacement.ShowData.Stages.Add(new Stage { Id = 5, Name = "Big" });
+        replacement.Shows[0].Stages.Add(new Stage { Id = 5, Name = "Big" });
 
         svc.ReplaceState(replacement);
 

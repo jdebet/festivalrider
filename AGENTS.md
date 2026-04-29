@@ -54,7 +54,7 @@
 - Band CSV header MUST be `Section,Key,Value,Index,Notes`.
 - Per-band CSV section order MUST match the `Active` plan's `## CSV format` section list. Keys MUST emit in declaration order. `ShowData`/`Stage` export as a separate "show" CSV; NEVER inline them in per-band CSVs.
 - Closed-set enums with an `Other`/`Custom` value MUST round-trip the paired `*Other` override string.
-- Running-order CSV columns MUST be `Stage,StartTime,BandName,SetLengthMinutes,ChangeoverMinutes,Notes`.
+- Running-order CSV columns MUST be `ShowId,Stage,StartTime,BandName,SetLengthMinutes,ChangeoverMinutes,Notes`.
 - USE CsvHelper. NEVER hand-roll CSV string concatenation.
 - Round-trip MUST be byte-stable. Adding a field MUST update writer, reader, and `ExportServiceTests` together.
 

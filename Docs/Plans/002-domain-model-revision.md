@@ -2,7 +2,9 @@
 
 ## Status
 
-`Active`
+`Superseded by 006 (partial)`
+
+The single `ShowData` root and the "multi-show out of scope" decision are superseded by 006. Section list, removals, and CSV layout from this plan still stand.
 
 ## Context
 

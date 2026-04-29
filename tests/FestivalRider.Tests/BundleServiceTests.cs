@@ -20,13 +20,18 @@ public sealed class BundleServiceTests
 
     private static AppState FullState()
     {
-        var state = new AppState();
-        state.ShowData = TestDataFactory.FullShow();
+        var show = TestDataFactory.FullShow();
+        var state = new AppState
+        {
+            Shows = new List<ShowData> { show },
+            ActiveShowId = show.Id,
+        };
         state.Bands.Add(TestDataFactory.FullBand(Guid.NewGuid()));
         state.Bands.Add(TestDataFactory.FullBand(Guid.NewGuid()));
         state.RunningOrders.Add(new RunningOrder
         {
             Id = Guid.NewGuid(),
+            ShowId = show.Id,
             ShowDayNumber = 1,
             Slots =
             {
@@ -83,7 +88,7 @@ public sealed class BundleServiceTests
         Assert.Equal(1, result.RunningOrderCount);
         Assert.Equal(original.Bands[0].Name, result.State!.Bands[0].Name);
         Assert.Equal(original.Bands[0].Rider.Tech.Foh.OwnConsoleModel, result.State.Bands[0].Rider.Tech.Foh.OwnConsoleModel);
-        Assert.Equal(original.ShowData.Name, result.State.ShowData.Name);
+        Assert.Equal(original.Shows[0].Name, result.State.Shows[0].Name);
         Assert.Equal(original.RunningOrders[0].Slots.Count, result.State.RunningOrders[0].Slots.Count);
         Assert.Null(result.Merge);
     }
@@ -101,7 +106,7 @@ public sealed class BundleServiceTests
         var names = archive.Entries.Select(e => e.FullName).ToList();
 
         Assert.Contains("manifest.json", names);
-        Assert.Contains("show.csv", names);
+        Assert.Equal(1, names.Count(n => n.StartsWith("shows/", StringComparison.Ordinal)));
         Assert.Equal(2, names.Count(n => n.StartsWith("bands/", StringComparison.Ordinal)));
         Assert.Equal(1, names.Count(n => n.StartsWith("running-orders/", StringComparison.Ordinal)));
     }
@@ -178,9 +183,11 @@ public sealed class BundleServiceTests
 
     private static AppState BuildLocalState(Action<AppState>? configure = null)
     {
+        var show = TestDataFactory.FullShow(); // stages: 1=Main, 2=Acoustic
         var state = new AppState
         {
-            ShowData = TestDataFactory.FullShow(), // stages: 1=Main, 2=Acoustic
+            Shows = new List<ShowData> { show },
+            ActiveShowId = show.Id,
         };
         configure?.Invoke(state);
         return state;
@@ -201,9 +208,11 @@ public sealed class BundleServiceTests
 
         // Bundle carries one band (incoming Guid not present locally).
         var bundleSender = new BandService(NullLogger<BandService>.Instance);
+        var bundleSenderShow = TestDataFactory.FullShow();
         var bundleState = new AppState
         {
-            ShowData = TestDataFactory.FullShow(),
+            Shows = new List<ShowData> { bundleSenderShow },
+            ActiveShowId = bundleSenderShow.Id,
             Bands = { BandWith(Guid.NewGuid(), "Incoming", new DateTimeOffset(2024, 5, 1, 0, 0, 0, TimeSpan.Zero)) },
         };
         bundleSender.ReplaceState(bundleState);
@@ -232,9 +241,11 @@ public sealed class BundleServiceTests
         var (svc, _, _) = Create();
         var sharedId = Guid.NewGuid();
 
+        var olderShow = TestDataFactory.FullShow();
         var olderBundle = new AppState
         {
-            ShowData = TestDataFactory.FullShow(),
+            Shows = new List<ShowData> { olderShow },
+            ActiveShowId = olderShow.Id,
             Bands = { BandWith(sharedId, "OldName", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero)) },
         };
         var zipOlder = svc.ExportBundle(olderBundle);
@@ -250,9 +261,11 @@ public sealed class BundleServiceTests
         Assert.Contains(skipResult.Warnings, w => w.Contains("skipped", StringComparison.OrdinalIgnoreCase));
 
         // Newer incoming wins.
+        var newerShow = TestDataFactory.FullShow();
         var newerBundle = new AppState
         {
-            ShowData = TestDataFactory.FullShow(),
+            Shows = new List<ShowData> { newerShow },
+            ActiveShowId = newerShow.Id,
             Bands = { BandWith(sharedId, "NewerName", new DateTimeOffset(2024, 12, 1, 0, 0, 0, TimeSpan.Zero)) },
         };
         var zipNewer = svc.ExportBundle(newerBundle);
@@ -269,9 +282,11 @@ public sealed class BundleServiceTests
         var sharedId = Guid.NewGuid();
         var ts = new DateTimeOffset(2024, 6, 1, 0, 0, 0, TimeSpan.Zero);
 
+        var equalShow = TestDataFactory.FullShow();
         var bundle = new AppState
         {
-            ShowData = TestDataFactory.FullShow(),
+            Shows = new List<ShowData> { equalShow },
+            ActiveShowId = equalShow.Id,
             Bands = { BandWith(sharedId, "Incoming", ts) },
         };
         var zip = svc.ExportBundle(bundle);
@@ -290,17 +305,17 @@ public sealed class BundleServiceTests
         var bundleShow = TestDataFactory.FullShow();
         bundleShow.Name = "Sender Festival";
         bundleShow.Stages[0].Name = "RenamedMain";
-        var bundle = new AppState { ShowData = bundleShow };
+        var bundle = new AppState { Shows = new List<ShowData> { bundleShow }, ActiveShowId = bundleShow.Id };
         var zip = svc.ExportBundle(bundle);
 
         var local = BuildLocalState();
-        var localShowRef = local.ShowData;
+        var localShowRef = local.Shows[0];
 
         var result = svc.ImportBundle(new MemoryStream(zip), BundleImportMode.Merge, local);
         Assert.Null(result.Error);
-        Assert.Same(localShowRef, result.State!.ShowData);
-        Assert.Equal("Festival 2024", result.State.ShowData.Name);
-        Assert.Equal("Main", result.State.ShowData.Stages[0].Name);
+        Assert.Same(localShowRef, result.State!.Shows[0]);
+        Assert.Equal("Festival 2024", result.State.Shows[0].Name);
+        Assert.Equal("Main", result.State.Shows[0].Stages[0].Name);
     }
 
     [Fact]
@@ -309,9 +324,10 @@ public sealed class BundleServiceTests
         var (svc, _, bands) = Create();
 
         // Sender's ShowData uses non-default stage IDs that won't match the local ones.
+        // Show name must match the local show so the per-show remap can resolve.
         var senderShow = new ShowData
         {
-            Name = "Sender",
+            Name = "Festival 2024",
             DateOfOpening = new DateOnly(2024, 6, 15),
             ShowDayCount = 3,
         };
@@ -321,13 +337,15 @@ public sealed class BundleServiceTests
         var bandId = Guid.NewGuid();
         var bundle = new AppState
         {
-            ShowData = senderShow,
+            Shows = new List<ShowData> { senderShow },
+            ActiveShowId = senderShow.Id,
             Bands = { BandWith(bandId, "B", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero)) },
             RunningOrders =
             {
                 new RunningOrder
                 {
                     Id = Guid.NewGuid(),
+                    ShowId = senderShow.Id,
                     ShowDayNumber = 1,
                     Slots =
                     {
@@ -356,20 +374,23 @@ public sealed class BundleServiceTests
     {
         var (svc, _, bands) = Create();
 
-        var senderShow = new ShowData { Name = "Sender", ShowDayCount = 1 };
+        // Show name must match the local show so the per-show remap can resolve.
+        var senderShow = new ShowData { Name = "Festival 2024", ShowDayCount = 1 };
         senderShow.Stages.Add(new Stage { Id = 1, Name = "Main" });
         senderShow.Stages.Add(new Stage { Id = 2, Name = "Tent" }); // not present locally
 
         var bandId = Guid.NewGuid();
         var bundle = new AppState
         {
-            ShowData = senderShow,
+            Shows = new List<ShowData> { senderShow },
+            ActiveShowId = senderShow.Id,
             Bands = { BandWith(bandId, "B", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero)) },
             RunningOrders =
             {
                 new RunningOrder
                 {
                     Id = Guid.NewGuid(),
+                    ShowId = senderShow.Id,
                     ShowDayNumber = 1,
                     Slots =
                     {
@@ -399,15 +420,18 @@ public sealed class BundleServiceTests
         var sharedRoId = Guid.NewGuid();
         var bandId = Guid.NewGuid();
 
+        var collisionShow = TestDataFactory.FullShow();
         var bundle = new AppState
         {
-            ShowData = TestDataFactory.FullShow(),
+            Shows = new List<ShowData> { collisionShow },
+            ActiveShowId = collisionShow.Id,
             Bands = { BandWith(bandId, "B", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero)) },
             RunningOrders =
             {
                 new RunningOrder
                 {
                     Id = sharedRoId,
+                    ShowId = collisionShow.Id,
                     ShowDayNumber = 2,
                     Slots = { new(bandId, 1, new TimeOnly(18, 0), 60, 15, "incoming") },
                 },
@@ -419,9 +443,11 @@ public sealed class BundleServiceTests
         var local = BuildLocalState(s =>
         {
             s.Bands.Add(BandWith(bandId, "Local B", DateTimeOffset.UtcNow));
+            // Local show name matches sender ("Festival 2024") so the merge can remap.
             s.RunningOrders.Add(new RunningOrder
             {
                 Id = sharedRoId,
+                ShowId = s.Shows[0].Id,
                 ShowDayNumber = 1,
                 Slots = { new(bandId, 1, new TimeOnly(10, 0), 30, 5, "local") },
             });
@@ -440,9 +466,11 @@ public sealed class BundleServiceTests
     {
         var (svc, _, _) = Create();
 
+        var sortShow = TestDataFactory.FullShow();
         var bundle = new AppState
         {
-            ShowData = TestDataFactory.FullShow(),
+            Shows = new List<ShowData> { sortShow },
+            ActiveShowId = sortShow.Id,
             Bands =
             {
                 BandWith(new Guid("ffffffff-ffff-ffff-ffff-ffffffffffff"), "Z", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero)),
@@ -464,7 +492,8 @@ public sealed class BundleServiceTests
     public void Merge_SchemaMismatch_RefusesLikeReplace()
     {
         var (svc, _, _) = Create();
-        var bundle = new AppState { ShowData = TestDataFactory.FullShow() };
+        var schemaShow = TestDataFactory.FullShow();
+        var bundle = new AppState { Shows = new List<ShowData> { schemaShow }, ActiveShowId = schemaShow.Id };
         var zip = svc.ExportBundle(bundle);
 
         var tampered = RebuildZip(zip, (name, content) =>
@@ -487,7 +516,8 @@ public sealed class BundleServiceTests
     public void Merge_NullCurrentState_Throws()
     {
         var (svc, _, _) = Create();
-        var bundle = new AppState { ShowData = TestDataFactory.FullShow() };
+        var nullShow = TestDataFactory.FullShow();
+        var bundle = new AppState { Shows = new List<ShowData> { nullShow }, ActiveShowId = nullShow.Id };
         var zip = svc.ExportBundle(bundle);
         Assert.Throws<ArgumentNullException>(
             () => svc.ImportBundle(new MemoryStream(zip), BundleImportMode.Merge, currentState: null));

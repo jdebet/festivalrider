@@ -473,6 +473,7 @@ public class ExportService : IExportService
         void S(string section, string key, string value, string index = "")
             => rows.Add(new Row { Section = section, Key = key, Value = value, Index = index });
 
+        S("Show", "Id", show.Id.ToString());
         S("Show", "Name", show.Name);
         S("Show", "Address", show.Address ?? string.Empty);
         S("Show", "DateOfOpening", IsoDate(show.DateOfOpening));
@@ -498,6 +499,8 @@ public class ExportService : IExportService
             DateOfOpening = ParseDateOnly(idx.Scalar("Show", "DateOfOpening"), DateOnly.FromDateTime(DateTime.UtcNow)),
             ShowDayCount = ParseInt(idx.Scalar("Show", "ShowDayCount"), 1),
         };
+        var idScalar = idx.Scalar("Show", "Id");
+        if (!string.IsNullOrEmpty(idScalar)) show.Id = ParseGuid(idScalar, show.Id);
         foreach (var g in idx.Indexed("Show.Stage"))
         {
             show.Stages.Add(new Stage
@@ -513,6 +516,7 @@ public class ExportService : IExportService
 
     private sealed class SlotRow
     {
+        public string ShowId { get; set; } = string.Empty;
         public string Stage { get; set; } = string.Empty;
         public string StartTime { get; set; } = string.Empty;
         public string BandName { get; set; } = string.Empty;
@@ -527,18 +531,18 @@ public class ExportService : IExportService
         NewLine = "\n",
     };
 
-    private string ResolveStageName(int stageId) =>
-        _bands.FindStage(stageId)?.Name ?? "Unknown stage";
+    private string ResolveStageName(Guid showId, int stageId) =>
+        _bands.FindStage(showId, stageId)?.Name ?? "Unknown stage";
 
     private string ResolveBandName(Guid bandId) =>
         _bands.FindBand(bandId)?.Name ?? "Unknown band";
 
-    private string WriteSlotRows(IEnumerable<RunningOrderSlot> slots)
+    private string WriteSlotRows(RunningOrder order, IEnumerable<RunningOrderSlot> slots)
     {
         // Stable ordering: by start time then stage name so diffs stay readable.
         var ordered = slots
             .OrderBy(s => s.StartTime)
-            .ThenBy(s => ResolveStageName(s.StageId), StringComparer.Ordinal);
+            .ThenBy(s => ResolveStageName(order.ShowId, s.StageId), StringComparer.Ordinal);
 
         using var sw = new StringWriter { NewLine = "\n" };
         using (var csv = new CsvWriter(sw, SlotConfig))
@@ -549,7 +553,8 @@ public class ExportService : IExportService
             {
                 csv.WriteRecord(new SlotRow
                 {
-                    Stage = ResolveStageName(s.StageId),
+                    ShowId = order.ShowId.ToString(),
+                    Stage = ResolveStageName(order.ShowId, s.StageId),
                     StartTime = s.StartTime.ToString("HH:mm", CultureInfo.InvariantCulture),
                     BandName = ResolveBandName(s.BandId),
                     SetLengthMinutes = Inv(s.SetLengthMinutes),
@@ -563,13 +568,13 @@ public class ExportService : IExportService
     }
 
     public string ExportRunningOrderCsv(RunningOrder order)
-        => WriteSlotRows(order.Slots);
+        => WriteSlotRows(order, order.Slots);
 
     public string ExportRunningOrderByStageCsv(RunningOrder order, int stageId)
-        => WriteSlotRows(order.Slots.Where(s => s.StageId == stageId));
+        => WriteSlotRows(order, order.Slots.Where(s => s.StageId == stageId));
 
     public string ExportRunningOrderByBandCsv(RunningOrder order, Guid bandId)
-        => WriteSlotRows(order.Slots.Where(s => s.BandId == bandId));
+        => WriteSlotRows(order, order.Slots.Where(s => s.BandId == bandId));
 
     public RunningOrder ImportRunningOrderCsv(string csv, ShowData show, IReadOnlyList<Band> bands)
     {
@@ -584,9 +589,13 @@ public class ExportService : IExportService
             .GroupBy(b => b.Name, StringComparer.Ordinal)
             .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.Ordinal);
 
-        var order = new RunningOrder();
+        var order = new RunningOrder { ShowId = show.Id };
         foreach (var r in rows)
         {
+            // Prefer the ShowId embedded in the row if present and parseable; falls back to the
+            // show passed in by the caller so legacy rows with empty ShowId still import.
+            if (Guid.TryParse(r.ShowId, out var rowShowId) && rowShowId != Guid.Empty)
+                order.ShowId = rowShowId;
             var stageId = stageByName.TryGetValue(r.Stage, out var sid) ? sid : 0;
             var bandId = bandByName.TryGetValue(r.BandName, out var bid) ? bid : Guid.Empty;
             var startTime = TimeOnly.TryParseExact(r.StartTime, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var t)

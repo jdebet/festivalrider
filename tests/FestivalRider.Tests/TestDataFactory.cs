@@ -88,6 +88,7 @@ public static class TestDataFactory
         return new RunningOrder
         {
             Id = Guid.NewGuid(),
+            ShowId = show.Id,
             ShowDayNumber = 1,
             Slots = new List<RunningOrderSlot>
             {

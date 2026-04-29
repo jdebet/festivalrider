@@ -20,7 +20,7 @@ public class BandRiderPrintStrategy : IPrintStrategy
     public string GetTitle(object context)
     {
         var band = ResolveBand(context);
-        var showName = _bands.Snapshot().ShowData.Name;
+        var showName = ActiveShow().Name;
         return string.IsNullOrWhiteSpace(showName)
             ? $"{band.Name} — rider"
             : $"{showName} — {band.Name} rider";
@@ -29,7 +29,7 @@ public class BandRiderPrintStrategy : IPrintStrategy
     public RenderFragment Render(object context)
     {
         var band = ResolveBand(context);
-        var show = _bands.Snapshot().ShowData;
+        var show = ActiveShow();
         return builder =>
         {
             var seq = 0;
@@ -40,6 +40,8 @@ public class BandRiderPrintStrategy : IPrintStrategy
             BuildHospitality(builder, ref seq, band.Rider.Hospitality);
         };
     }
+
+    private ShowData ActiveShow() => _bands.FindShow(_bands.ActiveShowId) ?? new ShowData();
 
     private Band ResolveBand(object context)
     {

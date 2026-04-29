@@ -12,6 +12,51 @@
 
 <h1 class="h3 mb-3">Settings</h1>
 
+<RiderSection Title="Manage shows">
+    <p class="text-muted small">Add, rename, delete, or switch the active show. Deleting the last show seeds a fresh "Untitled show".</p>
+    @if (BandService.Shows.Count == 0)
+    {
+        <div class="text-muted small mb-2">No shows yet.</div>
+    }
+    else
+    {
+        <ul class="list-group mb-2">
+            @foreach (var s in BandService.Shows)
+            {
+                var sid = s.Id;
+                <li class="list-group-item d-flex justify-content-between align-items-center" @key="sid">
+                    <div class="flex-grow-1 me-2">
+                        <InputText class="form-control form-control-sm"
+                                   @bind-Value="s.Name"
+                                   @bind-Value:after="() => RenameShow(s)" />
+                    </div>
+                    <div class="btn-group btn-group-sm">
+                        @if (BandService.ActiveShowId == sid)
+                        {
+                            <button type="button" class="btn btn-primary" disabled>Active</button>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-outline-primary"
+                                    @onclick="() => SetActiveShow(sid)">Set active</button>
+                        }
+                        <button type="button" class="btn btn-outline-danger"
+                                @onclick="() => RequestDeleteShow(sid)">Delete</button>
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+    <div class="row g-2 align-items-end">
+        <div class="col-md-9">
+            <input class="form-control" placeholder="New show name" @bind="_newShowName" />
+        </div>
+        <div class="col-md-3">
+            <button type="button" class="btn btn-outline-primary w-100" @onclick="AddShow">+ Add show</button>
+        </div>
+    </div>
+</RiderSection>
+
 <RiderSection Title="Show details">
     <EditForm Model="_show" OnValidSubmit="SaveShow">
         <DataAnnotationsValidator />
@@ -167,13 +212,23 @@
                OnConfirm="ConfirmDeleteStage"
                OnCancel="() => _pendingDeleteStageId = null" />
 
+<ConfirmDialog Show="_pendingDeleteShowId.HasValue"
+               Title="Delete show"
+               Message="@_deleteShowMessage"
+               ConfirmLabel="Delete"
+               OnConfirm="ConfirmDeleteShow"
+               OnCancel="() => _pendingDeleteShowId = null" />
+
 @code {
     private ShowData _show = new();
     private DateTime _dateOfOpening = DateTime.Today;
     private string _newStageName = string.Empty;
+    private string _newShowName = string.Empty;
     private bool _confirmClear;
     private int? _pendingDeleteStageId;
     private string _deleteStageMessage = string.Empty;
+    private Guid? _pendingDeleteShowId;
+    private string _deleteShowMessage = string.Empty;
     private AppState _snapshot = new();
     private BundleImportResult? _pendingBundle;
     private BundleImportMode _bundleImportMode = BundleImportMode.Replace;
@@ -197,20 +252,16 @@
     private void Reload()
     {
         _snapshot = BandService.Snapshot();
-        _show = _snapshot.ShowData;
+        _show = BandService.FindShow(BandService.ActiveShowId) ?? _snapshot.Shows.FirstOrDefault() ?? new ShowData();
         _dateOfOpening = _show.DateOfOpening == default
             ? DateTime.Today
             : _show.DateOfOpening.ToDateTime(TimeOnly.MinValue);
     }
 
-    private void SaveShow()
+    private async Task SaveShow()
     {
         _show.DateOfOpening = DateOnly.FromDateTime(_dateOfOpening);
-        // ShowData is mutated in place inside the live AppState (Snapshot returns the same instance reference today),
-        // but to be defensive, re-apply via ReplaceState to ensure OnChange fires and listeners persist.
-        var state = BandService.Snapshot();
-        state.ShowData = _show;
-        BandService.ReplaceState(state);
+        await BandService.UpdateShow(_show);
         Toasts.Show("Show details saved.", ToastLevel.Success);
     }
 
@@ -238,6 +289,49 @@
             Toasts.Show("Stage deleted.", ToastLevel.Info);
         }
         _pendingDeleteStageId = null;
+    }
+
+    private void AddShow()
+    {
+        var name = _newShowName.Trim();
+        if (string.IsNullOrEmpty(name)) return;
+        var id = BandService.AddShow(name);
+        _newShowName = string.Empty;
+        Toasts.Show($"Show \"{name}\" added.", ToastLevel.Success);
+        _ = BandService.SetActiveShow(id);
+    }
+
+    private async Task SetActiveShow(Guid id)
+    {
+        await BandService.SetActiveShow(id);
+    }
+
+    private async Task RenameShow(ShowData show)
+    {
+        await BandService.UpdateShow(show);
+    }
+
+    private void RequestDeleteShow(Guid id)
+    {
+        var show = BandService.FindShow(id);
+        var roCount = BandService.RunningOrders.Count(o => o.ShowId == id);
+        _pendingDeleteShowId = id;
+        _deleteShowMessage = roCount == 0
+            ? $"Delete show \"{show?.Name ?? id.ToString()}\"? This cannot be undone."
+            : $"Delete show \"{show?.Name ?? id.ToString()}\" and its {roCount} running order(s)? This cannot be undone.";
+    }
+
+    private async Task ConfirmDeleteShow()
+    {
+        if (_pendingDeleteShowId is { } id)
+        {
+            // Running orders tied to this show would otherwise orphan; remove them first.
+            foreach (var ro in BandService.RunningOrders.Where(o => o.ShowId == id).Select(o => o.Id).ToList())
+                BandService.DeleteRunningOrder(ro);
+            await BandService.DeleteShow(id);
+            Toasts.Show("Show deleted.", ToastLevel.Info);
+        }
+        _pendingDeleteShowId = null;
     }
 
     private async Task ForceSave()
@@ -274,9 +368,9 @@
         try
         {
             var show = Export.ImportShowCsv(csv);
-            var state = BandService.Snapshot();
-            state.ShowData = show;
-            BandService.ReplaceState(state);
+            // Pin the imported show to the currently active ShowId so stage references stay consistent.
+            show.Id = BandService.ActiveShowId;
+            await BandService.UpdateShow(show);
             Toasts.Show($"Imported show \"{show.Name}\" with {show.Stages.Count} stage(s).", ToastLevel.Success);
         }
         catch (Exception ex)

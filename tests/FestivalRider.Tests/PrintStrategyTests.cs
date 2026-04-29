@@ -11,22 +11,26 @@ public sealed class PrintStrategyTests
 {
     private static (IBandService, Band) Seed()
     {
-        var bands = new BandService(NullLogger<BandService>.Instance);
-        bands.ReplaceState(new AppState
+        var show = new ShowData
         {
-            ShowData = new ShowData
-            {
-                Name = "Fest 2024",
-                DateOfOpening = new DateOnly(2024, 6, 15),
-                ShowDayCount = 2,
-                Stages = { new Stage { Id = 1, Name = "Main" } }
-            }
-        });
+            Name = "Fest 2024",
+            DateOfOpening = new DateOnly(2024, 6, 15),
+            ShowDayCount = 2,
+            Stages = { new Stage { Id = 1, Name = "Main" } }
+        };
+        var state = new AppState
+        {
+            Shows = new List<ShowData> { show },
+            ActiveShowId = show.Id,
+        };
+        var bands = new BandService(NullLogger<BandService>.Instance);
+        bands.ReplaceState(state);
         var band = TestDataFactory.FullBand();
         bands.AddBand(band);
         bands.AddRunningOrder(new RunningOrder
         {
             Id = Guid.NewGuid(),
+            ShowId = show.Id,
             ShowDayNumber = 1,
             Slots = { new(band.Id, 1, new TimeOnly(20, 0), 60, 15, "Headliner") }
         });

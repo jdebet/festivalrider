@@ -79,13 +79,14 @@ public sealed class ExportServiceTests
         var bands = new BandService(NullLogger<BandService>.Instance);
         var svc = Create(bands);
         var show = TestDataFactory.FullShow();
-        bands.ReplaceState(new AppState { ShowData = show });
+        bands.ReplaceState(new AppState { Shows = new List<ShowData> { show }, ActiveShowId = show.Id });
         var band = TestDataFactory.FullBand();
         bands.AddBand(band);
         var ro = TestDataFactory.FullRunningOrder(show, band);
 
         var csv = svc.ExportRunningOrderCsv(ro);
-        Assert.Contains("Stage,StartTime,BandName,SetLengthMinutes,ChangeoverMinutes,Notes", csv);
+        Assert.Contains("ShowId,Stage,StartTime,BandName,SetLengthMinutes,ChangeoverMinutes,Notes", csv);
+        Assert.Contains(show.Id.ToString(), csv);
         Assert.Contains("14:00", csv);
         Assert.Contains("18:00", csv);
         Assert.Contains("Warmup", csv);
@@ -102,7 +103,7 @@ public sealed class ExportServiceTests
         var bands = new BandService(NullLogger<BandService>.Instance);
         var svc = Create(bands);
         var show = TestDataFactory.FullShow();
-        bands.ReplaceState(new AppState { ShowData = show });
+        bands.ReplaceState(new AppState { Shows = new List<ShowData> { show }, ActiveShowId = show.Id });
         var band = TestDataFactory.FullBand();
         bands.AddBand(band);
         var ro = TestDataFactory.FullRunningOrder(show, band);
@@ -120,7 +121,7 @@ public sealed class ExportServiceTests
         var bands = new BandService(NullLogger<BandService>.Instance);
         var svc = Create(bands);
         var show = TestDataFactory.FullShow();
-        bands.ReplaceState(new AppState { ShowData = show });
+        bands.ReplaceState(new AppState { Shows = new List<ShowData> { show }, ActiveShowId = show.Id });
         var band = TestDataFactory.FullBand();
         bands.AddBand(band);
         var ro = TestDataFactory.FullRunningOrder(show, band);

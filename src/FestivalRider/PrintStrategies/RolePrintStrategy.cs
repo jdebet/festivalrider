@@ -21,7 +21,7 @@ public class RolePrintStrategy : IPrintStrategy
     public string GetTitle(object context)
     {
         var (order, role, _) = Resolve(context);
-        var show = _bands.Snapshot().ShowData;
+        var show = _bands.FindShow(order.ShowId) ?? new ShowData();
         var date = show.DateOfOpening == default
             ? $"Day {order.ShowDayNumber}"
             : show.DateOfOpening.AddDays(order.ShowDayNumber - 1).ToString("ddd dd MMM yyyy");
@@ -33,7 +33,7 @@ public class RolePrintStrategy : IPrintStrategy
     public RenderFragment Render(object context)
     {
         var (order, role, slots) = Resolve(context);
-        var show = _bands.Snapshot().ShowData;
+        var show = _bands.FindShow(order.ShowId) ?? new ShowData();
         return builder =>
         {
             var seq = 0;

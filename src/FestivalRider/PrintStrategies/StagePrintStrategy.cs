@@ -21,7 +21,7 @@ public class StagePrintStrategy : IPrintStrategy
     public string GetTitle(object context)
     {
         var (order, stage, _) = Resolve(context);
-        var show = _bands.Snapshot().ShowData;
+        var show = _bands.FindShow(order.ShowId) ?? new ShowData();
         var date = show.DateOfOpening == default
             ? $"Day {order.ShowDayNumber}"
             : show.DateOfOpening.AddDays(order.ShowDayNumber - 1).ToString("ddd dd MMM yyyy");
@@ -33,7 +33,7 @@ public class StagePrintStrategy : IPrintStrategy
     public RenderFragment Render(object context)
     {
         var (order, stage, slots) = Resolve(context);
-        var show = _bands.Snapshot().ShowData;
+        var show = _bands.FindShow(order.ShowId) ?? new ShowData();
         return builder =>
         {
             var seq = 0;
@@ -49,8 +49,8 @@ public class StagePrintStrategy : IPrintStrategy
             throw new ArgumentException($"StagePrintStrategy expects StageContext, got {context?.GetType().Name ?? "null"}.", nameof(context));
         var order = _bands.FindRunningOrder(ctx.RunningOrderId)
             ?? throw new InvalidOperationException($"Running order {ctx.RunningOrderId} not found.");
-        var stage = _bands.FindStage(ctx.StageId)
-            ?? throw new InvalidOperationException($"Stage {ctx.StageId} not found.");
+        var stage = _bands.FindStage(order.ShowId, ctx.StageId)
+            ?? throw new InvalidOperationException($"Stage {ctx.StageId} not found in show {order.ShowId}.");
         var slots = order.Slots
             .Where(s => s.StageId == ctx.StageId)
             .OrderBy(s => s.StartTime)
