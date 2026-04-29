@@ -19,6 +19,9 @@ Versioned design documents for FestivalRider. Each plan captures locked decision
 | 003 | [Bundle zip export/import](./003-bundle-zip-export-import.md) | Superseded by 005 (partial) | Adjunct to 002. Adds single-file `.zip` bundle (`manifest.json` + per-entity CSVs) for full `AppState` round-trip. Replace-only import, schema-version gated, 20 MB cap. Wire format authoritative; Replace-only semantics superseded by 005. |
 | 004 | [Repo restructure: src/ and tests/](./004-repo-restructure-src-tests.md) | Active | Moves main project to `src/FestivalRider/` and test project to `tests/FestivalRider.Tests/`. Drops the `<Compile Remove>` workaround so the SDK glob can no longer see test sources. |
 | 005 | [Bundle merge-on-import](./005-bundle-merge-import.md) | Active | Successor to 003. Adds opt-in `BundleImportMode.Merge`: upserts bands and running orders by `Guid`, preserves locally unlisted entities, remaps stage references by name, leaves `ShowData` untouched. |
+| 006 | [Multi-show support](./006-multi-show-support.md) | Draft | Successor to 002 (partial). Generalizes `AppState.ShowData` to `List<ShowData> Shows` + `Guid ActiveShowId`; scopes running orders by `ShowId`; bands stay global. Schema bump 2 → 3. |
+| 007 | [jsPDF render swap](./007-jspdf-render.md) | Draft | Replaces the `RenderToPdfAsync` stub with a real PDF render via lazy-loaded `jsPDF` + `html2canvas`. Adds a "Download PDF" button to print pages. Amends the AGENTS rule that locked the `// SWAP` marker. |
+| 008 | [Schema migration framework](./008-schema-migration.md) | Draft | Adds an `IStateMigrator` pipeline run inside `StorageService.EnsureLoadedAsync`. Ships v1 → v2 as the first concrete migrator; reserves the v2 → v3 slot for 006. Backup-and-reset stays as the fallback. |
 
 ## Template
 
