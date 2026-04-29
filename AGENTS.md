@@ -76,7 +76,7 @@
 
 - ALWAYS test services through their interfaces. NEVER new up a concrete service outside construction lines.
 - ALWAYS fake `IJSRuntime` and time. NEVER touch real `localStorage`, `window.print()`, or the network in tests.
-- Tests MUST live in `FestivalRider.Tests/`. NEVER co-locate with production code.
+- Tests MUST live in `tests/FestivalRider.Tests/`. NEVER co-locate with production code.
 
 ## Task discipline
 

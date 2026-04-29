@@ -14,7 +14,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\FestivalRider.csproj" />
+        <ProjectReference Include="..\..\src\FestivalRider\FestivalRider.csproj" />
     </ItemGroup>
 
 </Project>

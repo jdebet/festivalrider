@@ -17,6 +17,7 @@ Versioned design documents for FestivalRider. Each plan captures locked decision
 | 001 | [Initial plan](./001-initial-plan.md)                   | Superseded by 002 (partial) | Static Blazor WASM 9 PWA on GitHub Pages — bands, riders, running order, print pipeline. Model spec + CSV sections superseded by 002; all other sections authoritative. |
 | 002 | [Domain model revision](./002-domain-model-revision.md) | Active | Refines models: single `ShowData` root, normalized `TravelParty`, structured `TechRider` (cables / lighting / power / FOH / monitors / stage). Drops `Genre`, `InputChannel`, `BacklineItem`. |
 | 003 | [Bundle zip export/import](./003-bundle-zip-export-import.md) | Active | Adjunct to 002. Adds single-file `.zip` bundle (`manifest.json` + per-entity CSVs) for full `AppState` round-trip. Replace-only import, schema-version gated, 20 MB cap. |
+| 004 | [Repo restructure: src/ and tests/](./004-repo-restructure-src-tests.md) | Active | Moves main project to `src/FestivalRider/` and test project to `tests/FestivalRider.Tests/`. Drops the `<Compile Remove>` workaround so the SDK glob can no longer see test sources. |
 
 ## Template
 

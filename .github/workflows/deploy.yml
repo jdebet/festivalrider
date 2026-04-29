@@ -29,7 +29,7 @@ jobs:
           dotnet-version: 9.0.x
 
       - name: Publish
-        run: dotnet publish FestivalRider.csproj -c Release -o publish -p:BlazorWebAssemblyBaseHref=/FestivalRider/
+        run: dotnet publish src/FestivalRider/FestivalRider.csproj -c Release -o publish -p:BlazorWebAssemblyBaseHref=/FestivalRider/
 
       # `BlazorWebAssemblyBaseHref` only rewrites index.html. Mirror the result
       # into 404.html so GitHub Pages' SPA fallback boots Blazor with the

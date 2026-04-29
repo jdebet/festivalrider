@@ -17,10 +17,6 @@
         <ServiceWorker Include="wwwroot\service-worker.js" PublishedContent="wwwroot\service-worker.published.js"/>
     </ItemGroup>
 
-    <ItemGroup>
-        <Compile Remove="FestivalRider.Tests\**\*.cs" />
-    </ItemGroup>
-
     <!--
         Rewrites <base href="/"> in the published index.html and 404.html when
         $(BlazorWebAssemblyBaseHref) is supplied (e.g. CI: -p:BlazorWebAssemblyBaseHref=/FestivalRider/).
