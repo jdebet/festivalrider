@@ -24,11 +24,12 @@ public class StorageService : IStorageService, IAsyncDisposable
     private readonly IBandService _bands;
     private readonly IJSRuntime _js;
     private readonly IToastService _toasts;
+    private readonly TimeProvider _timeProvider;
     private readonly Guid _tabId = Guid.NewGuid();
 
     private DotNetObjectReference<StorageService>? _selfRef;
     private CancellationTokenSource? _debounceCts;
-    private Timer? _heartbeatTimer;
+    private ITimer? _heartbeatTimer;
     private bool _loaded;
     private bool _subscribed;
 
@@ -36,12 +37,14 @@ public class StorageService : IStorageService, IAsyncDisposable
         ILogger<StorageService> logger,
         IBandService bands,
         IJSRuntime js,
-        IToastService toasts)
+        IToastService toasts,
+        TimeProvider? timeProvider = null)
     {
         _logger = logger;
         _bands = bands;
         _js = js;
         _toasts = toasts;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public bool AnotherTabActive { get; private set; }
@@ -69,7 +72,7 @@ public class StorageService : IStorageService, IAsyncDisposable
         _bands.OnChange += OnBandsChanged;
         _subscribed = true;
 
-        _heartbeatTimer = new Timer(_ => _ = HeartbeatAsync(), null, 0, HeartbeatMs);
+        _heartbeatTimer = _timeProvider.CreateTimer(_ => _ = HeartbeatAsync(), null, TimeSpan.Zero, TimeSpan.FromMilliseconds(HeartbeatMs));
     }
 
     public async Task FlushAsync()
@@ -151,7 +154,7 @@ public class StorageService : IStorageService, IAsyncDisposable
         _debounceCts?.Cancel();
         var cts = new CancellationTokenSource();
         _debounceCts = cts;
-        try { await Task.Delay(DebounceMs, cts.Token); }
+        try { await Task.Delay(TimeSpan.FromMilliseconds(DebounceMs), _timeProvider, cts.Token); }
         catch (TaskCanceledException) { return; }
         if (cts.IsCancellationRequested) return;
         await WriteStateAsync();
