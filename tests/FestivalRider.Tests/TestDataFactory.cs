@@ -1,3 +1,5 @@
+using System.IO.Compression;
+using System.Text;
 using FestivalRider.Models;
 
 namespace FestivalRider.Tests;
@@ -111,6 +113,50 @@ public static class TestDataFactory
           ]
         }
         """;
+
+    /// <summary>
+    /// Hand-rolls a v2 .zip bundle in plan-003 wire format (`schemaVersion: 2`, single
+    /// `show` field on the manifest, running-order CSV without a `ShowId` column) so
+    /// migration integration tests can exercise the v2 → v3 path without depending on a
+    /// long-deleted `BundleService` build.
+    /// </summary>
+    public static byte[] BuildV2BundleZip()
+    {
+        var bandId = new Guid("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var orderId = new Guid("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        var showCsv = "Section,Key,Value,Index,Notes\nShow,Name,V2 Festival,,\nShow,ShowDayCount,1,,\n";
+        var bandCsv = $"Section,Key,Value,Index,Notes\nBand,Id,{bandId},,\nBand,Name,Alpha,,\n";
+        var roCsv =
+            "Stage,StartTime,BandName,SetLengthMinutes,ChangeoverMinutes,Notes\n" +
+            "Main,18:00,Alpha,60,15,Headliner\n";
+
+        var manifest = "{" +
+            "\"format\":\"festivalrider-bundle\"," +
+            "\"schemaVersion\":2," +
+            "\"exportedAt\":\"2024-06-15T00:00:00+00:00\"," +
+            "\"show\":\"show.csv\"," +
+            $"\"bands\":[\"bands/{bandId}.csv\"]," +
+            $"\"runningOrders\":[\"running-orders/{orderId}.csv\"]" +
+            "}";
+
+        using var ms = new MemoryStream();
+        using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            WriteEntry(zip, "show.csv", showCsv);
+            WriteEntry(zip, $"bands/{bandId}.csv", bandCsv);
+            WriteEntry(zip, $"running-orders/{orderId}.csv", roCsv);
+            WriteEntry(zip, "manifest.json", manifest);
+        }
+        return ms.ToArray();
+
+        static void WriteEntry(ZipArchive zip, string name, string content)
+        {
+            var entry = zip.CreateEntry(name);
+            using var s = entry.Open();
+            var bytes = new UTF8Encoding(false).GetBytes(content);
+            s.Write(bytes, 0, bytes.Length);
+        }
+    }
 
     public static RunningOrder FullRunningOrder(ShowData show, Band band)
     {

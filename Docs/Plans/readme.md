@@ -23,7 +23,7 @@ Versioned design documents for FestivalRider. Each plan captures locked decision
 | 007 | [jsPDF render swap](./007-jspdf-render.md) | Superseded by 009 (full) | Parked before implementation. Raster pipeline (`html2canvas` + `jsPDF`) cannot produce searchable / highlightable PDFs; product needs vector. See 009 for the new direction. |
 | 008 | [Schema migration framework](./008-schema-migration.md) | Active | Adds an `IStateMigrator` pipeline run inside `StorageService.EnsureLoadedAsync`. Ships v1 → v2 as the first concrete migrator; reserves the v2 → v3 slot for 006. Backup-and-reset stays as the fallback. |
 | 009 | [Searchable PDF export & bundles](./009-searchable-pdf-bundle.md) | Draft | Roadmap / umbrella replacing 007. Locks the direction (emit PDF primitives directly; QuestPDF as default candidate) and reserves successor plans 010 (vector engine), 011 (PDF bundles), 012 (polish) for the concrete waves. |
-| 013 | [Bundle schema migration](./013-bundle-schema-migration.md) | Draft | Successor to 003 / 005 / 008. Adds an `IBundleMigrator` pipeline run inside `BundleService.ImportBundle`, ships v2 → v3 as the first concrete migrator, and softens 003's hard-refuse policy to migrate-then-fallback. Bundle wire format unchanged. (010-012 reserved by 009 for the PDF roadmap.) |
+| 013 | [Bundle schema migration](./013-bundle-schema-migration.md) | Active | Successor to 003 / 005 / 008. Adds an `IBundleMigrator` pipeline run inside `BundleService.ImportBundle`, ships v2 → v3 as the first concrete migrator, and softens 003's hard-refuse policy to migrate-then-fallback. Bundle wire format unchanged. (010-012 reserved by 009 for the PDF roadmap.) |
 
 ## Template
 

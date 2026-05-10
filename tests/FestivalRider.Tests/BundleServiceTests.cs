@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
+using FestivalRider.BundleMigrators;
 using FestivalRider.Models;
 using FestivalRider.Services;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -10,12 +11,18 @@ namespace FestivalRider.Tests;
 
 public sealed class BundleServiceTests
 {
-    private static (BundleService, IExportService, BandService) Create()
+    private static (BundleService, IExportService, BandService) Create(IEnumerable<IBundleMigrator>? migrators = null)
     {
         var bands = new BandService(NullLogger<BandService>.Instance);
         var export = new ExportService(NullLogger<ExportService>.Instance, bands);
-        var svc = new BundleService(export, NullLogger<BundleService>.Instance);
+        var svc = new BundleService(export, NullLogger<BundleService>.Instance, migrators);
         return (svc, export, bands);
+    }
+
+    private static BundleService CreateWithV2Migrator()
+    {
+        var (svc, _, _) = Create(new IBundleMigrator[] { new V2ToV3BundleMigrator() });
+        return svc;
     }
 
     private static AppState FullState()
@@ -521,5 +528,203 @@ public sealed class BundleServiceTests
         var zip = svc.ExportBundle(bundle);
         Assert.Throws<ArgumentNullException>(
             () => svc.ImportBundle(new MemoryStream(zip), BundleImportMode.Merge, currentState: null));
+    }
+
+    // -------- Bundle migration (plan 013) --------
+
+    [Fact]
+    public void Constructor_DuplicateMigrator_Throws()
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() => Create(new IBundleMigrator[]
+        {
+            new V2ToV3BundleMigrator(),
+            new V2ToV3BundleMigrator(),
+        }));
+        Assert.Contains("Duplicate", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Constructor_NonStepwiseMigrator_Throws()
+    {
+        Assert.Throws<InvalidOperationException>(() => Create(new IBundleMigrator[]
+        {
+            new SkippingBundleMigrator(),
+        }));
+    }
+
+    [Fact]
+    public void Import_V2Bundle_Replace_MigratesAndDecodes()
+    {
+        var svc = CreateWithV2Migrator();
+        var zip = TestDataFactory.BuildV2BundleZip();
+        var result = svc.ImportBundle(new MemoryStream(zip));
+
+        Assert.Null(result.Error);
+        Assert.NotNull(result.State);
+        Assert.Equal(3, result.State!.SchemaVersion);
+        Assert.Single(result.State.Shows);
+        Assert.Equal("V2 Festival", result.State.Shows[0].Name);
+        Assert.Equal(result.State.Shows[0].Id, result.State.ActiveShowId);
+        Assert.Single(result.State.Bands);
+        Assert.Equal("Alpha", result.State.Bands[0].Name);
+        Assert.Single(result.State.RunningOrders);
+        Assert.Equal(result.State.Shows[0].Id, result.State.RunningOrders[0].ShowId);
+    }
+
+    [Fact]
+    public void Import_V2Bundle_DoesNotReuseShowIdAcrossImports()
+    {
+        var svc = CreateWithV2Migrator();
+        var zip = TestDataFactory.BuildV2BundleZip();
+
+        var first = svc.ImportBundle(new MemoryStream(zip));
+        var second = svc.ImportBundle(new MemoryStream(zip));
+
+        Assert.Null(first.Error);
+        Assert.Null(second.Error);
+        Assert.NotEqual(first.State!.Shows[0].Id, second.State!.Shows[0].Id);
+    }
+
+    [Fact]
+    public void Import_V2Bundle_Merge_MigratesThenMerges()
+    {
+        var svc = CreateWithV2Migrator();
+        var zip = TestDataFactory.BuildV2BundleZip();
+
+        // Local has zero bands and no shows by name; merge should add the v2 band.
+        var local = new AppState();
+        var result = svc.ImportBundle(new MemoryStream(zip), BundleImportMode.Merge, local);
+
+        Assert.Null(result.Error);
+        Assert.NotNull(result.Merge);
+        Assert.Equal(1, result.Merge!.BandsAdded);
+        // Sender show name doesn't match any local show -> running order skipped.
+        Assert.Equal(1, result.Merge.RunningOrdersSkipped);
+    }
+
+    [Fact]
+    public void Import_V0Bundle_NoMigratorChain_Fails_WithGapMessage()
+    {
+        var svc = CreateWithV2Migrator();
+
+        // Hand-roll a v0 bundle (only schemaVersion changed; no v0 migrator registered).
+        var zip = TamperManifest(TestDataFactory.BuildV2BundleZip(), m => m["schemaVersion"] = 0);
+        var result = svc.ImportBundle(new MemoryStream(zip));
+
+        Assert.NotNull(result.Error);
+        Assert.Contains("cannot upgrade", result.Error!, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("v0", result.Error!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Import_NoMigratorsRegistered_KeepsLegacyMessage()
+    {
+        var (svc, _, _) = Create(); // no migrators
+        var zip = TestDataFactory.BuildV2BundleZip();
+        var result = svc.ImportBundle(new MemoryStream(zip));
+
+        Assert.NotNull(result.Error);
+        Assert.Contains("too old", result.Error!, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Import_Throwing_Migrator_Fails()
+    {
+        var (svc, _, _) = Create(new IBundleMigrator[] { new ThrowingBundleMigrator() });
+        var zip = TestDataFactory.BuildV2BundleZip();
+        var result = svc.ImportBundle(new MemoryStream(zip));
+
+        Assert.NotNull(result.Error);
+        Assert.Contains("migration failed", result.Error!, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Import_AlreadyCurrent_BypassesChain()
+    {
+        // An already-v3 bundle should short-circuit even with a (would-be-broken)
+        // v0 -> v1 migrator registered; the chain never runs.
+        var (svc, _, _) = Create(new IBundleMigrator[] { new ThrowingV0Migrator() });
+        var (exporter, _, bands) = Create();
+        var state = FullState();
+        bands.ReplaceState(state);
+        var zip = exporter.ExportBundle(state);
+
+        var result = svc.ImportBundle(new MemoryStream(zip));
+        Assert.Null(result.Error);
+    }
+
+    [Fact]
+    public void Import_MigratedBundle_ReExport_IsAlreadyCurrent()
+    {
+        var svc = CreateWithV2Migrator();
+        var (exporter, _, bands) = Create();
+
+        var first = svc.ImportBundle(new MemoryStream(TestDataFactory.BuildV2BundleZip()));
+        Assert.Null(first.Error);
+
+        bands.ReplaceState(first.State!);
+        var v3Zip = exporter.ExportBundle(first.State!);
+
+        // Second import of the re-exported bundle goes through the no-migration short-circuit.
+        var second = svc.ImportBundle(new MemoryStream(v3Zip));
+        Assert.Null(second.Error);
+        Assert.Equal(first.State!.Shows[0].Id, second.State!.Shows[0].Id);
+    }
+
+    private static byte[] TamperManifest(byte[] zip, Action<Dictionary<string, object>> mutate)
+    {
+        var entries = new List<(string name, byte[] content)>();
+        using (var ms = new MemoryStream(zip))
+        using (var zipIn = new ZipArchive(ms, ZipArchiveMode.Read))
+        {
+            foreach (var entry in zipIn.Entries)
+            {
+                using var s = entry.Open();
+                using var rdr = new BinaryReader(s);
+                var raw = rdr.ReadBytes((int)entry.Length);
+                if (entry.FullName == "manifest.json")
+                {
+                    var dict = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(Encoding.UTF8.GetString(raw))!
+                        .ToDictionary(kv => kv.Key, kv => (object)kv.Value);
+                    mutate(dict);
+                    raw = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(dict));
+                }
+                entries.Add((entry.FullName, raw));
+            }
+        }
+        using var outMs = new MemoryStream();
+        using (var outZip = new ZipArchive(outMs, ZipArchiveMode.Create, true))
+        {
+            foreach (var (name, content) in entries)
+            {
+                var ne = outZip.CreateEntry(name);
+                using var ws = ne.Open();
+                ws.Write(content, 0, content.Length);
+            }
+        }
+        return outMs.ToArray();
+    }
+
+    private sealed class ThrowingBundleMigrator : IBundleMigrator
+    {
+        public int FromVersion => 2;
+        public int ToVersion => 3;
+        public void Migrate(BundleScratch scratch, IList<string> warnings) =>
+            throw new InvalidOperationException("boom");
+    }
+
+    private sealed class ThrowingV0Migrator : IBundleMigrator
+    {
+        public int FromVersion => 0;
+        public int ToVersion => 1;
+        public void Migrate(BundleScratch scratch, IList<string> warnings) =>
+            throw new InvalidOperationException("should never run");
+    }
+
+    private sealed class SkippingBundleMigrator : IBundleMigrator
+    {
+        public int FromVersion => 1;
+        public int ToVersion => 3; // not stepwise
+        public void Migrate(BundleScratch scratch, IList<string> warnings) { }
     }
 }

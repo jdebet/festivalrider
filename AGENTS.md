@@ -49,6 +49,8 @@
 - On schema mismatch: run the `IStateMigrator` chain inside `StorageService.EnsureLoadedAsync`. If the chain reaches `CurrentSchemaVersion`, persist the migrated payload before binding and toast `"Migrated data v{from} → v{to}."`. Otherwise fall back to: copy raw payload to `festivalrider.backup.v{found}`, reset to clean `AppState`, toast. NEVER throw.
 - ALWAYS heartbeat `festivalrider.tab-lock` every 2s. Second tab MUST set `AnotherTabActive = true`; editing UI MUST disable via `MultiTabBanner`.
 - NEVER implement live cross-tab sync (out of scope).
+- ALL bundle-shape transformations MUST live under `src/FestivalRider/BundleMigrators/` as `IBundleMigrator` implementations. NEVER inline bundle migration in `BundleService` or any other service. Released bundle-migrator files MUST NOT be edited; bug fixes ship as a successor migrator.
+- On bundle schema mismatch: run the `IBundleMigrator` chain inside `BundleService.ImportBundle` between manifest format validation and entity decode. If the chain reaches `CurrentSchemaVersion`, continue with the migrated scratch and surface warnings via `BundleImportResult.Warnings`. Otherwise return `BundleImportResult` with `Error`; NEVER persist a bundle backup.
 
 ## CSV
 

@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using FestivalRider.BundleMigrators;
 using FestivalRider.Models;
 using Microsoft.Extensions.Logging;
 
@@ -26,11 +27,32 @@ public class BundleService : IBundleService
 
     private readonly IExportService _export;
     private readonly ILogger<BundleService> _logger;
+    private readonly IReadOnlyDictionary<int, IBundleMigrator> _migrators;
 
-    public BundleService(IExportService export, ILogger<BundleService> logger)
+    public BundleService(
+        IExportService export,
+        ILogger<BundleService> logger,
+        IEnumerable<IBundleMigrator>? migrators = null)
     {
         _export = export;
         _logger = logger;
+        _migrators = BuildMigratorIndex(migrators);
+    }
+
+    private static IReadOnlyDictionary<int, IBundleMigrator> BuildMigratorIndex(IEnumerable<IBundleMigrator>? migrators)
+    {
+        var dict = new Dictionary<int, IBundleMigrator>();
+        if (migrators is null) return dict;
+        foreach (var m in migrators)
+        {
+            if (m.ToVersion != m.FromVersion + 1)
+                throw new InvalidOperationException(
+                    $"Bundle migrator {m.GetType().Name} is not step-wise: FromVersion={m.FromVersion}, ToVersion={m.ToVersion}.");
+            if (!dict.TryAdd(m.FromVersion, m))
+                throw new InvalidOperationException(
+                    $"Duplicate IBundleMigrator registered for FromVersion={m.FromVersion}: {dict[m.FromVersion].GetType().Name} and {m.GetType().Name}.");
+        }
+        return dict;
     }
 
     private sealed class Manifest
@@ -99,14 +121,16 @@ public class BundleService : IBundleService
         {
             using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
 
-            var manifestEntry = archive.GetEntry(ManifestEntry);
-            if (manifestEntry is null)
+            // Read every non-directory zip entry into memory so the rest of the
+            // pipeline (and any migrators) can work against a single dictionary.
+            IDictionary<string, string> entryTexts = ReadAllEntryTexts(archive);
+            if (!entryTexts.TryGetValue(ManifestEntry, out var manifestJson))
                 return Fail("Bundle is missing manifest.json.");
 
             Manifest? manifest;
             try
             {
-                manifest = JsonSerializer.Deserialize<Manifest>(ReadAll(manifestEntry), JsonOpts);
+                manifest = JsonSerializer.Deserialize<Manifest>(manifestJson, JsonOpts);
             }
             catch (JsonException ex)
             {
@@ -118,14 +142,100 @@ public class BundleService : IBundleService
                 return Fail($"Unrecognized bundle format \"{manifest.Format}\".");
 
             var current = new AppState();
+
+            // Schema-version handling: idempotent short-circuit when already current,
+            // hard refuse on downgrade, run the migration chain otherwise.
             if (manifest.SchemaVersion != current.SchemaVersion)
             {
-                _logger.LogWarning(
-                    "Bundle schemaVersion {Found} does not match {Expected}; refusing import.",
-                    manifest.SchemaVersion, current.SchemaVersion);
-                return Fail(manifest.SchemaVersion < current.SchemaVersion
-                    ? $"Bundle schemaVersion {manifest.SchemaVersion} is too old; regenerate from v{current.SchemaVersion}."
-                    : $"Bundle schemaVersion {manifest.SchemaVersion} does not match expected {current.SchemaVersion}.");
+                if (_migrators.Count == 0)
+                {
+                    _logger.LogWarning(
+                        "Bundle schemaVersion {Found} does not match {Expected}; no migrators registered, refusing import.",
+                        manifest.SchemaVersion, current.SchemaVersion);
+                    return Fail(manifest.SchemaVersion < current.SchemaVersion
+                        ? $"Bundle schemaVersion {manifest.SchemaVersion} is too old; regenerate from v{current.SchemaVersion}."
+                        : $"Bundle schemaVersion {manifest.SchemaVersion} does not match expected {current.SchemaVersion}.");
+                }
+                if (manifest.SchemaVersion > current.SchemaVersion)
+                {
+                    _logger.LogWarning(
+                        "Bundle schemaVersion {Found} is newer than {Expected}; downgrade not supported.",
+                        manifest.SchemaVersion, current.SchemaVersion);
+                    return Fail($"Bundle schemaVersion {manifest.SchemaVersion} does not match expected {current.SchemaVersion}.");
+                }
+
+                // Pre-flight: chain must reach CurrentSchemaVersion without gaps.
+                for (int v = manifest.SchemaVersion; v < current.SchemaVersion; v++)
+                {
+                    if (!_migrators.ContainsKey(v))
+                    {
+                        _logger.LogWarning(
+                            "No bundle migrator covers v{From} -> v{To}; refusing import.", v, v + 1);
+                        return Fail(
+                            $"Bundle schemaVersion {manifest.SchemaVersion} cannot upgrade to v{current.SchemaVersion}: no migrator covers v{v}\u2192v{v + 1}.");
+                    }
+                }
+
+                IDictionary<string, object?> manifestDict;
+                try
+                {
+                    manifestDict = BundleScratch.ParseManifest(manifestJson);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to parse manifest.json into property bag for migration.");
+                    return Fail($"manifest.json is not valid JSON for migration: {ex.Message}");
+                }
+
+                // Scratch.Entries owns every non-manifest entry; manifest lives in
+                // the dict and is re-serialized once the chain completes.
+                var scratchEntries = new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (var kv in entryTexts)
+                {
+                    if (kv.Key == ManifestEntry) continue;
+                    scratchEntries[kv.Key] = kv.Value;
+                }
+                var scratch = new BundleScratch(manifestDict, scratchEntries, manifest.SchemaVersion);
+
+                try
+                {
+                    for (int v = scratch.SchemaVersion; v < current.SchemaVersion; v++)
+                    {
+                        var mig = _migrators[v];
+                        mig.Migrate(scratch, warnings);
+                        scratch.Manifest["schemaVersion"] = mig.ToVersion;
+                        scratch.SchemaVersion = mig.ToVersion;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Bundle migrator threw; refusing import.");
+                    return Fail($"Bundle migration failed: {ex.Message}");
+                }
+
+                // Re-deserialize the migrated manifest into the typed shape and
+                // swap the entry-text dictionary for the migrated scratch entries.
+                string migratedJson;
+                try
+                {
+                    migratedJson = scratch.SerializeManifest();
+                    manifest = JsonSerializer.Deserialize<Manifest>(migratedJson, JsonOpts);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Migrated manifest failed to round-trip.");
+                    return Fail($"Migrated manifest is not valid: {ex.Message}");
+                }
+                if (manifest is null || manifest.SchemaVersion != current.SchemaVersion)
+                    return Fail("Migrated manifest did not reach current schema version.");
+
+                entryTexts = scratch.Entries;
+            }
+            else
+            {
+                // Already current; drop the manifest entry so downstream lookups
+                // work against the same shape the migration path produces.
+                entryTexts.Remove(ManifestEntry);
             }
 
             foreach (var path in EnumerateListedPaths(manifest))
@@ -135,12 +245,10 @@ public class BundleService : IBundleService
             }
 
             var listed = new HashSet<string>(EnumerateListedPaths(manifest), StringComparer.Ordinal);
-            foreach (var entry in archive.Entries)
+            foreach (var name in entryTexts.Keys.OrderBy(n => n, StringComparer.Ordinal))
             {
-                if (entry.FullName == ManifestEntry) continue;
-                if (string.IsNullOrEmpty(entry.Name)) continue; // skip directory entries
-                if (!listed.Contains(entry.FullName))
-                    warnings.Add($"Ignored unlisted entry \"{entry.FullName}\".");
+                if (!listed.Contains(name))
+                    warnings.Add($"Ignored unlisted entry \"{name}\".");
             }
 
             // Shows
@@ -149,9 +257,9 @@ public class BundleService : IBundleService
             var shows = new List<ShowData>();
             foreach (var showPath in manifest.Shows)
             {
-                var entry = archive.GetEntry(showPath);
-                if (entry is null) return Fail($"Bundle missing show entry \"{showPath}\".");
-                var show = _export.ImportShowCsv(ReadAll(entry));
+                if (!entryTexts.TryGetValue(showPath, out var showCsv))
+                    return Fail($"Bundle missing show entry \"{showPath}\".");
+                var show = _export.ImportShowCsv(showCsv);
                 var pathId = ParseIdFromPath(showPath, ShowsPrefix);
                 if (pathId is { } g) show.Id = g;
                 shows.Add(show);
@@ -161,9 +269,9 @@ public class BundleService : IBundleService
             var bands = new List<Band>();
             foreach (var bandPath in manifest.Bands)
             {
-                var entry = archive.GetEntry(bandPath);
-                if (entry is null) return Fail($"Bundle missing band entry \"{bandPath}\".");
-                bands.Add(_export.ImportBandCsv(ReadAll(entry)));
+                if (!entryTexts.TryGetValue(bandPath, out var bandCsv))
+                    return Fail($"Bundle missing band entry \"{bandPath}\".");
+                bands.Add(_export.ImportBandCsv(bandCsv));
             }
 
             // Running orders — each decoded against the show recorded in its CSV rows.
@@ -171,10 +279,9 @@ public class BundleService : IBundleService
             var orders = new List<RunningOrder>();
             foreach (var orderPath in manifest.RunningOrders)
             {
-                var entry = archive.GetEntry(orderPath);
-                if (entry is null) return Fail($"Bundle missing running order entry \"{orderPath}\".");
+                if (!entryTexts.TryGetValue(orderPath, out var csv))
+                    return Fail($"Bundle missing running order entry \"{orderPath}\".");
 
-                var csv = ReadAll(entry);
                 var showForDecode = PeekShowIdFromCsv(csv) is { } sid && showsById.TryGetValue(sid, out var s)
                     ? s
                     : shows[0];
@@ -233,6 +340,20 @@ public class BundleService : IBundleService
         using var s = entry.Open();
         using var reader = new StreamReader(s, Utf8NoBom);
         return reader.ReadToEnd();
+    }
+
+    // Reads every non-directory zip entry into a name -> UTF-8 text map. Used
+    // by ImportBundle so the rest of the pipeline (and any IBundleMigrator)
+    // works against a single in-memory dictionary rather than the live archive.
+    private static Dictionary<string, string> ReadAllEntryTexts(ZipArchive archive)
+    {
+        var dict = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var entry in archive.Entries)
+        {
+            if (string.IsNullOrEmpty(entry.Name)) continue; // skip directory entries
+            dict[entry.FullName] = ReadAll(entry);
+        }
+        return dict;
     }
 
     // Parse the ShowId column out of the first data row without re-implementing CSV parsing:
