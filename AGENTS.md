@@ -45,7 +45,8 @@
 - ALWAYS debounce writes 1s via `CancellationTokenSource` + `Task.Delay`; the next write cancels the pending one.
 - ALWAYS flush pending writes on `beforeunload`.
 - ALWAYS bump `AppState.SchemaVersion` for any persisted-shape change.
-- On schema mismatch: copy raw payload to `festivalrider.backup.v{found}`, reset to clean `AppState`, toast. NEVER throw.
+- ALL persisted-shape transformations MUST live under `src/FestivalRider/Migrators/` as `IStateMigrator` implementations. NEVER inline schema migration in `StorageService` or any other service. Released migrator files MUST NOT be edited; bug fixes ship as a successor migrator.
+- On schema mismatch: run the `IStateMigrator` chain inside `StorageService.EnsureLoadedAsync`. If the chain reaches `CurrentSchemaVersion`, persist the migrated payload before binding and toast `"Migrated data v{from} → v{to}."`. Otherwise fall back to: copy raw payload to `festivalrider.backup.v{found}`, reset to clean `AppState`, toast. NEVER throw.
 - ALWAYS heartbeat `festivalrider.tab-lock` every 2s. Second tab MUST set `AnotherTabActive = true`; editing UI MUST disable via `MultiTabBanner`.
 - NEVER implement live cross-tab sync (out of scope).
 

@@ -83,6 +83,35 @@ public static class TestDataFactory
         return show;
     }
 
+    /// <summary>
+    /// Hand-rolled v1 JSON payload (per plan 001's shape) for migration tests.
+    /// Includes a band with `genre`, `rider.tech.inputs`, `backlineItems`, plus a running order.
+    /// </summary>
+    public static string BuildV1JsonPayload() => """
+        {
+          "schemaVersion": 1,
+          "bands": [
+            {
+              "id": "11111111-1111-1111-1111-111111111111",
+              "name": "Alpha",
+              "genre": "Rock",
+              "rider": {
+                "tech": {
+                  "inputs": [
+                    { "channel": 1, "source": "Kick" },
+                    { "channel": 2, "source": "Snare" }
+                  ],
+                  "backlineItems": [ { "name": "Amp" } ]
+                }
+              }
+            }
+          ],
+          "runningOrders": [
+            { "id": "33333333-3333-3333-3333-333333333333", "showDayNumber": 1, "slots": [] }
+          ]
+        }
+        """;
+
     public static RunningOrder FullRunningOrder(ShowData show, Band band)
     {
         return new RunningOrder

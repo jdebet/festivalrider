@@ -1,6 +1,8 @@
 using System.Text.Json;
+using FestivalRider.Migrators;
 using FestivalRider.Models;
 using FestivalRider.Services;
+using FestivalRider.Tests.Migrators;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -10,13 +12,14 @@ public sealed class StorageServiceTests
 {
     private static readonly JsonSerializerOptions CamelCase = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
-    private static (StorageService, FakeJSRuntime, FakeToastService, FakeTimeProvider, BandService) Create()
+    private static (StorageService, FakeJSRuntime, FakeToastService, FakeTimeProvider, BandService) Create(
+        IEnumerable<IStateMigrator>? migrators = null)
     {
         var js = new FakeJSRuntime();
         var toasts = new FakeToastService();
         var bands = new BandService(NullLogger<BandService>.Instance);
         var time = new FakeTimeProvider();
-        var svc = new StorageService(NullLogger<StorageService>.Instance, bands, js, toasts, time);
+        var svc = new StorageService(NullLogger<StorageService>.Instance, bands, js, toasts, time, migrators);
         return (svc, js, toasts, time, bands);
     }
 
@@ -127,6 +130,110 @@ public sealed class StorageServiceTests
 
         Assert.True(svc.AnotherTabActive);
         Assert.True(fired);
+    }
+
+    private static string? LastStateWrite(FakeJSRuntime js)
+    {
+        if (!js.Invocations.TryGetValue("festivalRiderStorage.setItem", out var calls)) return null;
+        for (int i = calls.Count - 1; i >= 0; i--)
+        {
+            var c = calls[i];
+            if (c.Length >= 2 && (c[0] as string) == "festivalrider.state") return c[1] as string;
+        }
+        return null;
+    }
+
+    [Fact]
+    public async Task Migration_v1_to_v3_Succeeds_PersistsAndToasts()
+    {
+        var migrators = new IStateMigrator[] { new V1ToV2Migrator(), new V2ToV3Migrator() };
+        var (svc, js, toasts, _, bands) = Create(migrators);
+        js.ReturnValues["festivalRiderStorage.getItem"] = TestDataFactory.BuildV1JsonPayload();
+        js.ReturnValues["festivalRiderStorage.setItem"] = true;
+
+        await svc.EnsureLoadedAsync();
+
+        Assert.Contains(toasts.Messages, t => t.Text.Contains("Migrated data v1") && t.Text.Contains("v3"));
+        // Migration warnings surfaced (genre + inputs + backline).
+        Assert.Contains(toasts.Messages, t => t.Text.Contains("Genre"));
+        Assert.Contains(toasts.Messages, t => t.Text.Contains("Inputs"));
+
+        // Migrated payload was persisted with schemaVersion=3.
+        var persisted = LastStateWrite(js);
+        Assert.NotNull(persisted);
+        using var doc = JsonDocument.Parse(persisted!);
+        Assert.Equal(3, doc.RootElement.GetProperty("schemaVersion").GetInt32());
+
+        // Bands survive the migration.
+        Assert.Single(bands.Bands);
+        Assert.Equal("Alpha", bands.Bands[0].Name);
+    }
+
+    [Fact]
+    public async Task Migration_MissingChain_FallsBackToBackupAndReset()
+    {
+        // Only v1->v2 registered, but CurrentSchemaVersion=3, so chain cannot reach target.
+        var migrators = new IStateMigrator[] { new V1ToV2Migrator() };
+        var (svc, js, toasts, _, _) = Create(migrators);
+        js.ReturnValues["festivalRiderStorage.getItem"] = TestDataFactory.BuildV1JsonPayload();
+
+        await svc.EnsureLoadedAsync();
+
+        Assert.Contains(toasts.Messages, t => t.Text.Contains("schema v1", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(toasts.Messages, t => t.Text.Contains("Migrated data"));
+        // Backup written under the v{found} key.
+        Assert.Contains(js.Invocations["festivalRiderStorage.setItem"],
+            args => args.Length >= 1 && (args[0] as string) == "festivalrider.backup.v1");
+    }
+
+    [Fact]
+    public async Task Migration_ThrowingMigrator_FallsBackToBackupAndReset()
+    {
+        var migrators = new IStateMigrator[] { new ThrowingMigrator { FromVersion = 1 }, new V2ToV3Migrator() };
+        var (svc, js, toasts, _, _) = Create(migrators);
+        js.ReturnValues["festivalRiderStorage.getItem"] = TestDataFactory.BuildV1JsonPayload();
+
+        await svc.EnsureLoadedAsync();
+
+        Assert.Contains(toasts.Messages, t => t.Text.Contains("schema v1", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(js.Invocations["festivalRiderStorage.setItem"],
+            args => args.Length >= 1 && (args[0] as string) == "festivalrider.backup.v1");
+    }
+
+    [Fact]
+    public async Task Migration_SecondEnsureLoaded_IsNoOp()
+    {
+        var migrators = new IStateMigrator[] { new V1ToV2Migrator(), new V2ToV3Migrator() };
+        var (svc, js, toasts, _, _) = Create(migrators);
+        js.ReturnValues["festivalRiderStorage.getItem"] = TestDataFactory.BuildV1JsonPayload();
+        js.ReturnValues["festivalRiderStorage.setItem"] = true;
+
+        await svc.EnsureLoadedAsync();
+        var firstCount = toasts.Messages.Count;
+
+        await svc.EnsureLoadedAsync();
+        Assert.Equal(firstCount, toasts.Messages.Count);
+    }
+
+    [Fact]
+    public void Migration_DuplicateFromVersion_ThrowsAtConstruction()
+    {
+        var migrators = new IStateMigrator[] { new V1ToV2Migrator(), new V1ToV2Migrator() };
+        Assert.Throws<InvalidOperationException>(() => Create(migrators));
+    }
+
+    [Fact]
+    public void Migration_NonStepwise_ThrowsAtConstruction()
+    {
+        Assert.Throws<InvalidOperationException>(() =>
+            Create(new IStateMigrator[] { new NonStepwiseMigrator() }));
+    }
+
+    private sealed class NonStepwiseMigrator : IStateMigrator
+    {
+        public int FromVersion => 1;
+        public int ToVersion => 3;
+        public System.Text.Json.Nodes.JsonNode Migrate(System.Text.Json.Nodes.JsonNode raw, IList<string> warnings) => raw;
     }
 
     [Fact]
