@@ -2,7 +2,9 @@
 
 ## Status
 
-`Draft`
+`Superseded by 009 (full)`
+
+Parked before implementation. The locked decision in this plan was a raster pipeline (`html2canvas` rasterizes the DOM, `jsPDF` packs the PNG into A4 pages). That output is **not searchable or highlightable** — there is no text in the PDF, only an image of text. The actual product requirement is searchable, highlightable PDFs delivered as a bundle, which a raster pipeline cannot satisfy. `window.print()` → "Save as PDF" already produces vector/searchable output, so this plan would have shipped a strictly worse artifact than what `PrintAsync` already gives users via the dialog. See [009-searchable-pdf-bundle.md](./009-searchable-pdf-bundle.md) for the new direction.
 
 ## Context
 
