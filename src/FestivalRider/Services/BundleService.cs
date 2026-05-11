@@ -27,15 +27,18 @@ public class BundleService : IBundleService
 
     private readonly IExportService _export;
     private readonly ILogger<BundleService> _logger;
+    private readonly ILocalizationService _loc;
     private readonly IReadOnlyDictionary<int, IBundleMigrator> _migrators;
 
     public BundleService(
         IExportService export,
         ILogger<BundleService> logger,
+        ILocalizationService loc,
         IEnumerable<IBundleMigrator>? migrators = null)
     {
         _export = export;
         _logger = logger;
+        _loc = loc;
         _migrators = BuildMigratorIndex(migrators);
     }
 
@@ -125,7 +128,7 @@ public class BundleService : IBundleService
             // pipeline (and any migrators) can work against a single dictionary.
             IDictionary<string, string> entryTexts = ReadAllEntryTexts(archive);
             if (!entryTexts.TryGetValue(ManifestEntry, out var manifestJson))
-                return Fail("Bundle is missing manifest.json.");
+                return Fail(_loc.T("bundle.error.missingManifest"));
 
             Manifest? manifest;
             try
@@ -134,12 +137,12 @@ public class BundleService : IBundleService
             }
             catch (JsonException ex)
             {
-                return Fail($"manifest.json is not valid JSON: {ex.Message}");
+                return Fail(_loc.T("bundle.error.invalidManifestJson", ex.Message));
             }
             if (manifest is null)
-                return Fail("manifest.json is empty.");
+                return Fail(_loc.T("bundle.error.emptyManifest"));
             if (!string.Equals(manifest.Format, Format, StringComparison.Ordinal))
-                return Fail($"Unrecognized bundle format \"{manifest.Format}\".");
+                return Fail(_loc.T("bundle.error.unknownFormat", manifest.Format));
 
             var current = new AppState();
 
@@ -153,15 +156,15 @@ public class BundleService : IBundleService
                         "Bundle schemaVersion {Found} does not match {Expected}; no migrators registered, refusing import.",
                         manifest.SchemaVersion, current.SchemaVersion);
                     return Fail(manifest.SchemaVersion < current.SchemaVersion
-                        ? $"Bundle schemaVersion {manifest.SchemaVersion} is too old; regenerate from v{current.SchemaVersion}."
-                        : $"Bundle schemaVersion {manifest.SchemaVersion} does not match expected {current.SchemaVersion}.");
+                        ? _loc.T("bundle.error.tooOld", manifest.SchemaVersion, current.SchemaVersion)
+                        : _loc.T("bundle.error.tooNew", manifest.SchemaVersion, current.SchemaVersion));
                 }
                 if (manifest.SchemaVersion > current.SchemaVersion)
                 {
                     _logger.LogWarning(
                         "Bundle schemaVersion {Found} is newer than {Expected}; downgrade not supported.",
                         manifest.SchemaVersion, current.SchemaVersion);
-                    return Fail($"Bundle schemaVersion {manifest.SchemaVersion} does not match expected {current.SchemaVersion}.");
+                    return Fail(_loc.T("bundle.error.tooNew", manifest.SchemaVersion, current.SchemaVersion));
                 }
 
                 // Pre-flight: chain must reach CurrentSchemaVersion without gaps.
@@ -171,8 +174,7 @@ public class BundleService : IBundleService
                     {
                         _logger.LogWarning(
                             "No bundle migrator covers v{From} -> v{To}; refusing import.", v, v + 1);
-                        return Fail(
-                            $"Bundle schemaVersion {manifest.SchemaVersion} cannot upgrade to v{current.SchemaVersion}: no migrator covers v{v}\u2192v{v + 1}.");
+                        return Fail(_loc.T("bundle.error.noMigrator", manifest.SchemaVersion, current.SchemaVersion, v, v + 1));
                     }
                 }
 
@@ -184,7 +186,7 @@ public class BundleService : IBundleService
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Failed to parse manifest.json into property bag for migration.");
-                    return Fail($"manifest.json is not valid JSON for migration: {ex.Message}");
+                    return Fail(_loc.T("bundle.error.manifestParseFailed", ex.Message));
                 }
 
                 // Scratch.Entries owns every non-manifest entry; manifest lives in
@@ -210,7 +212,7 @@ public class BundleService : IBundleService
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Bundle migrator threw; refusing import.");
-                    return Fail($"Bundle migration failed: {ex.Message}");
+                    return Fail(_loc.T("bundle.error.migrationFailed", ex.Message));
                 }
 
                 // Re-deserialize the migrated manifest into the typed shape and
@@ -224,10 +226,10 @@ public class BundleService : IBundleService
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Migrated manifest failed to round-trip.");
-                    return Fail($"Migrated manifest is not valid: {ex.Message}");
+                    return Fail(_loc.T("bundle.error.migratedManifestInvalid", ex.Message));
                 }
                 if (manifest is null || manifest.SchemaVersion != current.SchemaVersion)
-                    return Fail("Migrated manifest did not reach current schema version.");
+                    return Fail(_loc.T("bundle.error.migratedVersionMismatch"));
 
                 entryTexts = scratch.Entries;
             }
@@ -241,24 +243,24 @@ public class BundleService : IBundleService
             foreach (var path in EnumerateListedPaths(manifest))
             {
                 if (path.Contains("..", StringComparison.Ordinal) || Path.IsPathRooted(path))
-                    return Fail($"Refusing manifest path \"{path}\" (path traversal).");
+                    return Fail(_loc.T("bundle.error.pathTraversal", path));
             }
 
             var listed = new HashSet<string>(EnumerateListedPaths(manifest), StringComparer.Ordinal);
             foreach (var name in entryTexts.Keys.OrderBy(n => n, StringComparer.Ordinal))
             {
                 if (!listed.Contains(name))
-                    warnings.Add($"Ignored unlisted entry \"{name}\".");
+                    warnings.Add(_loc.T("bundle.warning.unlisted", name));
             }
 
             // Shows
             if (manifest.Shows.Count == 0)
-                return Fail("Bundle manifest has no shows.");
+                return Fail(_loc.T("bundle.error.noShows"));
             var shows = new List<ShowData>();
             foreach (var showPath in manifest.Shows)
             {
                 if (!entryTexts.TryGetValue(showPath, out var showCsv))
-                    return Fail($"Bundle missing show entry \"{showPath}\".");
+                    return Fail(_loc.T("bundle.error.missingShow", showPath));
                 var show = _export.ImportShowCsv(showCsv);
                 var pathId = ParseIdFromPath(showPath, ShowsPrefix);
                 if (pathId is { } g) show.Id = g;
@@ -270,7 +272,7 @@ public class BundleService : IBundleService
             foreach (var bandPath in manifest.Bands)
             {
                 if (!entryTexts.TryGetValue(bandPath, out var bandCsv))
-                    return Fail($"Bundle missing band entry \"{bandPath}\".");
+                    return Fail(_loc.T("bundle.error.missingBand", bandPath));
                 bands.Add(_export.ImportBandCsv(bandCsv));
             }
 
@@ -280,7 +282,7 @@ public class BundleService : IBundleService
             foreach (var orderPath in manifest.RunningOrders)
             {
                 if (!entryTexts.TryGetValue(orderPath, out var csv))
-                    return Fail($"Bundle missing running order entry \"{orderPath}\".");
+                    return Fail(_loc.T("bundle.error.missingRunningOrder", orderPath));
 
                 var showForDecode = PeekShowIdFromCsv(csv) is { } sid && showsById.TryGetValue(sid, out var s)
                     ? s
@@ -305,7 +307,7 @@ public class BundleService : IBundleService
             }
 
             // Merge
-            var (merged, stats) = MergeInto(currentState!, shows, bands, orders, warnings);
+            var (merged, stats) = MergeInto(currentState!, shows, bands, orders, warnings, _loc);
             return new BundleImportResult(
                 merged,
                 stats.BandsAdded + stats.BandsUpdated,
@@ -316,12 +318,12 @@ public class BundleService : IBundleService
         }
         catch (InvalidDataException ex)
         {
-            return Fail($"Not a valid zip archive: {ex.Message}");
+            return Fail(_loc.T("bundle.error.notZip", ex.Message));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Bundle import failed.");
-            return Fail($"Bundle import failed: {ex.Message}");
+            return Fail(_loc.T("bundle.error.importFailed", ex.Message));
         }
 
         BundleImportResult Fail(string error) =>
@@ -373,7 +375,8 @@ public class BundleService : IBundleService
         IReadOnlyList<ShowData> bundleShows,
         IReadOnlyList<Band> incomingBands,
         IReadOnlyList<RunningOrder> incomingOrders,
-        List<string> warnings)
+        List<string> warnings,
+        ILocalizationService loc)
     {
         // Bands: upsert by Guid, last-write-wins by UpdatedAt.
         var bandsById = currentState.Bands.ToDictionary(b => b.Id);
@@ -390,8 +393,7 @@ public class BundleService : IBundleService
                 else
                 {
                     bSkipped++;
-                    warnings.Add(
-                        $"Band \"{inc.Name}\" ({inc.Id}) skipped: incoming UpdatedAt {inc.UpdatedAt:o} is not newer than local {existing.UpdatedAt:o}.");
+                    warnings.Add(loc.T("bundle.warning.bandSkipped", inc.Name, inc.Id, inc.UpdatedAt.ToString("o"), existing.UpdatedAt.ToString("o")));
                 }
             }
             else
@@ -423,8 +425,7 @@ public class BundleService : IBundleService
             if (!bundleShowById.TryGetValue(inc.ShowId, out var senderShow))
             {
                 oSkipped++;
-                warnings.Add(
-                    $"Running order {inc.Id} (day {inc.ShowDayNumber}) skipped: bundle show {inc.ShowId} not found.");
+                warnings.Add(loc.T("bundle.warning.roNoShow", inc.Id, inc.ShowDayNumber, inc.ShowId));
                 continue;
             }
             var senderShowKey = NameKey(senderShow.Name);
@@ -433,8 +434,7 @@ public class BundleService : IBundleService
                 !localShowByName.TryGetValue(senderShowKey, out var localShow))
             {
                 oSkipped++;
-                warnings.Add(
-                    $"Running order {inc.Id} (day {inc.ShowDayNumber}) skipped: no unambiguous local show matches \"{senderShow.Name}\".");
+                warnings.Add(loc.T("bundle.warning.roNoLocalShow", inc.Id, inc.ShowDayNumber, senderShow.Name));
                 continue;
             }
 
@@ -481,7 +481,7 @@ public class BundleService : IBundleService
                 var parts = new List<string>();
                 if (missing.Count > 0) parts.Add($"missing local stage(s): {string.Join(", ", missing.Distinct())}");
                 if (ambiguous.Count > 0) parts.Add($"ambiguous local stage name(s): {string.Join(", ", ambiguous.Distinct())}");
-                warnings.Add($"Running order {inc.Id} (day {inc.ShowDayNumber}) skipped: {string.Join("; ", parts)}.");
+                warnings.Add(loc.T("bundle.warning.roMissingStages", inc.Id, inc.ShowDayNumber, string.Join("; ", parts)));
                 continue;
             }
 
@@ -494,7 +494,7 @@ public class BundleService : IBundleService
             };
             if (ordersById.ContainsKey(inc.Id))
             {
-                warnings.Add($"Running order {inc.Id} replaced an existing entry with the same id.");
+                warnings.Add(loc.T("bundle.warning.roReplaced", inc.Id));
                 ordersById[inc.Id] = ro;
                 oUpdated++;
             }

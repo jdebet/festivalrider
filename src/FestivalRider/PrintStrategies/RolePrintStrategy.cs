@@ -10,10 +10,12 @@ namespace FestivalRider.PrintStrategies;
 public class RolePrintStrategy : IPrintStrategy
 {
     private readonly IBandService _bands;
+    private readonly ILocalizationService _loc;
 
-    public RolePrintStrategy(IBandService bands)
+    public RolePrintStrategy(IBandService bands, ILocalizationService loc)
     {
         _bands = bands;
+        _loc = loc;
     }
 
     public string Key => "role";
@@ -23,11 +25,12 @@ public class RolePrintStrategy : IPrintStrategy
         var (order, role, _) = Resolve(context);
         var show = _bands.FindShow(order.ShowId) ?? new ShowData();
         var date = show.DateOfOpening == default
-            ? $"Day {order.ShowDayNumber}"
-            : show.DateOfOpening.AddDays(order.ShowDayNumber - 1).ToString("ddd dd MMM yyyy");
+            ? _loc.T("print.day", order.ShowDayNumber)
+            : show.DateOfOpening.AddDays(order.ShowDayNumber - 1).ToString("ddd dd MMM yyyy", _loc.Culture);
+        var roleLabel = _loc.T($"enum.ContactRole.{role}");
         return string.IsNullOrWhiteSpace(show.Name)
-            ? $"{RoleLabel(role)} — {date}"
-            : $"{show.Name} — {RoleLabel(role)} — {date}";
+            ? $"{roleLabel} — {date}"
+            : $"{show.Name} — {roleLabel} — {date}";
     }
 
     public RenderFragment Render(object context)
@@ -41,7 +44,7 @@ public class RolePrintStrategy : IPrintStrategy
             if (slots.Count == 0)
             {
                 builder.OpenElement(seq++, "p");
-                builder.AddContent(seq++, "No slots scheduled.");
+                builder.AddContent(seq++, _loc.T("print.role.noSlots"));
                 builder.CloseElement();
                 return;
             }
@@ -64,13 +67,13 @@ public class RolePrintStrategy : IPrintStrategy
         return (order, ctx.Role, slots);
     }
 
-    private static void BuildHeader(RenderTreeBuilder b, ref int seq, ContactRole role, RunningOrder order, ShowData show)
+    private void BuildHeader(RenderTreeBuilder b, ref int seq, ContactRole role, RunningOrder order, ShowData show)
     {
         b.OpenElement(seq++, "header");
         b.AddAttribute(seq++, "class", "print-section mb-3");
         b.OpenElement(seq++, "h1");
         b.AddAttribute(seq++, "class", "h3");
-        b.AddContent(seq++, RoleLabel(role));
+        b.AddContent(seq++, _loc.T($"enum.ContactRole.{role}"));
         b.CloseElement();
         b.OpenElement(seq++, "div");
         b.AddAttribute(seq++, "class", "text-muted");
@@ -79,7 +82,7 @@ public class RolePrintStrategy : IPrintStrategy
             b.AddContent(seq++, show.Name);
             b.AddContent(seq++, " · ");
         }
-        b.AddContent(seq++, $"Day {order.ShowDayNumber}");
+        b.AddContent(seq++, _loc.T("print.day", order.ShowDayNumber));
         if (show.DateOfOpening != default)
         {
             b.AddContent(seq++, " · ");
@@ -92,7 +95,7 @@ public class RolePrintStrategy : IPrintStrategy
     private void BuildBandBlock(RenderTreeBuilder b, ref int seq, Band band, RunningOrderSlot slot, ContactRole role)
     {
         var stage = _bands.FindStage(slot.StageId);
-        var stageLabel = stage?.Name ?? $"Unknown stage (#{slot.StageId})";
+        var stageLabel = stage?.Name ?? _loc.T("page.runningOrder.unknownStage", slot.StageId);
         var contacts = band.Contacts.Where(c => c.Role == role).ToList();
 
         b.OpenElement(seq++, "section");
@@ -108,7 +111,7 @@ public class RolePrintStrategy : IPrintStrategy
         {
             b.OpenElement(seq++, "div");
             b.AddAttribute(seq++, "class", "text-muted");
-            b.AddContent(seq++, "No contact for this role.");
+            b.AddContent(seq++, _loc.T("print.role.noContact"));
             b.CloseElement();
         }
         else
@@ -117,7 +120,7 @@ public class RolePrintStrategy : IPrintStrategy
             b.AddAttribute(seq++, "class", "table table-sm");
             b.OpenElement(seq++, "thead");
             b.OpenElement(seq++, "tr");
-            foreach (var h in new[] { "Name", "Email", "Phone" })
+            foreach (var h in new[] { _loc.T("field.name"), _loc.T("field.email"), _loc.T("field.phone") })
             {
                 b.OpenElement(seq++, "th");
                 b.AddContent(seq++, h);
@@ -146,7 +149,7 @@ public class RolePrintStrategy : IPrintStrategy
         b.CloseElement();
     }
 
-    private static void BuildRoleSummary(RenderTreeBuilder b, ref int seq, Band band, ContactRole role)
+    private void BuildRoleSummary(RenderTreeBuilder b, ref int seq, Band band, ContactRole role)
     {
         var t = band.Rider.Tech;
         var fields = new List<(string Label, string Value)>();
@@ -154,45 +157,45 @@ public class RolePrintStrategy : IPrintStrategy
         switch (role)
         {
             case ContactRole.FOHEngineer:
-                AddIfSet(fields, "FOH console", t.Foh.OwnConsoleModel);
-                fields.Add(("FOH output", $"{t.Foh.OutputProtocol} @ {t.Foh.OutputLocation}"));
-                AddIfSet(fields, "Output notes", t.Foh.OutputNotes);
-                AddIfSet(fields, "Additional hardware", t.Foh.AdditionalHardware);
+                AddIfSet(fields, _loc.T("print.band.field.fohConsole"), t.Foh.OwnConsoleModel);
+                fields.Add((_loc.T("print.band.field.fohOutput"), $"{_loc.T($"enum.OutputProtocol.{t.Foh.OutputProtocol}")} @ {_loc.T($"enum.OutputLocation.{t.Foh.OutputLocation}")}"));
+                AddIfSet(fields, _loc.T("field.foh.outputNotes"), t.Foh.OutputNotes);
+                AddIfSet(fields, _loc.T("field.foh.additionalHardware"), t.Foh.AdditionalHardware);
                 if (t.Foh.StageToFohSendCount > 0)
-                    fields.Add(("Stage→FOH sends", $"{t.Foh.StageToFohSendCount}{(t.Foh.StageToFohRoundTrip ? " (round trip)" : "")}"));
+                    fields.Add((_loc.T("field.foh.stageToFohSends"), $"{t.Foh.StageToFohSendCount}{(t.Foh.StageToFohRoundTrip ? " (" + _loc.T("print.band.roundTrip") + ")" : "")}"));
                 if (t.Foh.FootprintWidthMeters is { } fw && t.Foh.FootprintLengthMeters is { } fl)
-                    fields.Add(("FOH footprint", $"{fw}m × {fl}m"));
-                AddIfSet(fields, "FOH notes", t.Foh.Notes);
+                    fields.Add((_loc.T("print.band.field.fohFootprint"), $"{fw}m × {fl}m"));
+                AddIfSet(fields, _loc.T("print.band.field.fohNotes"), t.Foh.Notes);
                 break;
 
             case ContactRole.MonitorEngineer:
-                fields.Add(("Source", t.Monitors.SourceMode.ToString()));
+                fields.Add((_loc.T("field.monitors.sourceMode"), _loc.T($"enum.MonitorSourceMode.{t.Monitors.SourceMode}")));
                 if (t.Monitors.SourceMode == MonitorSourceMode.OwnConsole)
                 {
-                    AddIfSet(fields, "Monitor console", t.Monitors.OwnConsoleModel);
-                    fields.Add(("Console location", t.Monitors.OwnConsoleLocation.ToString()));
+                    AddIfSet(fields, _loc.T("print.band.field.monitorConsole"), t.Monitors.OwnConsoleModel);
+                    fields.Add((_loc.T("field.monitors.consoleLocation"), _loc.T($"enum.MonitorTechLocation.{t.Monitors.OwnConsoleLocation}")));
                 }
-                fields.Add(("Wedges", t.Monitors.Wedges.Count.ToString()));
-                fields.Add(("In-ears", t.Monitors.InEars.Count.ToString()));
-                AddIfSet(fields, "Monitor notes", t.Monitors.Notes);
+                fields.Add((_loc.T("field.monitors.wedges"), t.Monitors.Wedges.Count.ToString()));
+                fields.Add((_loc.T("field.monitors.inEars"), t.Monitors.InEars.Count.ToString()));
+                AddIfSet(fields, _loc.T("print.band.field.monitorNotes"), t.Monitors.Notes);
                 break;
 
             case ContactRole.StageManager:
             case ContactRole.BackingTech:
-                fields.Add(("Power", $"{AmpLabel(t.Power.Amperage)} {PhaseLabel(t.Power.Phase)}"));
-                AddIfSet(fields, "Adapter notes", t.Power.AdapterNotes);
-                fields.Add(("Risers", t.Stage.Risers.Count.ToString()));
-                fields.Add(("Other risers", t.Stage.OtherRisers.Count.ToString()));
-                fields.Add(("Wireless mics", t.Stage.WirelessMics.Sum(m => m.Count).ToString()));
-                if (t.Stage.BringsOwnMics) fields.Add(("Mics", "Brings own"));
-                AddIfSet(fields, "Stage notes", t.Stage.Notes);
+                fields.Add((_loc.T("print.band.field.power"), $"{AmpLabel(t.Power.Amperage)} {PhaseLabel(t.Power.Phase)}"));
+                AddIfSet(fields, _loc.T("field.power.adapterNotes"), t.Power.AdapterNotes);
+                fields.Add((_loc.T("field.stage.risers"), t.Stage.Risers.Count.ToString()));
+                fields.Add((_loc.T("field.stage.otherRisers"), t.Stage.OtherRisers.Count.ToString()));
+                fields.Add((_loc.T("field.stage.wirelessMics"), t.Stage.WirelessMics.Sum(m => m.Count).ToString()));
+                if (t.Stage.BringsOwnMics) fields.Add((_loc.T("field.stage.bringsOwnMics"), _loc.T("print.band.field.bringsOwnMics")));
+                AddIfSet(fields, _loc.T("print.band.field.stageNotes"), t.Stage.Notes);
                 break;
 
             case ContactRole.TourManager:
             case ContactRole.BandManager:
                 var tp = band.TravelParty.Members;
-                fields.Add(("Travel party", tp.Count.ToString()));
-                AddIfSet(fields, "Band notes", band.Notes);
+                fields.Add((_loc.T("section.travelParty.title"), tp.Count.ToString()));
+                AddIfSet(fields, _loc.T("field.notes"), band.Notes);
                 break;
         }
 
@@ -219,24 +222,7 @@ public class RolePrintStrategy : IPrintStrategy
         if (!string.IsNullOrWhiteSpace(value)) fields.Add((label, value!));
     }
 
-    private static string AmpLabel(PowerAmperage a) => a switch
-    {
-        PowerAmperage._16_A => "16A",
-        PowerAmperage._32_A => "32A",
-        PowerAmperage._63_A => "63A",
-        _ => a.ToString(),
-    };
+    private string AmpLabel(PowerAmperage a) => _loc.T($"enum.PowerAmperage.{a}");
 
-    private static string PhaseLabel(PowerPhase p) => p == PowerPhase.ThreePhase ? "3-phase" : "single-phase";
-
-    private static string RoleLabel(ContactRole r) => r switch
-    {
-        ContactRole.TourManager => "Tour manager",
-        ContactRole.BandManager => "Band manager",
-        ContactRole.FOHEngineer => "FOH engineer",
-        ContactRole.MonitorEngineer => "Monitor engineer",
-        ContactRole.StageManager => "Stage manager",
-        ContactRole.BackingTech => "Backing tech",
-        _ => r.ToString(),
-    };
+    private string PhaseLabel(PowerPhase p) => _loc.T($"enum.PowerPhase.{p}");
 }

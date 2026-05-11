@@ -1,18 +1,19 @@
 @page "/"
 @implements IDisposable
 @inject IBandService BandService
+@inject ILocalizationService Localization
 @inject NavigationManager Nav
 
-<PageTitle>Bands · FestivalRider</PageTitle>
+<PageTitle>@Localization.T("page.bands.title")</PageTitle>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="h3 m-0">Bands</h1>
-    <button class="btn btn-primary" @onclick="AddBand">+ New band</button>
+    <h1 class="h3 m-0">@Localization.T("page.bands.heading")</h1>
+    <button class="btn btn-primary" @onclick="AddBand">@Localization.T("page.bands.addBand")</button>
 </div>
 
 @if (BandService.Bands.Count == 0)
 {
-    <div class="alert alert-info">No bands yet. Click <strong>New band</strong> to add one.</div>
+    <p class="text-muted">@Localization.T("page.bands.empty", Localization.T("page.bands.addBand"))</p>
 }
 else
 {
@@ -22,17 +23,22 @@ else
             <div class="col" @key="band.Id">
                 <BandCard Band="band"
                           OnEdit="EditBand"
+                          OnPrint="PrintBand"
                           OnDelete="RequestDelete"
-                          OnPrint="PrintBand" />
+                          EditLabel="@Localization.T("page.bands.card.edit")"
+                          PrintLabel="@Localization.T("page.bands.card.print")"
+                          DeleteLabel="@Localization.T("page.bands.card.delete")"
+                          ContactsSummaryFormat="@Localization.T("page.bands.card.contacts")"
+                          TravellersSummaryFormat="@Localization.T("page.bands.card.travellers")" />
             </div>
         }
     </div>
 }
 
 <ConfirmDialog Show="_pendingDeleteId.HasValue"
-               Title="Delete band"
+               Title="@Localization.T("confirm.deleteBand.title")"
                Message="@_deleteMessage"
-               ConfirmLabel="Delete"
+               ConfirmLabel="@Localization.T("confirm.deleteBand.label")"
                OnConfirm="ConfirmDelete"
                OnCancel="CancelDelete" />
 
@@ -43,13 +49,14 @@ else
     protected override void OnInitialized()
     {
         BandService.OnChange += HandleChange;
+        Localization.OnLocaleChanged += HandleChange;
     }
 
     private void HandleChange() => InvokeAsync(StateHasChanged);
 
     private void AddBand()
     {
-        var band = new Band { Name = "New band" };
+        var band = new Band { Name = Localization.T("page.bands.newBandDefault") };
         BandService.AddBand(band);
         Nav.NavigateTo($"/band/{band.Id}");
     }
@@ -62,7 +69,7 @@ else
     {
         var band = BandService.FindBand(id);
         _pendingDeleteId = id;
-        _deleteMessage = $"Delete \"{band?.Name ?? "this band"}\"? This cannot be undone.";
+        _deleteMessage = Localization.T("confirm.deleteBand.message", band?.Name ?? string.Empty);
     }
 
     private void ConfirmDelete()
@@ -76,5 +83,6 @@ else
     public void Dispose()
     {
         BandService.OnChange -= HandleChange;
+        Localization.OnLocaleChanged -= HandleChange;
     }
 }

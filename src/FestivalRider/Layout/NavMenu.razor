@@ -1,6 +1,7 @@
 ﻿@using FestivalRider.Components
 @implements IDisposable
 @inject IBandService BandService
+@inject ILocalizationService Localization
 
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
@@ -16,21 +17,28 @@
         <div class="nav-item px-3 py-2">
             <ShowPicker Shows="BandService.Shows"
                         ActiveShowId="BandService.ActiveShowId"
-                        OnChange="OnShowChanged" />
+                        OnChange="OnShowChanged"
+                        Label="@Localization.T("nav.show.label")"
+                        UntitledPlaceholder="@Localization.T("nav.show.untitled")" />
+        </div>
+        <div class="nav-item px-3 py-1">
+            <LocalePicker Locales="Localization.AvailableLocales"
+                          CurrentTag="Localization.CurrentLocale"
+                          OnChange="OnLocaleChanged" />
         </div>
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Bands
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> @Localization.T("nav.bands")
             </NavLink>
         </div>
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="running-order">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Running order
+                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> @Localization.T("nav.runningOrder")
             </NavLink>
         </div>
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="settings">
-                <span class="bi bi-gear-fill-nav-menu" aria-hidden="true"></span> Settings
+                <span class="bi bi-gear-fill-nav-menu" aria-hidden="true"></span> @Localization.T("nav.settings")
             </NavLink>
         </div>
     </nav>
@@ -48,6 +56,7 @@
     protected override void OnInitialized()
     {
         BandService.OnChange += HandleChange;
+        Localization.OnLocaleChanged += HandleChange;
     }
 
     private void HandleChange() => InvokeAsync(StateHasChanged);
@@ -57,8 +66,14 @@
         await BandService.SetActiveShow(id);
     }
 
+    private async Task OnLocaleChanged(string tag)
+    {
+        await Localization.SetLocaleAsync(tag);
+    }
+
     public void Dispose()
     {
         BandService.OnChange -= HandleChange;
+        Localization.OnLocaleChanged -= HandleChange;
     }
 }

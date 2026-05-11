@@ -15,7 +15,7 @@ public sealed class BundleServiceTests
     {
         var bands = new BandService(NullLogger<BandService>.Instance);
         var export = new ExportService(NullLogger<ExportService>.Instance, bands);
-        var svc = new BundleService(export, NullLogger<BundleService>.Instance, migrators);
+        var svc = new BundleService(export, NullLogger<BundleService>.Instance, FakeLocalizationService.Instance, migrators);
         return (svc, export, bands);
     }
 

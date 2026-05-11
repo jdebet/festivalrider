@@ -7,16 +7,20 @@
         <div class="toast show align-items-center text-bg-info border-0" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="d-flex">
                 <div class="toast-body">
-                    A new version of FestivalRider is available.
+                    @BodyText
                 </div>
-                <button type="button" class="btn btn-sm btn-light me-2 my-auto" @onclick="Reload">Reload</button>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" aria-label="Dismiss" @onclick="Dismiss"></button>
+                <button type="button" class="btn btn-sm btn-light me-2 my-auto" @onclick="Reload">@ReloadLabel</button>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" aria-label="@DismissLabel" @onclick="Dismiss"></button>
             </div>
         </div>
     </div>
 }
 
 @code {
+    [Parameter] public string BodyText { get; set; } = "A new version of FestivalRider is available.";
+    [Parameter] public string ReloadLabel { get; set; } = "Reload";
+    [Parameter] public string DismissLabel { get; set; } = "Dismiss";
+
     private bool _visible;
     private DotNetObjectReference<UpdateAvailableToast>? _ref;
 

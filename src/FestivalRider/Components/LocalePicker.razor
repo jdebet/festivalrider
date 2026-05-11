@@ -1,0 +1,28 @@
+@using FestivalRider.Services
+
+@if (Locales is not null && Locales.Count > 1)
+{
+    <div class="input-group input-group-sm">
+        <select class="form-select form-select-sm"
+                value="@CurrentTag"
+                @onchange="OnSelect">
+            @foreach (var locale in Locales)
+            {
+                <option value="@locale.Tag">@locale.DisplayName</option>
+            }
+        </select>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<LocaleDescriptor> Locales { get; set; } = Array.Empty<LocaleDescriptor>();
+    [Parameter] public string CurrentTag { get; set; } = "en";
+    [Parameter] public EventCallback<string> OnChange { get; set; }
+
+    private async Task OnSelect(ChangeEventArgs e)
+    {
+        var tag = e.Value?.ToString() ?? "en";
+        if (!string.Equals(tag, CurrentTag, StringComparison.OrdinalIgnoreCase))
+            await OnChange.InvokeAsync(tag);
+    }
+}

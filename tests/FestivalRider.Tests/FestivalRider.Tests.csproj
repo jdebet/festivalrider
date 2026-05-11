@@ -17,4 +17,10 @@
         <ProjectReference Include="..\..\src\FestivalRider\FestivalRider.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <Content Include="..\..\src\FestivalRider\wwwroot\i18n\**\*.json"
+                 Link="i18n\%(RecursiveDir)%(Filename)%(Extension)"
+                 CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+
 </Project>

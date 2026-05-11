@@ -3,14 +3,14 @@
 @if (Shows is not null && Shows.Count > 0)
 {
     <div class="input-group input-group-sm">
-        <span class="input-group-text" id="show-picker-label">Show</span>
+        <span class="input-group-text" id="show-picker-label">@Label</span>
         <select class="form-select form-select-sm"
                 aria-labelledby="show-picker-label"
                 value="@ActiveShowId"
                 @onchange="OnSelect">
             @foreach (var s in Shows)
             {
-                <option value="@s.Id">@(string.IsNullOrWhiteSpace(s.Name) ? "Untitled show" : s.Name)</option>
+                <option value="@s.Id">@(string.IsNullOrWhiteSpace(s.Name) ? UntitledPlaceholder : s.Name)</option>
             }
         </select>
     </div>
@@ -20,6 +20,8 @@
     [Parameter, EditorRequired] public IReadOnlyList<ShowData> Shows { get; set; } = Array.Empty<ShowData>();
     [Parameter] public Guid ActiveShowId { get; set; }
     [Parameter] public EventCallback<Guid> OnChange { get; set; }
+    [Parameter] public string Label { get; set; } = "Show";
+    [Parameter] public string UntitledPlaceholder { get; set; } = "Untitled show";
 
     private async Task OnSelect(ChangeEventArgs e)
     {

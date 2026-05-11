@@ -1,5 +1,6 @@
 ﻿@inherits LayoutComponentBase
 @implements IAsyncDisposable
+@inject ILocalizationService Localization
 @inject IStorageService Storage
 @inject IToastService Toasts
 
@@ -9,7 +10,7 @@
     </div>
 
     <main>
-        <MultiTabBanner Show="Storage.AnotherTabActive" />
+        <MultiTabBanner Show="Storage.AnotherTabActive" Message="@Localization.T("banner.multitab")" />
         <div class="top-row px-4">
             <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
         </div>
@@ -21,19 +22,23 @@
 </div>
 
 <ToastContainer Toasts="Toasts.Active" OnDismiss="Toasts.Dismiss" />
-<UpdateAvailableToast />
+<UpdateAvailableToast BodyText="@Localization.T("update.body")"
+                      ReloadLabel="@Localization.T("update.reload")"
+                      DismissLabel="@Localization.T("update.dismiss")" />
 
 @code {
     protected override void OnInitialized()
     {
         Storage.OnAnotherTabChanged += HandleChange;
         Toasts.OnChange += HandleChange;
+        Localization.OnLocaleChanged += HandleChange;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
+            await Localization.EnsureLoadedAsync();
             await Storage.EnsureLoadedAsync();
         }
     }
@@ -44,6 +49,7 @@
     {
         Storage.OnAnotherTabChanged -= HandleChange;
         Toasts.OnChange -= HandleChange;
+        Localization.OnLocaleChanged -= HandleChange;
         await Storage.FlushAsync();
     }
 }

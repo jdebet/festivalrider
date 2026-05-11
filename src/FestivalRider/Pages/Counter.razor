@@ -1,18 +1,31 @@
 ﻿@page "/counter"
+@implements IDisposable
+@inject ILocalizationService Localization
 
-<PageTitle>Counter</PageTitle>
+<PageTitle>@Localization.T("page.counter.title")</PageTitle>
 
-<h1>Counter</h1>
+<h1>@Localization.T("page.counter.heading")</h1>
 
-<p role="status">Current count: @currentCount</p>
+<p role="status">@Localization.T("page.counter.count", currentCount)</p>
 
-<button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
+<button class="btn btn-primary" @onclick="IncrementCount">@Localization.T("page.counter.clickMe")</button>
 
 @code {
     private int currentCount = 0;
+
+    protected override void OnInitialized()
+    {
+        Localization.OnLocaleChanged += HandleChange;
+    }
 
     private void IncrementCount() {
         currentCount++;
     }
 
+    private void HandleChange() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Localization.OnLocaleChanged -= HandleChange;
+    }
 }

@@ -2,21 +2,22 @@
 @using System.Globalization
 @implements IDisposable
 @inject IBandService BandService
+@inject ILocalizationService Localization
 @inject IStorageService Storage
 @inject IExportService Export
 @inject IBundleService Bundle
 @inject IToastService Toasts
 @inject IJSRuntime JS
 
-<PageTitle>Settings · FestivalRider</PageTitle>
+<PageTitle>@Localization.T("page.settings.title")</PageTitle>
 
-<h1 class="h3 mb-3">Settings</h1>
+<h1 class="h3 mb-3">@Localization.T("page.settings.heading")</h1>
 
-<RiderSection Title="Manage shows">
-    <p class="text-muted small">Add, rename, delete, or switch the active show. Deleting the last show seeds a fresh "Untitled show".</p>
+<RiderSection Title="@Localization.T("section.shows.title")">
+    <p class="text-muted small">@Localization.T("page.settings.shows.description")</p>
     @if (BandService.Shows.Count == 0)
     {
-        <div class="text-muted small mb-2">No shows yet.</div>
+        <div class="text-muted small mb-2">@Localization.T("page.settings.shows.noShows")</div>
     }
     else
     {
@@ -33,15 +34,15 @@
                     <div class="btn-group btn-group-sm">
                         @if (BandService.ActiveShowId == sid)
                         {
-                            <button type="button" class="btn btn-primary" disabled>Active</button>
+                            <button type="button" class="btn btn-primary" disabled>@Localization.T("page.settings.shows.active")</button>
                         }
                         else
                         {
                             <button type="button" class="btn btn-outline-primary"
-                                    @onclick="() => SetActiveShow(sid)">Set active</button>
+                                    @onclick="() => SetActiveShow(sid)">@Localization.T("page.settings.shows.setActive")</button>
                         }
                         <button type="button" class="btn btn-outline-danger"
-                                @onclick="() => RequestDeleteShow(sid)">Delete</button>
+                                @onclick="() => RequestDeleteShow(sid)">@Localization.T("page.settings.shows.delete")</button>
                     </div>
                 </li>
             }
@@ -49,41 +50,41 @@
     }
     <div class="row g-2 align-items-end">
         <div class="col-md-9">
-            <input class="form-control" placeholder="New show name" @bind="_newShowName" />
+            <input class="form-control" placeholder="@Localization.T("page.settings.shows.namePlaceholder")" @bind="_newShowName" />
         </div>
         <div class="col-md-3">
-            <button type="button" class="btn btn-outline-primary w-100" @onclick="AddShow">+ Add show</button>
+            <button type="button" class="btn btn-outline-primary w-100" @onclick="AddShow">@Localization.T("page.settings.shows.addBtn")</button>
         </div>
     </div>
 </RiderSection>
 
-<RiderSection Title="Show details">
+<RiderSection Title="@Localization.T("section.showDetails.title")">
     <EditForm Model="_show" OnValidSubmit="SaveShow">
         <DataAnnotationsValidator />
         <ValidationSummary />
         <div class="row g-2 mb-2">
             <div class="col-md-6">
-                <label class="form-label">Name</label>
+                <label class="form-label">@Localization.T("field.name")</label>
                 <InputText class="form-control" @bind-Value="_show.Name" />
             </div>
             <div class="col-md-6">
-                <label class="form-label">Address</label>
+                <label class="form-label">@Localization.T("page.settings.showDetails.address")</label>
                 <InputText class="form-control" @bind-Value="_show.Address" />
             </div>
             <div class="col-md-3">
-                <label class="form-label">Date of opening</label>
+                <label class="form-label">@Localization.T("page.settings.showDetails.dateOfOpening")</label>
                 <InputDate class="form-control" @bind-Value="_dateOfOpening" />
             </div>
             <div class="col-md-3">
-                <label class="form-label">Show day count</label>
+                <label class="form-label">@Localization.T("page.settings.showDetails.showDayCount")</label>
                 <InputNumber class="form-control" @bind-Value="_show.ShowDayCount" />
             </div>
         </div>
 
-        <h6>Stages</h6>
+        <h6>@Localization.T("page.settings.showDetails.stages")</h6>
         @if (_show.Stages.Count == 0)
         {
-            <div class="text-muted small mb-2">No stages yet.</div>
+            <div class="text-muted small mb-2">@Localization.T("page.settings.showDetails.noStages")</div>
         }
         else
         {
@@ -98,46 +99,46 @@
                     </div>
                     <div class="col-md-3">
                         <button type="button" class="btn btn-outline-danger w-100"
-                                @onclick="() => RequestDeleteStage(s.Id)">Delete</button>
+                                @onclick="() => RequestDeleteStage(s.Id)">@Localization.T("page.settings.shows.delete")</button>
                     </div>
                 </div>
             }
         }
         <div class="row g-2 align-items-end mb-2">
             <div class="col-md-9">
-                <input class="form-control" placeholder="New stage name" @bind="_newStageName" />
+                <input class="form-control" placeholder="@Localization.T("page.settings.showDetails.newStagePlaceholder")" @bind="_newStageName" />
             </div>
             <div class="col-md-3">
-                <button type="button" class="btn btn-outline-primary w-100" @onclick="AddStage">+ Add stage</button>
+                <button type="button" class="btn btn-outline-primary w-100" @onclick="AddStage">@Localization.T("page.settings.showDetails.addStageBtn")</button>
             </div>
         </div>
 
-        <button type="submit" class="btn btn-primary">Save show details</button>
+        <button type="submit" class="btn btn-primary">@Localization.T("page.settings.showDetails.saveBtn")</button>
     </EditForm>
 </RiderSection>
 
-<RiderSection Title="Show CSV">
-    <p class="text-muted small">Export or import the show's metadata and stage list (separate from per-band CSVs).</p>
+<RiderSection Title="@Localization.T("section.showCsv.title")">
+    <p class="text-muted small">@Localization.T("page.settings.showCsv.description")</p>
     <div class="d-flex flex-wrap gap-2 mb-2">
-        <button type="button" class="btn btn-outline-primary" @onclick="ExportShowCsv">Export show CSV</button>
+        <button type="button" class="btn btn-outline-primary" @onclick="ExportShowCsv">@Localization.T("page.settings.showCsv.exportBtn")</button>
         <label class="btn btn-outline-secondary mb-0">
-            Import show CSV
+            @Localization.T("page.settings.showCsv.importBtn")
             <InputFile OnChange="ImportShowCsv" accept=".csv" class="d-none" />
         </label>
     </div>
 </RiderSection>
 
-<RiderSection Title="Bands CSV">
-    <p class="text-muted small">Export each band as long-format CSV, or import a band CSV (creates a new band; ID conflicts overwrite).</p>
+<RiderSection Title="@Localization.T("section.bandsCsv.title")">
+    <p class="text-muted small">@Localization.T("page.settings.bandsCsv.description")</p>
     <div class="d-flex flex-wrap gap-2 mb-3">
         <label class="btn btn-outline-secondary mb-0">
-            Import band CSV
+            @Localization.T("page.settings.bandsCsv.importBtn")
             <InputFile OnChange="ImportBandCsv" accept=".csv" class="d-none" />
         </label>
     </div>
     @if (BandService.Bands.Count == 0)
     {
-        <div class="text-muted small">No bands to export.</div>
+        <div class="text-muted small">@Localization.T("page.settings.bandsCsv.noBands")</div>
     }
     else
     {
@@ -147,33 +148,33 @@
                 <li class="list-group-item d-flex justify-content-between align-items-center" @key="band.Id">
                     <span>@band.Name</span>
                     <button type="button" class="btn btn-sm btn-outline-primary"
-                            @onclick="() => ExportBandCsv(band)">Export CSV</button>
+                            @onclick="() => ExportBandCsv(band)">@Localization.T("page.settings.bandsCsv.exportBtn")</button>
                 </li>
             }
         </ul>
     }
 </RiderSection>
 
-<RiderSection Title="Bundle">
-    <p class="text-muted small">Download a single <code>.zip</code> bundling the show, every band, and every running order. Replace overwrites everything; Merge upserts bands and running orders by id.</p>
+<RiderSection Title="@Localization.T("section.bundle.title")">
+    <p class="text-muted small">@Localization.T("page.settings.bundle.description")</p>
     <div class="mb-2">
         <div class="form-check form-check-inline">
             <input class="form-check-input" type="radio" id="bundleModeReplace"
                    checked="@(_bundleImportMode == BundleImportMode.Replace)"
                    @onchange="() => _bundleImportMode = BundleImportMode.Replace" />
-            <label class="form-check-label" for="bundleModeReplace">Replace</label>
+            <label class="form-check-label" for="bundleModeReplace">@Localization.T("page.settings.bundle.replace")</label>
         </div>
         <div class="form-check form-check-inline">
             <input class="form-check-input" type="radio" id="bundleModeMerge"
                    checked="@(_bundleImportMode == BundleImportMode.Merge)"
                    @onchange="() => _bundleImportMode = BundleImportMode.Merge" />
-            <label class="form-check-label" for="bundleModeMerge">Merge</label>
+            <label class="form-check-label" for="bundleModeMerge">@Localization.T("page.settings.bundle.merge")</label>
         </div>
     </div>
     <div class="d-flex flex-wrap gap-2 mb-2">
-        <button type="button" class="btn btn-outline-primary" @onclick="ExportBundle">Export bundle</button>
+        <button type="button" class="btn btn-outline-primary" @onclick="ExportBundle">@Localization.T("page.settings.bundle.exportBtn")</button>
         <label class="btn btn-outline-secondary mb-0">
-            Import bundle
+            @Localization.T("page.settings.bundle.importBtn")
             <InputFile OnChange="StageBundleImport" accept=".zip" class="d-none" />
         </label>
     </div>
@@ -186,36 +187,36 @@
                OnConfirm="ConfirmBundleImport"
                OnCancel="() => _pendingBundle = null" />
 
-<RiderSection Title="Storage">
+<RiderSection Title="@Localization.T("section.storage.title")">
     <p class="text-muted small">
         Schema version: <strong>@_snapshot.SchemaVersion</strong>
         · Bands: <strong>@_snapshot.Bands.Count</strong>
         · Running orders: <strong>@_snapshot.RunningOrders.Count</strong>
     </p>
     <div class="d-flex flex-wrap gap-2">
-        <button type="button" class="btn btn-outline-primary" @onclick="ForceSave">Force save</button>
-        <button type="button" class="btn btn-outline-danger" @onclick="() => _confirmClear = true">Clear all data</button>
+        <button type="button" class="btn btn-outline-primary" @onclick="ForceSave">@Localization.T("page.settings.storage.forceSave")</button>
+        <button type="button" class="btn btn-outline-danger" @onclick="() => _confirmClear = true">@Localization.T("page.settings.storage.clearAll")</button>
     </div>
 </RiderSection>
 
 <ConfirmDialog Show="_confirmClear"
-               Title="Clear all data"
-               Message="Erase all bands, running orders, and show data from this browser? This cannot be undone."
-               ConfirmLabel="Clear"
+               Title="@Localization.T("confirm.clearData.title")"
+               Message="@Localization.T("confirm.clearData.message")"
+               ConfirmLabel="@Localization.T("confirm.clearData.label")"
                OnConfirm="ConfirmClear"
                OnCancel="() => _confirmClear = false" />
 
 <ConfirmDialog Show="_pendingDeleteStageId.HasValue"
-               Title="Delete stage"
+               Title="@Localization.T("confirm.deleteStage.title")"
                Message="@_deleteStageMessage"
-               ConfirmLabel="Delete"
+               ConfirmLabel="@Localization.T("confirm.deleteStage.label")"
                OnConfirm="ConfirmDeleteStage"
                OnCancel="() => _pendingDeleteStageId = null" />
 
 <ConfirmDialog Show="_pendingDeleteShowId.HasValue"
-               Title="Delete show"
+               Title="@Localization.T("confirm.deleteShow.title")"
                Message="@_deleteShowMessage"
-               ConfirmLabel="Delete"
+               ConfirmLabel="@Localization.T("confirm.deleteShow.label")"
                OnConfirm="ConfirmDeleteShow"
                OnCancel="() => _pendingDeleteShowId = null" />
 
@@ -240,6 +241,7 @@
     protected override void OnInitialized()
     {
         BandService.OnChange += HandleChange;
+        Localization.OnLocaleChanged += HandleChange;
         Reload();
     }
 
@@ -262,7 +264,7 @@
     {
         _show.DateOfOpening = DateOnly.FromDateTime(_dateOfOpening);
         await BandService.UpdateShow(_show);
-        Toasts.Show("Show details saved.", ToastLevel.Success);
+        Toasts.Show(Localization.T("toast.settings.showDetailsSaved"), ToastLevel.Success);
     }
 
     private void AddStage()
@@ -271,14 +273,14 @@
         if (string.IsNullOrEmpty(name)) return;
         var id = BandService.AddStage(name);
         _newStageName = string.Empty;
-        Toasts.Show($"Stage \"{name}\" added (#{id}).", ToastLevel.Success);
+        Toasts.Show(Localization.T("toast.settings.stageAdded", name, id), ToastLevel.Success);
     }
 
     private void RequestDeleteStage(int id)
     {
         var stage = BandService.FindStage(id);
         _pendingDeleteStageId = id;
-        _deleteStageMessage = $"Delete stage \"{stage?.Name ?? id.ToString()}\"? Existing slots referencing it become \"Unknown stage\".";
+        _deleteStageMessage = Localization.T("confirm.deleteStage.message", stage?.Name ?? id.ToString());
     }
 
     private void ConfirmDeleteStage()
@@ -286,7 +288,7 @@
         if (_pendingDeleteStageId is { } id)
         {
             BandService.DeleteStage(id);
-            Toasts.Show("Stage deleted.", ToastLevel.Info);
+            Toasts.Show(Localization.T("toast.settings.stageDeleted"), ToastLevel.Info);
         }
         _pendingDeleteStageId = null;
     }
@@ -297,7 +299,7 @@
         if (string.IsNullOrEmpty(name)) return;
         var id = BandService.AddShow(name);
         _newShowName = string.Empty;
-        Toasts.Show($"Show \"{name}\" added.", ToastLevel.Success);
+        Toasts.Show(Localization.T("toast.settings.showAdded", name), ToastLevel.Success);
         _ = BandService.SetActiveShow(id);
     }
 
@@ -317,8 +319,8 @@
         var roCount = BandService.RunningOrders.Count(o => o.ShowId == id);
         _pendingDeleteShowId = id;
         _deleteShowMessage = roCount == 0
-            ? $"Delete show \"{show?.Name ?? id.ToString()}\"? This cannot be undone."
-            : $"Delete show \"{show?.Name ?? id.ToString()}\" and its {roCount} running order(s)? This cannot be undone.";
+            ? Localization.T("confirm.deleteShow.message", show?.Name ?? id.ToString())
+            : Localization.T("confirm.deleteShow.messageWithRo", show?.Name ?? id.ToString(), roCount);
     }
 
     private async Task ConfirmDeleteShow()
@@ -329,7 +331,7 @@
             foreach (var ro in BandService.RunningOrders.Where(o => o.ShowId == id).Select(o => o.Id).ToList())
                 BandService.DeleteRunningOrder(ro);
             await BandService.DeleteShow(id);
-            Toasts.Show("Show deleted.", ToastLevel.Info);
+            Toasts.Show(Localization.T("toast.settings.showDeleted"), ToastLevel.Info);
         }
         _pendingDeleteShowId = null;
     }
@@ -337,14 +339,14 @@
     private async Task ForceSave()
     {
         await Storage.FlushAsync();
-        Toasts.Show("State flushed to local storage.", ToastLevel.Success);
+        Toasts.Show(Localization.T("toast.settings.forceSaved"), ToastLevel.Success);
     }
 
     private async Task ConfirmClear()
     {
         _confirmClear = false;
         await Storage.ClearAsync();
-        Toasts.Show("All data cleared.", ToastLevel.Warning);
+        Toasts.Show(Localization.T("toast.settings.cleared"), ToastLevel.Warning);
     }
 
     private async Task ExportShowCsv()
@@ -371,11 +373,11 @@
             // Pin the imported show to the currently active ShowId so stage references stay consistent.
             show.Id = BandService.ActiveShowId;
             await BandService.UpdateShow(show);
-            Toasts.Show($"Imported show \"{show.Name}\" with {show.Stages.Count} stage(s).", ToastLevel.Success);
+            Toasts.Show(Localization.T("toast.settings.showImported", show.Name, show.Stages.Count), ToastLevel.Success);
         }
         catch (Exception ex)
         {
-            Toasts.Show($"Import failed: {ex.Message}", ToastLevel.Error);
+            Toasts.Show(Localization.T("toast.settings.importFailed", ex.Message), ToastLevel.Error);
         }
     }
 
@@ -390,18 +392,18 @@
             if (existing is null)
             {
                 BandService.AddBand(band);
-                Toasts.Show($"Imported band \"{band.Name}\".", ToastLevel.Success);
+                Toasts.Show(Localization.T("toast.settings.bandImported", band.Name), ToastLevel.Success);
             }
             else
             {
                 BandService.DeleteBand(existing.Id);
                 BandService.AddBand(band);
-                Toasts.Show($"Replaced band \"{band.Name}\".", ToastLevel.Success);
+                Toasts.Show(Localization.T("toast.settings.bandReplaced", band.Name), ToastLevel.Success);
             }
         }
         catch (Exception ex)
         {
-            Toasts.Show($"Import failed: {ex.Message}", ToastLevel.Error);
+            Toasts.Show(Localization.T("toast.settings.importFailed", ex.Message), ToastLevel.Error);
         }
     }
 
@@ -431,7 +433,7 @@
         var stamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
         var fname = $"festivalrider-{Sanitize(_show.Name)}-{stamp}.zip";
         await JS.InvokeVoidAsync("festivalRiderCsv.downloadBytes", fname, "application/zip", bytes);
-        Toasts.Show($"Bundle exported ({bytes.Length / 1024} KB).", ToastLevel.Success);
+        Toasts.Show(Localization.T("toast.settings.bundleExported", bytes.Length / 1024), ToastLevel.Success);
     }
 
     private async Task StageBundleImport(InputFileChangeEventArgs e)
@@ -450,18 +452,18 @@
         }
         catch (IOException)
         {
-            Toasts.Show($"Bundle exceeds the {maxSize / (1024 * 1024)} MB limit.", ToastLevel.Error);
+            Toasts.Show(Localization.T("toast.settings.bundleSizeExceeded", maxSize / (1024 * 1024)), ToastLevel.Error);
             return;
         }
         catch (Exception ex)
         {
-            Toasts.Show($"Bundle read failed: {ex.Message}", ToastLevel.Error);
+            Toasts.Show(Localization.T("toast.settings.bundleReadFailed", ex.Message), ToastLevel.Error);
             return;
         }
 
         if (result.Error is not null || result.State is null)
         {
-            Toasts.Show($"Bundle rejected: {result.Error}", ToastLevel.Error);
+            Toasts.Show(Localization.T("toast.settings.bundleRejected", result.Error), ToastLevel.Error);
             return;
         }
 
@@ -469,17 +471,15 @@
         _pendingBundleMode = mode;
         if (mode == BundleImportMode.Merge)
         {
-            _bundleConfirmTitle = "Merge bundle";
-            _bundleConfirmLabel = "Merge";
-            _bundleConfirmMessage =
-                $"Merge {result.BandCount} band(s) and {result.RunningOrderCount} running order(s) into the current data? Existing entries with newer timestamps will be kept.";
+            _bundleConfirmTitle = Localization.T("confirm.bundleMerge.title");
+            _bundleConfirmLabel = Localization.T("confirm.bundleMerge.label");
+            _bundleConfirmMessage = Localization.T("confirm.bundleMerge.message", result.BandCount, result.RunningOrderCount);
         }
         else
         {
-            _bundleConfirmTitle = "Replace all data";
-            _bundleConfirmLabel = "Replace";
-            _bundleConfirmMessage =
-                $"Replace all current data with {result.BandCount} band(s) and {result.RunningOrderCount} running order(s) from the bundle?";
+            _bundleConfirmTitle = Localization.T("confirm.bundleReplace.title");
+            _bundleConfirmLabel = Localization.T("confirm.bundleReplace.label");
+            _bundleConfirmMessage = Localization.T("confirm.bundleReplace.message", result.BandCount, result.RunningOrderCount);
         }
     }
 
@@ -494,12 +494,11 @@
         string summary;
         if (mode == BundleImportMode.Merge && result.Merge is { } m)
         {
-            summary =
-                $"Merge applied: +{m.BandsAdded} bands, ~{m.BandsUpdated} updated, {m.BandsSkipped} skipped; +{m.RunningOrdersAdded} running orders, ~{m.RunningOrdersUpdated} updated, {m.RunningOrdersSkipped} skipped.";
+            summary = Localization.T("toast.settings.bundleMergeApplied", m.BandsAdded, m.BandsUpdated, m.BandsSkipped, m.RunningOrdersAdded, m.RunningOrdersUpdated, m.RunningOrdersSkipped);
         }
         else
         {
-            summary = $"Imported {result.BandCount} band(s), {result.RunningOrderCount} running order(s).";
+            summary = Localization.T("toast.settings.bundleImported", result.BandCount, result.RunningOrderCount);
         }
 
         if (result.Warnings.Count == 0)
@@ -522,5 +521,6 @@
     public void Dispose()
     {
         BandService.OnChange -= HandleChange;
+        Localization.OnLocaleChanged -= HandleChange;
     }
 }

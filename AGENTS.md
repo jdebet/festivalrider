@@ -81,6 +81,19 @@
 - ALWAYS fake `IJSRuntime` and time. NEVER touch real `localStorage`, `window.print()`, or the network in tests.
 - Tests MUST live in `tests/FestivalRider.Tests/`. NEVER co-locate with production code.
 
+## Localization
+
+- Source-of-truth catalog is `src/FestivalRider/wwwroot/i18n/en.json`. NEVER remove a released key or change its `{N}` placeholder count; adding keys is always safe.
+- Every user-facing string MUST resolve through `ILocalizationService.T(key, args)`. NEVER hard-code English literals in Razor markup, toast text, print-strategy strings, `<PageTitle>` content, or `aria-*` labels.
+- Catalog filename MUST match the lower-cased BCP-47 tag exactly (`en.json`, `fr-fr.json`). NEVER mixed case.
+- Enum localization keys MUST follow `enum.{TypeName}.{ValueName}` exactly. New enum members MUST ship their key in the same commit.
+- Components in `Components/` MUST NOT inject `ILocalizationService`. They receive translated strings via `[Parameter]`. Layouts and pages inject and pass down.
+- `ILocalizationService` MUST NOT participate in the `IStateMigrator` or `IBundleMigrator` chains. Locale is not part of `AppState` and not part of bundles.
+- Locale is persisted under `festivalrider.locale` (separate from `AppState`). Schema impact: zero. No `IStateMigrator` and no `IBundleMigrator` for locale.
+- All persisted formats (CSV, bundle JSON/CSV, `AppState` JSON, filenames) MUST use `CultureInfo.InvariantCulture` for every numeric/date/bool conversion. NEVER use `CultureInfo.CurrentCulture` for any persisted byte.
+- `LocalizationCatalogTests` enforces key-set parity between every locale file and `en.json`. A failing parity test MUST block merge.
+- A nested static class `LocalizationKeys` mirrors every key in `en.json` for IDE autocomplete. Adding a key to `en.json` REQUIRES adding the corresponding constant to `LocalizationKeys`. `LocalizationCatalogTests` enforces 1:1 parity between `en.json` keys and `LocalizationKeys` constant values.
+
 ## Task discipline
 
 - Every commit MUST leave the app compiling and runnable.

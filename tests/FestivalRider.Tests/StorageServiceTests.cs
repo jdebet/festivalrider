@@ -19,7 +19,7 @@ public sealed class StorageServiceTests
         var toasts = new FakeToastService();
         var bands = new BandService(NullLogger<BandService>.Instance);
         var time = new FakeTimeProvider();
-        var svc = new StorageService(NullLogger<StorageService>.Instance, bands, js, toasts, time, migrators);
+        var svc = new StorageService(NullLogger<StorageService>.Instance, bands, js, toasts, FakeLocalizationService.Instance, time, migrators);
         return (svc, js, toasts, time, bands);
     }
 

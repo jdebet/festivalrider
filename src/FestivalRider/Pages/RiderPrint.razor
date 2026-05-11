@@ -1,20 +1,20 @@
 @page "/print/{StrategyKey}/{ContextId}"
 @layout EmptyLayout
+@implements IDisposable
 @inject IEnumerable<IPrintStrategy> Strategies
 @inject IStorageService Storage
+@inject ILocalizationService Localization
 @inject IPdfExportService Pdf
 @inject NavigationManager Nav
 
 @if (!_ready)
 {
-    <p class="p-3">Loading…</p>
+    <p class="p-3">@Localization.T("page.print.loading")</p>
 }
 else if (_strategy is null || _context is null)
 {
     <div class="p-4">
-        <h1 class="h4">Not found</h1>
-        <p>No printable view for <code>@StrategyKey</code> / <code>@ContextId</code>.</p>
-        <button class="btn btn-outline-secondary" @onclick="GoBack">Back</button>
+        <h1 class="h4">@Localization.T("page.print.notFound.heading")</h1>
     </div>
 }
 else
@@ -24,8 +24,8 @@ else
         <div class="d-flex justify-content-between align-items-center mb-3 no-print">
             <h1 class="h4 m-0">@_strategy.GetTitle(_context)</h1>
             <div class="d-flex gap-2">
-                <button class="btn btn-primary" @onclick="Print">Print</button>
-                <button class="btn btn-outline-secondary" @onclick="GoBack">Back</button>
+                <button class="btn btn-primary" @onclick="Print">@Localization.T("page.print.print")</button>
+                <button class="btn btn-outline-secondary" @onclick="GoBack">@Localization.T("page.print.back")</button>
             </div>
         </div>
         @_strategy.Render(_context)
@@ -39,6 +39,13 @@ else
     private bool _ready;
     private IPrintStrategy? _strategy;
     private object? _context;
+
+    protected override void OnInitialized()
+    {
+        Localization.OnLocaleChanged += HandleChange;
+    }
+
+    private void HandleChange() => InvokeAsync(StateHasChanged);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -94,4 +101,9 @@ else
     }
 
     private void GoBack() => Nav.NavigateTo("/");
+
+    public void Dispose()
+    {
+        Localization.OnLocaleChanged -= HandleChange;
+    }
 }

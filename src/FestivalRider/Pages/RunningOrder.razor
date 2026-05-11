@@ -2,34 +2,35 @@
 @using RoModel = FestivalRider.Models.RunningOrder
 @implements IDisposable
 @inject IBandService BandService
+@inject ILocalizationService Localization
 @inject IExportService Export
 @inject IToastService Toasts
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 
-<PageTitle>Running order · FestivalRider</PageTitle>
+<PageTitle>@Localization.T("page.runningOrder.title")</PageTitle>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="h3 m-0">Running order</h1>
-    <button class="btn btn-primary" @onclick="AddRunningOrder">+ New running order</button>
+    <h1 class="h3 m-0">@Localization.T("page.runningOrder.heading")</h1>
+    <button class="btn btn-primary" @onclick="AddRunningOrder">@Localization.T("page.runningOrder.addBtn")</button>
 </div>
 
 @if (_show.Stages.Count == 0)
 {
     <div class="alert alert-warning">
-        No stages defined. Add stages in <a href="settings">Settings</a> before scheduling slots.
+        @Localization.T("page.runningOrder.noStages")
     </div>
 }
 @if (BandService.Bands.Count == 0)
 {
     <div class="alert alert-warning">
-        No bands yet. Add bands on the <a href="">Bands</a> page before scheduling slots.
+        @Localization.T("page.runningOrder.noBands")
     </div>
 }
 
 @if (!BandService.RunningOrdersForActiveShow.Any())
 {
-    <div class="alert alert-info">No running orders yet. Click <strong>New running order</strong> to add one.</div>
+    <div class="alert alert-info">@Localization.T("page.runningOrder.empty", Localization.T("page.runningOrder.addBtn"))</div>
 }
 else
 {
@@ -39,26 +40,26 @@ else
             @{ var ro = order; }
             <div class="row g-2 align-items-end mb-3">
                 <div class="col-md-3">
-                    <label class="form-label">Show day number</label>
+                    <label class="form-label">@Localization.T("page.runningOrder.dayLabel")</label>
                     <input type="number" min="1" max="@_show.ShowDayCount" class="form-control"
                            value="@ro.ShowDayNumber"
                            @onchange="e => OnDayChanged(ro, e)" />
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">Computed date</label>
+                    <label class="form-label">@Localization.T("page.runningOrder.dateLabel")</label>
                     <input class="form-control" readonly value="@FormatDate(ro)" />
                 </div>
                 <div class="col-md-5 text-md-end">
                     <button class="btn btn-outline-primary me-2"
-                            @onclick="() => ExportFull(ro)">Export CSV</button>
+                            @onclick="() => ExportFull(ro)">@Localization.T("page.runningOrder.exportCsv")</button>
                     <button class="btn btn-outline-danger"
-                            @onclick="() => RequestDelete(ro.Id)">Delete</button>
+                            @onclick="() => RequestDelete(ro.Id)">@Localization.T("page.runningOrder.deleteBtn")</button>
                 </div>
             </div>
 
             @if (ro.Slots.Count == 0)
             {
-                <div class="text-muted small mb-2">No slots yet.</div>
+                <div class="text-muted small mb-2">@Localization.T("page.runningOrder.noSlots")</div>
             }
             else
             {
@@ -66,12 +67,12 @@ else
                     <table class="table table-sm align-middle">
                         <thead>
                             <tr>
-                                <th style="width: 18%">Stage</th>
-                                <th style="width: 12%">Start</th>
-                                <th style="width: 22%">Band</th>
-                                <th style="width: 10%">Set min</th>
-                                <th style="width: 10%">Changeover</th>
-                                <th>Notes</th>
+                                <th style="width: 18%">@Localization.T("page.runningOrder.col.stage")</th>
+                                <th style="width: 12%">@Localization.T("page.runningOrder.col.start")</th>
+                                <th style="width: 22%">@Localization.T("page.runningOrder.col.band")</th>
+                                <th style="width: 10%">@Localization.T("page.runningOrder.col.setMin")</th>
+                                <th style="width: 10%">@Localization.T("page.runningOrder.col.changeover")</th>
+                                <th>@Localization.T("page.runningOrder.col.notes")</th>
                                 <th style="width: 60px"></th>
                             </tr>
                         </thead>
@@ -87,7 +88,7 @@ else
                                                 @onchange="e => UpdateSlot(ro, idx, s => s with { StageId = ParseInt(e.Value) })">
                                             @if (BandService.FindStage(slot.StageId) is null)
                                             {
-                                                <option value="@slot.StageId" selected>Unknown stage (#@slot.StageId)</option>
+                                                <option value="@slot.StageId" selected>@Localization.T("page.runningOrder.unknownStage", slot.StageId)</option>
                                             }
                                             @foreach (var st in _show.Stages)
                                             {
@@ -106,7 +107,7 @@ else
                                                 @onchange="e => UpdateSlot(ro, idx, s => s with { BandId = ParseGuid(e.Value, s.BandId) })">
                                             @if (BandService.FindBand(slot.BandId) is null)
                                             {
-                                                <option value="@slot.BandId" selected>Unknown band</option>
+                                                <option value="@slot.BandId" selected>@Localization.T("page.runningOrder.unknownBand")</option>
                                             }
                                             @foreach (var b in BandService.Bands)
                                             {
@@ -142,7 +143,7 @@ else
 
             <div class="d-flex flex-wrap gap-2 align-items-end">
                 <button class="btn btn-outline-primary" @onclick="() => AddSlot(ro)"
-                        disabled="@(BandService.Bands.Count == 0 || _show.Stages.Count == 0)">+ Add slot</button>
+                        disabled="@(BandService.Bands.Count == 0 || _show.Stages.Count == 0)">@Localization.T("page.runningOrder.addSlotBtn")</button>
 
                 @{
                     var stagesUsed = ro.Slots.Select(s => s.StageId).Distinct().ToList();
@@ -152,47 +153,47 @@ else
                 @if (stagesUsed.Count > 0)
                 {
                     <div class="input-group" style="max-width: 320px;">
-                        <span class="input-group-text">Stage</span>
+                        <span class="input-group-text">@Localization.T("page.runningOrder.stage")</span>
                         <select class="form-select" @bind="_byStageSelection[ro.Id]">
-                            <option value="0">— pick stage —</option>
+                            <option value="0">@Localization.T("page.runningOrder.pickStageDefault")</option>
                             @foreach (var sid in stagesUsed)
                             {
                                 <option value="@sid">@(BandService.FindStage(sid)?.Name ?? $"Unknown #{sid}")</option>
                             }
                         </select>
                         <button class="btn btn-outline-secondary"
-                                @onclick="() => ExportByStage(ro)">Export</button>
+                                @onclick="() => ExportByStage(ro)">@Localization.T("page.runningOrder.export")</button>
                         <button class="btn btn-outline-secondary"
-                                @onclick="() => PrintStage(ro)">Print</button>
+                                @onclick="() => PrintStage(ro)">@Localization.T("page.runningOrder.print")</button>
                     </div>
                 }
 
                 @if (bandsUsed.Count > 0)
                 {
                     <div class="input-group" style="max-width: 360px;">
-                        <span class="input-group-text">Band</span>
+                        <span class="input-group-text">@Localization.T("page.runningOrder.band")</span>
                         <select class="form-select" @bind="_byBandSelection[ro.Id]">
-                            <option value="@Guid.Empty">— pick band —</option>
+                            <option value="@Guid.Empty">@Localization.T("page.runningOrder.pickBandDefault")</option>
                             @foreach (var bid in bandsUsed)
                             {
-                                <option value="@bid">@(BandService.FindBand(bid)?.Name ?? "Unknown band")</option>
+                                <option value="@bid">@(BandService.FindBand(bid)?.Name ?? Localization.T("page.runningOrder.unknownBand"))</option>
                             }
                         </select>
                         <button class="btn btn-outline-secondary"
-                                @onclick="() => ExportByBand(ro)">Export</button>
+                                @onclick="() => ExportByBand(ro)">@Localization.T("page.runningOrder.export")</button>
                     </div>
                 }
 
                 <div class="input-group" style="max-width: 360px;">
-                    <span class="input-group-text">Role</span>
+                    <span class="input-group-text">@Localization.T("page.runningOrder.role")</span>
                     <select class="form-select" @bind="_byRoleSelection[ro.Id]">
                         @foreach (var r in Enum.GetValues<ContactRole>())
                         {
-                            <option value="@r">@r</option>
+                            <option value="@r">@Localization.T($"enum.ContactRole.{r}")</option>
                         }
                     </select>
                     <button class="btn btn-outline-secondary"
-                            @onclick="() => PrintRole(ro)">Print</button>
+                            @onclick="() => PrintRole(ro)">@Localization.T("page.runningOrder.print")</button>
                 </div>
             </div>
         </RiderSection>
@@ -200,9 +201,9 @@ else
 }
 
 <ConfirmDialog Show="_pendingDeleteId.HasValue"
-               Title="Delete running order"
+               Title="@Localization.T("confirm.deleteRunningOrder.title")"
                Message="@_deleteMessage"
-               ConfirmLabel="Delete"
+               ConfirmLabel="@Localization.T("confirm.deleteRunningOrder.label")"
                OnConfirm="ConfirmDelete"
                OnCancel="() => _pendingDeleteId = null" />
 
@@ -218,6 +219,7 @@ else
     protected override void OnInitialized()
     {
         BandService.OnChange += HandleChange;
+        Localization.OnLocaleChanged += HandleChange;
         Reload();
     }
 
@@ -241,10 +243,9 @@ else
     private string TitleFor(RoModel ro)
     {
         var date = FormatDate(ro);
-        var slotWord = ro.Slots.Count == 1 ? "slot" : "slots";
         return string.IsNullOrEmpty(date)
-            ? $"Day {ro.ShowDayNumber} ({ro.Slots.Count} {slotWord})"
-            : $"Day {ro.ShowDayNumber} · {date} ({ro.Slots.Count} {slotWord})";
+            ? Localization.T("page.runningOrder.dayTitle.noDate", ro.ShowDayNumber, ro.Slots.Count)
+            : Localization.T("page.runningOrder.dayTitle", ro.ShowDayNumber, date, ro.Slots.Count);
     }
 
     private string FormatDate(RoModel ro)
@@ -304,8 +305,8 @@ else
         var ro = BandService.FindRunningOrder(id);
         _pendingDeleteId = id;
         _deleteMessage = ro is null
-            ? "Delete this running order?"
-            : $"Delete running order for day {ro.ShowDayNumber} ({ro.Slots.Count} slot(s))? This cannot be undone.";
+            ? Localization.T("confirm.deleteRunningOrder.messageFallback")
+            : Localization.T("confirm.deleteRunningOrder.message", ro.ShowDayNumber, ro.Slots.Count);
     }
 
     private void ConfirmDelete()
@@ -330,7 +331,7 @@ else
     {
         if (!_byStageSelection.TryGetValue(ro.Id, out var sid) || sid <= 0)
         {
-            Toasts.Show("Pick a stage first.", ToastLevel.Info);
+            Toasts.Show(Localization.T("toast.runningOrder.pickStage"), ToastLevel.Info);
             return;
         }
         var csv = Export.ExportRunningOrderByStageCsv(ro, sid);
@@ -342,7 +343,7 @@ else
     {
         if (!_byBandSelection.TryGetValue(ro.Id, out var bid) || bid == Guid.Empty)
         {
-            Toasts.Show("Pick a band first.", ToastLevel.Info);
+            Toasts.Show(Localization.T("toast.runningOrder.pickBand"), ToastLevel.Info);
             return;
         }
         var csv = Export.ExportRunningOrderByBandCsv(ro, bid);
@@ -354,7 +355,7 @@ else
     {
         if (!_byStageSelection.TryGetValue(ro.Id, out var sid) || sid <= 0)
         {
-            Toasts.Show("Pick a stage first.", ToastLevel.Info);
+            Toasts.Show(Localization.T("toast.runningOrder.pickStage"), ToastLevel.Info);
             return;
         }
         Nav.NavigateTo($"print/stage/{ro.Id}:{sid}");
@@ -396,5 +397,6 @@ else
     public void Dispose()
     {
         BandService.OnChange -= HandleChange;
+        Localization.OnLocaleChanged -= HandleChange;
     }
 }

@@ -10,10 +10,12 @@ namespace FestivalRider.PrintStrategies;
 public class StagePrintStrategy : IPrintStrategy
 {
     private readonly IBandService _bands;
+    private readonly ILocalizationService _loc;
 
-    public StagePrintStrategy(IBandService bands)
+    public StagePrintStrategy(IBandService bands, ILocalizationService loc)
     {
         _bands = bands;
+        _loc = loc;
     }
 
     public string Key => "stage";
@@ -23,8 +25,8 @@ public class StagePrintStrategy : IPrintStrategy
         var (order, stage, _) = Resolve(context);
         var show = _bands.FindShow(order.ShowId) ?? new ShowData();
         var date = show.DateOfOpening == default
-            ? $"Day {order.ShowDayNumber}"
-            : show.DateOfOpening.AddDays(order.ShowDayNumber - 1).ToString("ddd dd MMM yyyy");
+            ? _loc.T("print.day", order.ShowDayNumber)
+            : show.DateOfOpening.AddDays(order.ShowDayNumber - 1).ToString("ddd dd MMM yyyy", _loc.Culture);
         return string.IsNullOrWhiteSpace(show.Name)
             ? $"{stage.Name} — {date}"
             : $"{show.Name} — {stage.Name} — {date}";
@@ -58,7 +60,7 @@ public class StagePrintStrategy : IPrintStrategy
         return (order, stage, slots);
     }
 
-    private static void BuildHeader(RenderTreeBuilder b, ref int seq, Stage stage, RunningOrder order, ShowData show)
+    private void BuildHeader(RenderTreeBuilder b, ref int seq, Stage stage, RunningOrder order, ShowData show)
     {
         b.OpenElement(seq++, "header");
         b.AddAttribute(seq++, "class", "print-section mb-3");
@@ -73,7 +75,7 @@ public class StagePrintStrategy : IPrintStrategy
             b.AddContent(seq++, show.Name);
             b.AddContent(seq++, " · ");
         }
-        b.AddContent(seq++, $"Day {order.ShowDayNumber}");
+        b.AddContent(seq++, _loc.T("print.day", order.ShowDayNumber));
         if (show.DateOfOpening != default)
         {
             b.AddContent(seq++, " · ");
@@ -89,13 +91,13 @@ public class StagePrintStrategy : IPrintStrategy
         b.AddAttribute(seq++, "class", "print-section mb-3");
         b.OpenElement(seq++, "h2");
         b.AddAttribute(seq++, "class", "h5");
-        b.AddContent(seq++, "Schedule");
+        b.AddContent(seq++, _loc.T("print.stage.scheduleHeading"));
         b.CloseElement();
 
         if (slots.Count == 0)
         {
             b.OpenElement(seq++, "p");
-            b.AddContent(seq++, "No slots on this stage.");
+            b.AddContent(seq++, _loc.T("print.stage.noSlots"));
             b.CloseElement();
             b.CloseElement();
             return;
@@ -105,7 +107,7 @@ public class StagePrintStrategy : IPrintStrategy
         b.AddAttribute(seq++, "class", "table table-sm");
         b.OpenElement(seq++, "thead");
         b.OpenElement(seq++, "tr");
-        foreach (var h in new[] { "Start", "Set", "Changeover", "Band", "Notes" })
+        foreach (var h in new[] { _loc.T("print.stage.col.start"), _loc.T("print.stage.col.set"), _loc.T("print.stage.col.changeover"), _loc.T("print.stage.col.band"), _loc.T("print.stage.col.notes") })
         {
             b.OpenElement(seq++, "th");
             b.AddContent(seq++, h);
@@ -121,9 +123,9 @@ public class StagePrintStrategy : IPrintStrategy
             foreach (var v in new[]
             {
                 s.StartTime.ToString("HH:mm"),
-                $"{s.SetLengthMinutes} min",
-                $"{s.ChangeoverMinutes} min",
-                band?.Name ?? "Unknown band",
+                _loc.T("print.stage.min", s.SetLengthMinutes),
+                _loc.T("print.stage.min", s.ChangeoverMinutes),
+                band?.Name ?? _loc.T("print.stage.unknownBand"),
                 s.Notes ?? string.Empty,
             })
             {
@@ -145,14 +147,14 @@ public class StagePrintStrategy : IPrintStrategy
         b.AddAttribute(seq++, "class", "print-section mb-3");
         b.OpenElement(seq++, "h2");
         b.AddAttribute(seq++, "class", "h5");
-        b.AddContent(seq++, "Tech summary");
+        b.AddContent(seq++, _loc.T("print.stage.techSummaryHeading"));
         b.CloseElement();
 
         b.OpenElement(seq++, "table");
         b.AddAttribute(seq++, "class", "table table-sm");
         b.OpenElement(seq++, "thead");
         b.OpenElement(seq++, "tr");
-        foreach (var h in new[] { "Start", "Band", "Power", "FOH console", "Monitors", "Wedges", "IEMs", "Risers" })
+        foreach (var h in new[] { _loc.T("print.stage.col.start"), _loc.T("print.stage.col.band"), _loc.T("print.stage.col.power"), _loc.T("print.stage.col.fohConsole"), _loc.T("print.stage.col.monitors"), _loc.T("print.stage.col.wedges"), _loc.T("print.stage.col.iems"), _loc.T("print.stage.col.risers") })
         {
             b.OpenElement(seq++, "th");
             b.AddContent(seq++, h);
@@ -169,7 +171,7 @@ public class StagePrintStrategy : IPrintStrategy
             foreach (var v in new[]
             {
                 s.StartTime.ToString("HH:mm"),
-                band?.Name ?? "Unknown band",
+                band?.Name ?? _loc.T("print.stage.unknownBand"),
                 t is null ? string.Empty : $"{AmpLabel(t.Power.Amperage)} {PhaseLabel(t.Power.Phase)}",
                 t?.Foh.OwnConsoleModel ?? string.Empty,
                 t is null ? string.Empty : MonitorLabel(t.Monitors),
@@ -189,20 +191,15 @@ public class StagePrintStrategy : IPrintStrategy
         b.CloseElement();
     }
 
-    private static string AmpLabel(PowerAmperage a) => a switch
-    {
-        PowerAmperage._16_A => "16A",
-        PowerAmperage._32_A => "32A",
-        PowerAmperage._63_A => "63A",
-        _ => a.ToString(),
-    };
+    private string AmpLabel(PowerAmperage a) => _loc.T($"enum.PowerAmperage.{a}");
 
-    private static string PhaseLabel(PowerPhase p) => p == PowerPhase.ThreePhase ? "3φ" : "1φ";
+    private string PhaseLabel(PowerPhase p) => _loc.T($"enum.PowerPhase.{p}");
 
-    private static string MonitorLabel(MonitorSetup m) => m.SourceMode switch
+    private string MonitorLabel(MonitorSetup m)
     {
-        MonitorSourceMode.OwnConsole => string.IsNullOrWhiteSpace(m.OwnConsoleModel) ? "Own" : $"Own ({m.OwnConsoleModel})",
-        MonitorSourceMode.FromFoh => "From FOH",
-        _ => "—",
-    };
+        var label = _loc.T($"enum.MonitorSourceMode.{m.SourceMode}");
+        if (m.SourceMode == MonitorSourceMode.OwnConsole && !string.IsNullOrWhiteSpace(m.OwnConsoleModel))
+            return $"{label} ({m.OwnConsoleModel})";
+        return label;
+    }
 }

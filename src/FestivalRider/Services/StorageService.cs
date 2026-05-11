@@ -26,6 +26,7 @@ public class StorageService : IStorageService, IAsyncDisposable
     private readonly IBandService _bands;
     private readonly IJSRuntime _js;
     private readonly IToastService _toasts;
+    private readonly ILocalizationService _loc;
     private readonly TimeProvider _timeProvider;
     private readonly IReadOnlyDictionary<int, IStateMigrator> _migrators;
     private readonly Guid _tabId = Guid.NewGuid();
@@ -41,6 +42,7 @@ public class StorageService : IStorageService, IAsyncDisposable
         IBandService bands,
         IJSRuntime js,
         IToastService toasts,
+        ILocalizationService loc,
         TimeProvider? timeProvider = null,
         IEnumerable<IStateMigrator>? migrators = null)
     {
@@ -48,6 +50,7 @@ public class StorageService : IStorageService, IAsyncDisposable
         _bands = bands;
         _js = js;
         _toasts = toasts;
+        _loc = loc;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _migrators = BuildMigratorIndex(migrators);
     }
@@ -129,7 +132,7 @@ public class StorageService : IStorageService, IAsyncDisposable
         {
             _logger.LogError(ex, "State payload is not valid JSON; backing up and resetting.");
             await BackupAndResetAsync(raw, foundVersion: 0);
-            _toasts.Show("Saved data was unreadable; reset to a clean state.", ToastLevel.Warning);
+            _toasts.Show(_loc.T("toast.storage.unreadable"), ToastLevel.Warning);
             return;
         }
 
@@ -139,7 +142,7 @@ public class StorageService : IStorageService, IAsyncDisposable
             if (!migrated)
             {
                 await BackupAndResetAsync(raw, foundVersion);
-                _toasts.Show($"Saved data uses schema v{foundVersion}; backed up and reset to v{CurrentSchemaVersion}.", ToastLevel.Warning);
+                _toasts.Show(_loc.T("toast.storage.backupReset", foundVersion, CurrentSchemaVersion), ToastLevel.Warning);
                 return;
             }
 
@@ -151,7 +154,7 @@ public class StorageService : IStorageService, IAsyncDisposable
                 {
                     _logger.LogWarning("Persisting migrated payload returned false; falling back to backup-and-reset.");
                     await BackupAndResetAsync(raw, foundVersion);
-                    _toasts.Show("Migration could not be saved; backed up and reset.", ToastLevel.Error);
+                    _toasts.Show(_loc.T("toast.storage.migrationFailed"), ToastLevel.Error);
                     return;
                 }
             }
@@ -159,12 +162,12 @@ public class StorageService : IStorageService, IAsyncDisposable
             {
                 _logger.LogError(ex, "Failed to persist migrated payload; falling back to backup-and-reset.");
                 await BackupAndResetAsync(raw, foundVersion);
-                _toasts.Show("Migration could not be saved; backed up and reset.", ToastLevel.Error);
+                _toasts.Show(_loc.T("toast.storage.migrationFailed"), ToastLevel.Error);
                 return;
             }
 
             raw = migratedJson!;
-            _toasts.Show($"Migrated data v{foundVersion} \u2192 v{CurrentSchemaVersion}.", ToastLevel.Info);
+            _toasts.Show(_loc.T("toast.storage.migrated", foundVersion, CurrentSchemaVersion), ToastLevel.Info);
             foreach (var w in warnings.Take(3))
                 _toasts.Show(w, ToastLevel.Warning);
             if (warnings.Count > 0)
@@ -176,17 +179,17 @@ public class StorageService : IStorageService, IAsyncDisposable
             var state = JsonSerializer.Deserialize<AppState>(raw, JsonOpts);
             if (state is null)
             {
-                _toasts.Show("Saved data was empty; reset to a clean state.", ToastLevel.Warning);
+                _toasts.Show(_loc.T("toast.storage.empty"), ToastLevel.Warning);
                 return;
             }
             _bands.ReplaceState(state);
-            _toasts.Show($"Restored {state.Bands.Count} bands from previous session.", ToastLevel.Info);
+            _toasts.Show(_loc.T("toast.storage.restored", state.Bands.Count), ToastLevel.Info);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to deserialize state; backing up and resetting.");
             await BackupAndResetAsync(raw, foundVersion);
-            _toasts.Show("Saved data was unreadable; reset to a clean state.", ToastLevel.Warning);
+            _toasts.Show(_loc.T("toast.storage.unreadable"), ToastLevel.Warning);
         }
     }
 
@@ -268,7 +271,7 @@ public class StorageService : IStorageService, IAsyncDisposable
             var json = JsonSerializer.Serialize(_bands.Snapshot(), JsonOpts);
             var ok = await _js.InvokeAsync<bool>("festivalRiderStorage.setItem", StateKey, json);
             if (!ok)
-                _toasts.Show("Saving failed (storage quota?). Export to CSV, then clear data.", ToastLevel.Error);
+                _toasts.Show(_loc.T("toast.storage.saveFailed"), ToastLevel.Error);
         }
         catch (Exception ex)
         {
