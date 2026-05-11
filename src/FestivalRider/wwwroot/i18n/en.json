@@ -20,7 +20,7 @@
   "page.bands.card.print": "Print",
   "page.bands.card.delete": "Delete",
   "page.bands.card.contacts": "{0} contact(s)",
-  "page.bands.card.travellers": "{0} traveller(s)",
+  "page.bands.card.travellers": "{0} people",
 
   "confirm.deleteBand.title": "Delete band",
   "confirm.deleteBand.message": "Delete \"{0}\"? This cannot be undone.",
