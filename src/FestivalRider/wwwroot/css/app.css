@@ -112,3 +112,26 @@ code {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+
+/* Density utilities (plan 015) */
+.fr-table-dense > tbody > tr > td,
+.fr-table-dense > tbody > tr > th,
+.fr-table-dense > thead > tr > td,
+.fr-table-dense > thead > tr > th {
+    padding: 0.25rem 0.5rem;
+}
+
+.fr-form-ultra-sm {
+    padding: 0.15rem 0.35rem;
+    font-size: 0.8125rem;
+    line-height: 1.3;
+}
+
+.fr-py-tight {
+    padding-top: 0.25rem !important;
+    padding-bottom: 0.25rem !important;
+}
+
+.fr-gap-xs {
+    gap: 0.25rem !important;
+}

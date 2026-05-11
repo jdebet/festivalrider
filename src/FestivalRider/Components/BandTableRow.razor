@@ -1,0 +1,33 @@
+@* Dense band table row. No service injection; inputs via [Parameter], outputs via EventCallback. *@
+<tr @key="Band.Id">
+    <td>
+        <a href="/band/@Band.Id" class="fw-medium text-decoration-none">@Band.Name</a>
+        @if (!string.IsNullOrWhiteSpace(Band.Notes))
+        {
+            <span class="text-muted small ms-1">@Band.Notes</span>
+        }
+    </td>
+    <td class="text-center">@Band.Contacts.Count</td>
+    <td class="text-center">@Band.TravelParty.Members.Count</td>
+    <td>
+        <div class="d-flex gap-1 justify-content-end">
+            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="HandleEdit">@EditLabel</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="HandlePrint">@PrintLabel</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" @onclick="HandleDelete">@DeleteLabel</button>
+        </div>
+    </td>
+</tr>
+
+@code {
+    [Parameter, EditorRequired] public Band Band { get; set; } = default!;
+    [Parameter] public EventCallback<Guid> OnEdit { get; set; }
+    [Parameter] public EventCallback<Guid> OnDelete { get; set; }
+    [Parameter] public EventCallback<Guid> OnPrint { get; set; }
+    [Parameter] public string EditLabel { get; set; } = "Edit";
+    [Parameter] public string PrintLabel { get; set; } = "Print";
+    [Parameter] public string DeleteLabel { get; set; } = "Delete";
+
+    private Task HandleEdit() => OnEdit.InvokeAsync(Band.Id);
+    private Task HandleDelete() => OnDelete.InvokeAsync(Band.Id);
+    private Task HandlePrint() => OnPrint.InvokeAsync(Band.Id);
+}

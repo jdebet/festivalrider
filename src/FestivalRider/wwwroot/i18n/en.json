@@ -1,6 +1,8 @@
 {
   "nav.bands": "Bands",
+  "nav.bandsV2": "Bands v2",
   "nav.runningOrder": "Running order",
+  "nav.runningOrderV2": "RO v2",
   "nav.settings": "Settings",
   "nav.show.label": "Show",
   "nav.show.untitled": "Untitled show",
@@ -12,6 +14,8 @@
   "update.dismiss": "Dismiss",
 
   "page.bands.title": "Bands · FestivalRider",
+  "page.bandsV2.title": "Bands v2 · FestivalRider",
+  "page.bandsV2.filterPlaceholder": "Filter bands...",
   "page.bands.heading": "Bands",
   "page.bands.addBand": "+ New band",
   "page.bands.empty": "No bands yet. Click {0} to add one.",

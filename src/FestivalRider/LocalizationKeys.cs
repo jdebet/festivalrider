@@ -5,7 +5,9 @@ public static class LocalizationKeys
     public static class Nav
     {
         public const string Bands = "nav.bands";
+        public const string BandsV2 = "nav.bandsV2";
         public const string RunningOrder = "nav.runningOrder";
+        public const string RunningOrderV2 = "nav.runningOrderV2";
         public const string Settings = "nav.settings";
         public static class Show
         {
@@ -43,6 +45,12 @@ public static class LocalizationKeys
                 public const string Contacts = "page.bands.card.contacts";
                 public const string Travellers = "page.bands.card.travellers";
             }
+        }
+
+        public static class BandsV2
+        {
+            public const string Title = "page.bandsV2.title";
+            public const string FilterPlaceholder = "page.bandsV2.filterPlaceholder";
         }
 
         public static class Editor

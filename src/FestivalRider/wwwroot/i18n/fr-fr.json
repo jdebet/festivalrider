@@ -1,6 +1,8 @@
 {
   "nav.bands": "Groupes",
+  "nav.bandsV2": "Groupes v2",
   "nav.runningOrder": "Ordre de passage",
+  "nav.runningOrderV2": "OP v2",
   "nav.settings": "Paramètres",
   "nav.show.label": "Spectacle",
   "nav.show.untitled": "Spectacle sans titre",
@@ -12,6 +14,8 @@
   "update.dismiss": "Ignorer",
 
   "page.bands.title": "Groupes · FestivalRider",
+  "page.bandsV2.title": "Groupes v2 · FestivalRider",
+  "page.bandsV2.filterPlaceholder": "Filtrer les groupes...",
   "page.bands.heading": "Groupes",
   "page.bands.addBand": "+ Ajouter un groupe",
   "page.bands.empty": "Aucuns groupes. Cliquez sur {0} pour en ajouter un.",

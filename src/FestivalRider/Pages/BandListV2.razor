@@ -1,0 +1,114 @@
+@page "/bands-v2"
+@implements IDisposable
+@inject IBandService BandService
+@inject ILocalizationService Localization
+@inject NavigationManager Nav
+
+<PageTitle>@Localization.T("page.bandsV2.title")</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h1 class="h4 m-0">@Localization.T("page.bands.heading")</h1>
+    <button class="btn btn-primary btn-sm" @onclick="AddBand">@Localization.T("page.bands.addBand")</button>
+</div>
+
+<div class="mb-2">
+    <input type="text"
+           class="form-control form-control-sm"
+           style="max-width: 320px;"
+           placeholder="@Localization.T("page.bandsV2.filterPlaceholder")"
+           @bind="_filter"
+           @bind:event="oninput" />
+</div>
+
+@if (FilteredBands.Count == 0)
+{
+    <p class="text-muted small">@Localization.T("page.bands.empty", Localization.T("page.bands.addBand"))</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm table-hover fr-table-dense align-middle">
+            <thead>
+                <tr>
+                    <th>@Localization.T("field.name")</th>
+                    <th class="text-center" style="width: 100px;">@Localization.T("section.contacts.title")</th>
+                    <th class="text-center" style="width: 120px;">@Localization.T("section.travelParty.title")</th>
+                    <th style="width: 200px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var band in FilteredBands)
+                {
+                    <BandTableRow Band="band"
+                                  OnEdit="EditBand"
+                                  OnPrint="PrintBand"
+                                  OnDelete="RequestDelete"
+                                  EditLabel="@Localization.T("page.bands.card.edit")"
+                                  PrintLabel="@Localization.T("page.bands.card.print")"
+                                  DeleteLabel="@Localization.T("page.bands.card.delete")" />
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<ConfirmDialog Show="_pendingDeleteId.HasValue"
+               Title="@Localization.T("confirm.deleteBand.title")"
+               Message="@_deleteMessage"
+               ConfirmLabel="@Localization.T("confirm.deleteBand.label")"
+               OnConfirm="ConfirmDelete"
+               OnCancel="CancelDelete" />
+
+@code {
+    private Guid? _pendingDeleteId;
+    private string _deleteMessage = string.Empty;
+    private string _filter = string.Empty;
+
+    private IReadOnlyList<Band> FilteredBands =>
+        string.IsNullOrWhiteSpace(_filter)
+            ? BandService.Bands
+            : BandService.Bands.Where(b =>
+                b.Name.Contains(_filter, StringComparison.OrdinalIgnoreCase) ||
+                (!string.IsNullOrWhiteSpace(b.Notes) && b.Notes.Contains(_filter, StringComparison.OrdinalIgnoreCase))
+            ).ToList();
+
+    protected override void OnInitialized()
+    {
+        BandService.OnChange += HandleChange;
+        Localization.OnLocaleChanged += HandleChange;
+    }
+
+    private void HandleChange() => InvokeAsync(StateHasChanged);
+
+    private void AddBand()
+    {
+        var band = new Band { Name = Localization.T("page.bands.newBandDefault") };
+        BandService.AddBand(band);
+        Nav.NavigateTo($"/band-v2/{band.Id}");
+    }
+
+    private void EditBand(Guid id) => Nav.NavigateTo($"/band-v2/{id}");
+
+    private void PrintBand(Guid id) => Nav.NavigateTo($"/print/band/{id}");
+
+    private void RequestDelete(Guid id)
+    {
+        var band = BandService.FindBand(id);
+        _pendingDeleteId = id;
+        _deleteMessage = Localization.T("confirm.deleteBand.message", band?.Name ?? string.Empty);
+    }
+
+    private void ConfirmDelete()
+    {
+        if (_pendingDeleteId is { } id) BandService.DeleteBand(id);
+        _pendingDeleteId = null;
+    }
+
+    private void CancelDelete() => _pendingDeleteId = null;
+
+    public void Dispose()
+    {
+        BandService.OnChange -= HandleChange;
+        Localization.OnLocaleChanged -= HandleChange;
+    }
+}

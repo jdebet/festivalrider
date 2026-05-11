@@ -3,55 +3,60 @@
 @inject IBandService BandService
 @inject ILocalizationService Localization
 
-<div class="top-row ps-3 navbar navbar-dark">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="">FestivalRider</a>
-        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+        <button title="Navigation menu" class="navbar-toggler" type="button" @onclick="ToggleNavMenu">
             <span class="navbar-toggler-icon"></span>
         </button>
+        <div class="@NavMenuCssClass navbar-collapse">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                        @Localization.T("nav.bands")
+                    </NavLink>
+                </li>
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="bands-v2">
+                        @Localization.T("nav.bandsV2")
+                    </NavLink>
+                </li>
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="running-order">
+                        @Localization.T("nav.runningOrder")
+                    </NavLink>
+                </li>
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="running-order-v2">
+                        @Localization.T("nav.runningOrderV2")
+                    </NavLink>
+                </li>
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="settings">
+                        @Localization.T("nav.settings")
+                    </NavLink>
+                </li>
+            </ul>
+            <div class="d-flex align-items-center gap-2">
+                <ShowPicker Shows="BandService.Shows"
+                            ActiveShowId="BandService.ActiveShowId"
+                            OnChange="OnShowChanged"
+                            Label="@Localization.T("nav.show.label")"
+                            UntitledPlaceholder="@Localization.T("nav.show.untitled")" />
+                <LocalePicker Locales="Localization.AvailableLocales"
+                              CurrentTag="Localization.CurrentLocale"
+                              OnChange="OnLocaleChanged" />
+            </div>
+        </div>
     </div>
-</div>
-
-<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3 py-2">
-            <ShowPicker Shows="BandService.Shows"
-                        ActiveShowId="BandService.ActiveShowId"
-                        OnChange="OnShowChanged"
-                        Label="@Localization.T("nav.show.label")"
-                        UntitledPlaceholder="@Localization.T("nav.show.untitled")" />
-        </div>
-        <div class="nav-item px-3 py-1">
-            <LocalePicker Locales="Localization.AvailableLocales"
-                          CurrentTag="Localization.CurrentLocale"
-                          OnChange="OnLocaleChanged" />
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> @Localization.T("nav.bands")
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="running-order">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> @Localization.T("nav.runningOrder")
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="settings">
-                <span class="bi bi-gear-fill-nav-menu" aria-hidden="true"></span> @Localization.T("nav.settings")
-            </NavLink>
-        </div>
-    </nav>
-</div>
+</nav>
 
 @code {
-    private bool collapseNavMenu = true;
+    private bool _collapseNavMenu = true;
 
-    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+    private string? NavMenuCssClass => _collapseNavMenu ? "collapse" : null;
 
-    private void ToggleNavMenu() {
-        collapseNavMenu = !collapseNavMenu;
-    }
+    private void ToggleNavMenu() => _collapseNavMenu = !_collapseNavMenu;
 
     protected override void OnInitialized()
     {

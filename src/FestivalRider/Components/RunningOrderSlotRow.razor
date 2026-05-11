@@ -1,0 +1,96 @@
+@* Compact running-order slot row. No service injection; all state flows from page. *@
+<tr @key="(OrderId, Index)">
+    <td class="text-center fr-py-tight" style="width: 32px;">
+        <div class="d-flex flex-column">
+            <button type="button" class="btn btn-link btn-sm p-0 lh-1" @onclick="() => OnMoveUp.InvokeAsync(Index)" disabled="@(Index == 0)">&#9650;</button>
+            <button type="button" class="btn btn-link btn-sm p-0 lh-1" @onclick="() => OnMoveDown.InvokeAsync(Index)" disabled="@(IsLast)">&#9660;</button>
+        </div>
+    </td>
+    <td class="fr-py-tight">
+        <select class="form-select form-select-sm fr-form-ultra-sm"
+                value="@Slot.StageId"
+                @onchange="e => OnUpdate.InvokeAsync((Index, Slot with { StageId = ParseInt(e.Value) }))">
+            @if (FindStage(Slot.StageId) is null)
+            {
+                <option value="@Slot.StageId">@UnknownStageLabel</option>
+            }
+            @foreach (var s in Stages)
+            {
+                <option value="@s.Id">@s.Name</option>
+            }
+        </select>
+    </td>
+    <td class="fr-py-tight">
+        <input type="time" class="form-control form-control-sm fr-form-ultra-sm"
+               value="@Slot.StartTime.ToString("HH:mm")"
+               @onchange="e => OnUpdate.InvokeAsync((Index, Slot with { StartTime = ParseTime(e.Value, Slot.StartTime) }))" />
+    </td>
+    <td class="fr-py-tight">
+        <select class="form-select form-select-sm fr-form-ultra-sm"
+                value="@Slot.BandId"
+                @onchange="e => OnUpdate.InvokeAsync((Index, Slot with { BandId = ParseGuid(e.Value, Slot.BandId) }))">
+            @if (FindBand(Slot.BandId) is null)
+            {
+                <option value="@Slot.BandId">@UnknownBandLabel</option>
+            }
+            @foreach (var b in Bands)
+            {
+                <option value="@b.Id">@b.Name</option>
+            }
+        </select>
+    </td>
+    <td class="fr-py-tight">
+        <input type="number" min="0" class="form-control form-control-sm fr-form-ultra-sm"
+               value="@Slot.SetLengthMinutes"
+               @onchange="e => OnUpdate.InvokeAsync((Index, Slot with { SetLengthMinutes = ParseInt(e.Value) }))" />
+    </td>
+    <td class="fr-py-tight">
+        <input type="number" min="0" class="form-control form-control-sm fr-form-ultra-sm"
+               value="@Slot.ChangeoverMinutes"
+               @onchange="e => OnUpdate.InvokeAsync((Index, Slot with { ChangeoverMinutes = ParseInt(e.Value) }))" />
+    </td>
+    <td class="fr-py-tight">
+        <input class="form-control form-control-sm fr-form-ultra-sm"
+               value="@(Slot.Notes ?? string.Empty)"
+               @onchange="e => OnUpdate.InvokeAsync((Index, Slot with { Notes = NullIfEmpty((string?)e.Value) }))" />
+    </td>
+    <td class="text-end fr-py-tight">
+        <button type="button" class="btn btn-sm btn-outline-danger fr-form-ultra-sm"
+                @onclick="() => OnRemove.InvokeAsync(Index)">&#10005;</button>
+    </td>
+</tr>
+
+@code {
+    [Parameter, EditorRequired] public Guid OrderId { get; set; }
+    [Parameter, EditorRequired] public int Index { get; set; }
+    [Parameter] public bool IsLast { get; set; }
+    [Parameter, EditorRequired] public RunningOrderSlot Slot { get; set; } = default!;
+    [Parameter] public IReadOnlyList<Stage> Stages { get; set; } = Array.Empty<Stage>();
+    [Parameter] public IReadOnlyList<Band> Bands { get; set; } = Array.Empty<Band>();
+    [Parameter] public string UnknownStageLabel { get; set; } = "Unknown stage";
+    [Parameter] public string UnknownBandLabel { get; set; } = "Unknown band";
+
+    [Parameter] public EventCallback<(int index, RunningOrderSlot newSlot)> OnUpdate { get; set; }
+    [Parameter] public EventCallback<int> OnRemove { get; set; }
+    [Parameter] public EventCallback<int> OnMoveUp { get; set; }
+    [Parameter] public EventCallback<int> OnMoveDown { get; set; }
+
+    private Stage? FindStage(int id) => Stages.FirstOrDefault(s => s.Id == id);
+    private Band? FindBand(Guid id) => Bands.FirstOrDefault(b => b.Id == id);
+
+    private static int ParseInt(object? value)
+    {
+        if (value is null) return 0;
+        return int.TryParse(value.ToString(), System.Globalization.NumberStyles.Integer,
+            System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 0;
+    }
+
+    private static Guid ParseGuid(object? value, Guid fallback)
+        => Guid.TryParse(value?.ToString(), out var g) ? g : fallback;
+
+    private static TimeOnly ParseTime(object? value, TimeOnly fallback)
+        => TimeOnly.TryParse(value?.ToString(), out var t) ? t : fallback;
+
+    private static string? NullIfEmpty(string? s)
+        => string.IsNullOrWhiteSpace(s) ? null : s;
+}

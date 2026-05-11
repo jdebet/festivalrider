@@ -25,6 +25,7 @@ Versioned design documents for FestivalRider. Each plan captures locked decision
 | 009 | [Searchable PDF export & bundles](./009-searchable-pdf-bundle.md) | Draft | Roadmap / umbrella replacing 007. Locks the direction (emit PDF primitives directly; QuestPDF as default candidate) and reserves successor plans 010 (vector engine), 011 (PDF bundles), 012 (polish) for the concrete waves. |
 | 013 | [Bundle schema migration](./013-bundle-schema-migration.md) | Active | Successor to 003 / 005 / 008. Adds an `IBundleMigrator` pipeline run inside `BundleService.ImportBundle`, ships v2 → v3 as the first concrete migrator, and softens 003's hard-refuse policy to migrate-then-fallback. Bundle wire format unchanged. (010-012 reserved by 009 for the PDF roadmap.) |
 | 014 | [i18n framework](./014-i18n-framework.md) | Active | Hand-rolled `ILocalizationService` + flat-JSON catalogs under `wwwroot/i18n/`. Ships `en` (source-of-truth) and `fr-FR` (wave 14h). Build-time parity test; missing-key falls back to EN. Locale lives in a separate `localStorage` key (no schema bump, never in bundles). Pins CSV / bundle wire format to `CultureInfo.InvariantCulture`. |
+| 015 | [UI density and UX rework](./015-ui-density-ux.md) | Active | Adds parallel v2 pages (`/bands-v2`, `/running-order-v2`, `/band-v2/{Id:guid}`) with denser layouts, live filters, drag reorder, and tighter forms. Global layout collapses sidebar into top navbar. Old routes stay untouched for A/B comparison. |
 
 ## Template
 
