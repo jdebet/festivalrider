@@ -57,6 +57,21 @@ public sealed class LocalizationServiceTests
     }
 
     [Fact]
+    public async Task EnsureLoadedAsync_RaisesOnLocaleChanged_OnFirstLoadOnly()
+    {
+        var (svc, _, _) = Create();
+
+        var fired = 0;
+        svc.OnLocaleChanged += () => fired++;
+
+        await svc.EnsureLoadedAsync();
+        Assert.Equal(1, fired);
+
+        await svc.EnsureLoadedAsync();
+        Assert.Equal(1, fired);
+    }
+
+    [Fact]
     public async Task EnsureLoadedAsync_NoPersistedTag_AutodetectsBrowserLanguage()
     {
         var (svc, js, _) = Create();

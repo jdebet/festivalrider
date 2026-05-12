@@ -67,6 +67,7 @@ public class LocalizationService : ILocalizationService
         _culture = SafeGetCulture(tag);
 
         await SetHtmlLangAsync(tag);
+        OnLocaleChanged?.Invoke();
     }
 
     public async Task SetLocaleAsync(string tag)
