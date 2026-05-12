@@ -10,5 +10,6 @@ public class Cable
     public string? TypeOther { get; set; }
     public string? CategoryOrSpec { get; set; }
     public decimal? MinLengthMeters { get; set; }
+    public decimal? MaxLengthMeters { get; set; }
     public CableProvider Provider { get; set; }
 }

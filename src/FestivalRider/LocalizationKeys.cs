@@ -252,6 +252,7 @@ public static class LocalizationKeys
             public const string Type = "field.cable.type";
             public const string TypeOther = "field.cable.typeOther";
             public const string MinLength = "field.cable.minLength";
+            public const string MaxLength = "field.cable.maxLength";
             public const string AddBtn = "field.cable.addBtn";
         }
         public static class Lighting
@@ -260,6 +261,8 @@ public static class LocalizationKeys
             public const string BackdropWidth = "field.lighting.backdropWidth";
             public const string BackdropHeight = "field.lighting.backdropHeight";
             public const string FloorMachines = "field.lighting.floorMachines";
+            public const string ModelOrType = "field.lighting.modelOrType";
+            public const string Location = "field.lighting.location";
             public const string AddMachine = "field.lighting.addMachine";
         }
         public static class Power
@@ -272,11 +275,13 @@ public static class LocalizationKeys
         {
             public const string OwnConsole = "field.foh.ownConsole";
             public const string OutputProtocol = "field.foh.outputProtocol";
+            public const string OutputProtocolOther = "field.foh.outputProtocolOther";
             public const string OutputLocation = "field.foh.outputLocation";
+            public const string OutputLocationOther = "field.foh.outputLocationOther";
             public const string OutputNotes = "field.foh.outputNotes";
             public const string AdditionalHardware = "field.foh.additionalHardware";
             public const string StageToFohSends = "field.foh.stageToFohSends";
-            public const string RoundTrip = "field.foh.roundTrip";
+            public const string RoundTripCount = "field.foh.roundTripCount";
             public const string FootprintWidth = "field.foh.footprintWidth";
             public const string FootprintLength = "field.foh.footprintLength";
         }
@@ -472,6 +477,7 @@ public static class LocalizationKeys
                 public const string Target = "print.band.col.target";
                 public const string Spec = "print.band.col.spec";
                 public const string MinM = "print.band.col.minM";
+                public const string MaxM = "print.band.col.maxM";
                 public const string Provider = "print.band.col.provider";
             }
             public static class Field
@@ -640,11 +646,13 @@ public static class LocalizationKeys
         {
             public const string Aes = "enum.OutputProtocol.Aes";
             public const string Analog = "enum.OutputProtocol.Analog";
+            public const string Other = "enum.OutputProtocol.Other";
         }
         public static class OutputLocation
         {
             public const string Foh = "enum.OutputLocation.Foh";
             public const string Stage = "enum.OutputLocation.Stage";
+            public const string Other = "enum.OutputLocation.Other";
         }
         public static class OtherRiserType
         {

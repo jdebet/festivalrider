@@ -177,6 +177,7 @@ public class ExportService : IExportService
                 S("Tech.Cable", "TypeOther", c.TypeOther ?? string.Empty, idx);
             S("Tech.Cable", "CategoryOrSpec", c.CategoryOrSpec ?? string.Empty, idx);
             S("Tech.Cable", "MinLengthMeters", Inv(c.MinLengthMeters), idx);
+            S("Tech.Cable", "MaxLengthMeters", Inv(c.MaxLengthMeters), idx);
             S("Tech.Cable", "Provider", c.Provider.ToString(), idx);
         }
 
@@ -191,6 +192,7 @@ public class ExportService : IExportService
         {
             var m = l.FloorMachines[i]; var idx = Inv(i);
             S("Tech.LightingMachine", "Name", m.Name, idx);
+            S("Tech.LightingMachine", "Location", m.Location ?? string.Empty, idx);
             S("Tech.LightingMachine", "Count", Inv(m.Count), idx);
         }
 
@@ -204,11 +206,15 @@ public class ExportService : IExportService
         var f = t.Foh;
         S("Tech.Foh", "OwnConsoleModel", f.OwnConsoleModel ?? string.Empty);
         S("Tech.Foh", "OutputProtocol", f.OutputProtocol.ToString());
+        if (f.OutputProtocol == OutputProtocol.Other)
+            S("Tech.Foh", "OutputProtocolOther", f.OutputProtocolOther ?? string.Empty);
         S("Tech.Foh", "OutputLocation", f.OutputLocation.ToString());
+        if (f.OutputLocation == OutputLocation.Other)
+            S("Tech.Foh", "OutputLocationOther", f.OutputLocationOther ?? string.Empty);
         S("Tech.Foh", "OutputNotes", f.OutputNotes ?? string.Empty);
         S("Tech.Foh", "AdditionalHardware", f.AdditionalHardware ?? string.Empty);
         S("Tech.Foh", "StageToFohSendCount", Inv(f.StageToFohSendCount));
-        S("Tech.Foh", "StageToFohRoundTrip", f.StageToFohRoundTrip.ToString());
+        S("Tech.Foh", "StageToFohRoundTripCount", Inv(f.StageToFohRoundTripCount));
         S("Tech.Foh", "FootprintWidthMeters", Inv(f.FootprintWidthMeters));
         S("Tech.Foh", "FootprintLengthMeters", Inv(f.FootprintLengthMeters));
         S("Tech.Foh", "Notes", f.Notes ?? string.Empty);
@@ -344,6 +350,7 @@ public class ExportService : IExportService
                 TypeOther = NullIfEmpty(GroupVal(g, "TypeOther")),
                 CategoryOrSpec = NullIfEmpty(GroupVal(g, "CategoryOrSpec")),
                 MinLengthMeters = ParseDecNullable(GroupVal(g, "MinLengthMeters")),
+                MaxLengthMeters = ParseDecNullable(GroupVal(g, "MaxLengthMeters")),
                 Provider = ParseEnum(GroupVal(g, "Provider"), CableProvider.Venue),
             });
         }
@@ -358,6 +365,7 @@ public class ExportService : IExportService
             t.Lighting.FloorMachines.Add(new LightingMachine
             {
                 Name = GroupVal(g, "Name"),
+                Location = NullIfEmpty(GroupVal(g, "Location")),
                 Count = ParseInt(GroupVal(g, "Count")),
             });
         }
@@ -371,11 +379,19 @@ public class ExportService : IExportService
         var f = t.Foh;
         f.OwnConsoleModel = NullIfEmpty(idx.Scalar("Tech.Foh", "OwnConsoleModel"));
         f.OutputProtocol = ParseEnum(idx.Scalar("Tech.Foh", "OutputProtocol"), OutputProtocol.Aes);
+        f.OutputProtocolOther = NullIfEmpty(idx.Scalar("Tech.Foh", "OutputProtocolOther"));
         f.OutputLocation = ParseEnum(idx.Scalar("Tech.Foh", "OutputLocation"), OutputLocation.Foh);
+        f.OutputLocationOther = NullIfEmpty(idx.Scalar("Tech.Foh", "OutputLocationOther"));
         f.OutputNotes = NullIfEmpty(idx.Scalar("Tech.Foh", "OutputNotes"));
         f.AdditionalHardware = NullIfEmpty(idx.Scalar("Tech.Foh", "AdditionalHardware"));
         f.StageToFohSendCount = ParseInt(idx.Scalar("Tech.Foh", "StageToFohSendCount"));
-        f.StageToFohRoundTrip = ParseBool(idx.Scalar("Tech.Foh", "StageToFohRoundTrip"));
+        var roundTripCountStr = idx.Scalar("Tech.Foh", "StageToFohRoundTripCount");
+        if (string.IsNullOrEmpty(roundTripCountStr))
+        {
+            // Backward safety: fall back to old bool key
+            roundTripCountStr = ParseBool(idx.Scalar("Tech.Foh", "StageToFohRoundTrip")) ? "1" : "0";
+        }
+        f.StageToFohRoundTripCount = ParseInt(roundTripCountStr);
         f.FootprintWidthMeters = ParseDecNullable(idx.Scalar("Tech.Foh", "FootprintWidthMeters"));
         f.FootprintLengthMeters = ParseDecNullable(idx.Scalar("Tech.Foh", "FootprintLengthMeters"));
         f.Notes = NullIfEmpty(idx.Scalar("Tech.Foh", "Notes"));

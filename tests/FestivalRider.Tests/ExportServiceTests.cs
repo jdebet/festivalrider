@@ -41,11 +41,15 @@ public sealed class ExportServiceTests
         Assert.Equal("Drums", imported.TravelParty.Members[0].Role);
         Assert.Single(imported.Rider.Tech.Cables);
         Assert.Equal(CablePoint.StageCenter, imported.Rider.Tech.Cables[0].Source);
+        Assert.Equal(25m, imported.Rider.Tech.Cables[0].MaxLengthMeters);
         Assert.Single(imported.Rider.Tech.Lighting.FloorMachines);
         Assert.Equal(4, imported.Rider.Tech.Lighting.FloorMachines[0].Count);
+        Assert.Equal("Stage left", imported.Rider.Tech.Lighting.FloorMachines[0].Location);
         Assert.Equal(PowerAmperage._63_A, imported.Rider.Tech.Power.Amperage);
         Assert.Equal(PowerPhase.ThreePhase, imported.Rider.Tech.Power.Phase);
         Assert.Equal("Yamaha QL5", imported.Rider.Tech.Foh.OwnConsoleModel);
+        Assert.Equal(32, imported.Rider.Tech.Foh.StageToFohSendCount);
+        Assert.Equal(2, imported.Rider.Tech.Foh.StageToFohRoundTripCount);
         Assert.Single(imported.Rider.Tech.Monitors.Wedges);
         Assert.Single(imported.Rider.Tech.Monitors.InEars);
         Assert.Single(imported.Rider.Tech.Stage.Risers);

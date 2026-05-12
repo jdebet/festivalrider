@@ -144,25 +144,25 @@ public sealed class StorageServiceTests
     }
 
     [Fact]
-    public async Task Migration_v1_to_v3_Succeeds_PersistsAndToasts()
+    public async Task Migration_v1_to_v4_Succeeds_PersistsAndToasts()
     {
-        var migrators = new IStateMigrator[] { new V1ToV2Migrator(), new V2ToV3Migrator() };
+        var migrators = new IStateMigrator[] { new V1ToV2Migrator(), new V2ToV3Migrator(), new V3ToV4Migrator() };
         var (svc, js, toasts, _, bands) = Create(migrators);
         js.ReturnValues["festivalRiderStorage.getItem"] = TestDataFactory.BuildV1JsonPayload();
         js.ReturnValues["festivalRiderStorage.setItem"] = true;
 
         await svc.EnsureLoadedAsync();
 
-        Assert.Contains(toasts.Messages, t => t.Text.Contains("Migrated data v1") && t.Text.Contains("v3"));
+        Assert.Contains(toasts.Messages, t => t.Text.Contains("Migrated data v1") && t.Text.Contains("v4"));
         // Migration warnings surfaced (genre + inputs + backline).
         Assert.Contains(toasts.Messages, t => t.Text.Contains("Genre"));
         Assert.Contains(toasts.Messages, t => t.Text.Contains("Inputs"));
 
-        // Migrated payload was persisted with schemaVersion=3.
+        // Migrated payload was persisted with schemaVersion=4.
         var persisted = LastStateWrite(js);
         Assert.NotNull(persisted);
         using var doc = JsonDocument.Parse(persisted!);
-        Assert.Equal(3, doc.RootElement.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal(4, doc.RootElement.GetProperty("schemaVersion").GetInt32());
 
         // Bands survive the migration.
         Assert.Single(bands.Bands);

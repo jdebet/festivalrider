@@ -38,10 +38,11 @@ public static class TestDataFactory
             Type = CableType.RJ45,
             CategoryOrSpec = "Cat6",
             MinLengthMeters = 15m,
+            MaxLengthMeters = 25m,
             Provider = CableProvider.Venue
         });
         t.Lighting.OwnConsoleModel = "MA Lighting dot2";
-        t.Lighting.FloorMachines.Add(new LightingMachine { Name = "Wash", Count = 4 });
+        t.Lighting.FloorMachines.Add(new LightingMachine { Name = "Wash", Location = "Stage left", Count = 4 });
         t.Lighting.BackdropWidthMeters = 6m;
         t.Lighting.BackdropHeightMeters = 3m;
         t.Power.Amperage = PowerAmperage._63_A;
@@ -49,6 +50,8 @@ public static class TestDataFactory
         t.Foh.OwnConsoleModel = "Yamaha QL5";
         t.Foh.OutputProtocol = OutputProtocol.Aes;
         t.Foh.OutputLocation = OutputLocation.Foh;
+        t.Foh.StageToFohSendCount = 32;
+        t.Foh.StageToFohRoundTripCount = 2;
         t.Foh.FootprintWidthMeters = 2.5m;
         t.Foh.FootprintLengthMeters = 1.5m;
         t.Monitors.SourceMode = MonitorSourceMode.OwnConsole;

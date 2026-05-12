@@ -182,7 +182,7 @@ public class BandRiderPrintStrategy : IPrintStrategy
             b.AddAttribute(seq++, "class", "table table-sm");
             b.OpenElement(seq++, "thead");
             b.OpenElement(seq++, "tr");
-            foreach (var h in new[] { _loc.T("field.cable.source"), _loc.T("field.cable.target"), _loc.T("field.type"), _loc.T("field.spec"), _loc.T("print.band.col.minM"), _loc.T("field.provider") })
+            foreach (var h in new[] { _loc.T("field.cable.source"), _loc.T("field.cable.target"), _loc.T("field.type"), _loc.T("field.spec"), _loc.T("print.band.col.minM"), _loc.T("print.band.col.maxM"), _loc.T("field.provider") })
             {
                 b.OpenElement(seq++, "th");
                 b.AddContent(seq++, h);
@@ -200,6 +200,7 @@ public class BandRiderPrintStrategy : IPrintStrategy
                     TypeLabel(c.Type, c.TypeOther),
                     c.CategoryOrSpec ?? string.Empty,
                     c.MinLengthMeters?.ToString() ?? string.Empty,
+                    c.MaxLengthMeters?.ToString() ?? string.Empty,
                     _loc.T($"enum.CableProvider.{c.Provider}"),
                 })
                 {
@@ -221,7 +222,7 @@ public class BandRiderPrintStrategy : IPrintStrategy
             b.OpenElement(seq++, "strong");
             b.AddContent(seq++, _loc.T("field.lighting.floorMachines") + ": ");
             b.CloseElement();
-            b.AddContent(seq++, string.Join(", ", t.Lighting.FloorMachines.Select(m => $"{m.Count}× {m.Name}")));
+            b.AddContent(seq++, string.Join(", ", t.Lighting.FloorMachines.Select(m => $"{m.Count}× {m.Name}{(string.IsNullOrWhiteSpace(m.Location) ? "" : $" ({m.Location})")}")));
             b.CloseElement();
         }
         if (t.Lighting.BackdropWidthMeters is { } w && t.Lighting.BackdropHeightMeters is { } h2)
@@ -233,11 +234,18 @@ public class BandRiderPrintStrategy : IPrintStrategy
 
         // FOH
         Field(b, ref seq, _loc.T("print.band.field.fohConsole"), t.Foh.OwnConsoleModel);
-        Field(b, ref seq, _loc.T("print.band.field.fohOutput"), $"{_loc.T($"enum.OutputProtocol.{t.Foh.OutputProtocol}")} @ {_loc.T($"enum.OutputLocation.{t.Foh.OutputLocation}")}");
+        var protocolLabel = t.Foh.OutputProtocol == OutputProtocol.Other && !string.IsNullOrWhiteSpace(t.Foh.OutputProtocolOther) ? t.Foh.OutputProtocolOther! : _loc.T($"enum.OutputProtocol.{t.Foh.OutputProtocol}");
+        var locationLabel = t.Foh.OutputLocation == OutputLocation.Other && !string.IsNullOrWhiteSpace(t.Foh.OutputLocationOther) ? t.Foh.OutputLocationOther! : _loc.T($"enum.OutputLocation.{t.Foh.OutputLocation}");
+        Field(b, ref seq, _loc.T("print.band.field.fohOutput"), $"{protocolLabel} @ {locationLabel}");
         Field(b, ref seq, _loc.T("field.foh.outputNotes"), t.Foh.OutputNotes);
         Field(b, ref seq, _loc.T("field.foh.additionalHardware"), t.Foh.AdditionalHardware);
         if (t.Foh.StageToFohSendCount > 0)
-            Field(b, ref seq, _loc.T("field.foh.stageToFohSends"), $"{t.Foh.StageToFohSendCount}{(t.Foh.StageToFohRoundTrip ? " (" + _loc.T("print.band.roundTrip") + ")" : "")}");
+        {
+            var sends = $"{t.Foh.StageToFohSendCount}";
+            if (t.Foh.StageToFohRoundTripCount > 0)
+                sends += $" ({t.Foh.StageToFohRoundTripCount} {_loc.T("print.band.roundTrip")})";
+            Field(b, ref seq, _loc.T("field.foh.stageToFohSends"), sends);
+        }
         if (t.Foh.FootprintWidthMeters is { } fw && t.Foh.FootprintLengthMeters is { } fl)
             Field(b, ref seq, _loc.T("print.band.field.fohFootprint"), $"{fw}m × {fl}m");
         Field(b, ref seq, _loc.T("print.band.field.fohNotes"), t.Foh.Notes);

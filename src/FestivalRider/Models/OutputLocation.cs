@@ -4,4 +4,5 @@ public enum OutputLocation
 {
     Foh,
     Stage,
+    Other,
 }

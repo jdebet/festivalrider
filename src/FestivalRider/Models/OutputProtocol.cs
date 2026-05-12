@@ -4,4 +4,5 @@ public enum OutputProtocol
 {
     Aes,
     Analog,
+    Other,
 }
