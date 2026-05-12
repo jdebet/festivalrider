@@ -33,7 +33,7 @@ else
                     <th>@Localization.T("field.name")</th>
                     <th class="text-center" style="width: 100px;">@Localization.T("section.contacts.title")</th>
                     <th class="text-center" style="width: 120px;">@Localization.T("section.travelParty.title")</th>
-                    <th style="width: 200px;"></th>
+                    <th style="width: 140px;"></th>
                 </tr>
             </thead>
             <tbody>
@@ -41,10 +41,8 @@ else
                 {
                     <BandTableRow Band="band"
                                   OnEdit="EditBand"
-                                  OnPrint="PrintBand"
                                   OnDelete="RequestDelete"
                                   EditLabel="@Localization.T("page.bands.card.edit")"
-                                  PrintLabel="@Localization.T("page.bands.card.print")"
                                   DeleteLabel="@Localization.T("page.bands.card.delete")" />
                 }
             </tbody>
@@ -88,8 +86,6 @@ else
     }
 
     private void EditBand(Guid id) => Nav.NavigateTo($"/band/{id}");
-
-    private void PrintBand(Guid id) => Nav.NavigateTo($"/print/band/{id}");
 
     private void RequestDelete(Guid id)
     {

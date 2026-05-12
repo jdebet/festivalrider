@@ -28,6 +28,7 @@ Versioned design documents for FestivalRider. Each plan captures locked decision
 | 015 | [UI density and UX rework](./015-ui-density-ux.md) | Superseded by 016 | Adds parallel v2 pages (`/bands-v2`, `/running-order-v2`, `/band-v2/{Id:guid}`) with denser layouts, live filters, drag reorder, and tighter forms. Global layout collapses sidebar into top navbar. Old routes stay untouched for A/B comparison. |
 | 016 | [Retire v1 pages](./016-retire-v1-pages.md) | Active | Deletes old v1 pages (`BandList`, `RunningOrder`, `RiderEditor`) and promotes v2 pages to primary routes (`/`, `/running-order`, `/band/{Id:guid}`). Simplifies nav menu. |
 | 017 | [Model refactor: FOH, lighting, and cables](./017-model-refactor-foh-lighting-cables.md) | Draft | Schema bump 3 → 4. Adds `Cable.MaxLengthMeters`, `LightingMachine.Location`, `Other` escapes on `OutputProtocol`/`OutputLocation`, and replaces `FohSound.StageToFohRoundTrip` bool with `StageToFohRoundTripCount` int. Ships `V3ToV4Migrator` and `V3ToV4BundleMigrator`. |
+| 018 | [Export and Save pages](./018-export-save-pages.md) | Active | New `/export` page centralizes running order CSV exports, stage/band/role prints, and band prints. New `/save` page centralizes show CSV, bands CSV, bundle export/import, and storage status. Settings trimmed to shows, show details, and a collapsed Danger Zone card. |
 
 ## Template
 

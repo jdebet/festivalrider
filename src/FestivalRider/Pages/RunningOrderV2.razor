@@ -3,10 +3,6 @@
 @implements IDisposable
 @inject IBandService BandService
 @inject ILocalizationService Localization
-@inject IExportService Export
-@inject IToastService Toasts
-@inject IJSRuntime JS
-@inject NavigationManager Nav
 
 <PageTitle>@Localization.T("page.runningOrder.title")</PageTitle>
 
@@ -45,8 +41,7 @@ else
                     <label class="small text-muted mb-0">@Localization.T("page.runningOrder.dateLabel")</label>
                     <input class="form-control form-control-sm" style="width: 130px;" readonly value="@FormatDate(ro)" />
                 </div>
-                <div class="ms-auto d-flex gap-1">
-                    <button class="btn btn-sm btn-outline-primary" @onclick="() => ExportFull(ro)">@Localization.T("page.runningOrder.exportCsv")</button>
+                <div class="ms-auto">
                     <button class="btn btn-sm btn-outline-danger" @onclick="() => RequestDelete(ro.Id)">@Localization.T("page.runningOrder.deleteBtn")</button>
                 </div>
             </div>
@@ -96,53 +91,6 @@ else
             <div class="d-flex flex-wrap gap-2 align-items-end py-2">
                 <button class="btn btn-sm btn-outline-primary" @onclick="() => AddSlot(ro)"
                         disabled="@(BandService.Bands.Count == 0 || _show.Stages.Count == 0)">@Localization.T("page.runningOrder.addSlotBtn")</button>
-
-                @{
-                    var stagesUsed = ro.Slots.Select(s => s.StageId).Distinct().ToList();
-                    var bandsUsed = ro.Slots.Select(s => s.BandId).Distinct().ToList();
-                }
-
-                @if (stagesUsed.Count > 0)
-                {
-                    <div class="input-group input-group-sm" style="max-width: 280px;">
-                        <span class="input-group-text">@Localization.T("page.runningOrder.stage")</span>
-                        <select class="form-select" @bind="_byStageSelection[ro.Id]">
-                            <option value="0">@Localization.T("page.runningOrder.pickStageDefault")</option>
-                            @foreach (var sid in stagesUsed)
-                            {
-                                <option value="@sid">@(BandService.FindStage(sid)?.Name ?? $"Unknown #{sid}")</option>
-                            }
-                        </select>
-                        <button class="btn btn-outline-secondary" @onclick="() => ExportByStage(ro)">@Localization.T("page.runningOrder.export")</button>
-                        <button class="btn btn-outline-secondary" @onclick="() => PrintStage(ro)">@Localization.T("page.runningOrder.print")</button>
-                    </div>
-                }
-
-                @if (bandsUsed.Count > 0)
-                {
-                    <div class="input-group input-group-sm" style="max-width: 300px;">
-                        <span class="input-group-text">@Localization.T("page.runningOrder.band")</span>
-                        <select class="form-select" @bind="_byBandSelection[ro.Id]">
-                            <option value="@Guid.Empty">@Localization.T("page.runningOrder.pickBandDefault")</option>
-                            @foreach (var bid in bandsUsed)
-                            {
-                                <option value="@bid">@(BandService.FindBand(bid)?.Name ?? Localization.T("page.runningOrder.unknownBand"))</option>
-                            }
-                        </select>
-                        <button class="btn btn-outline-secondary" @onclick="() => ExportByBand(ro)">@Localization.T("page.runningOrder.export")</button>
-                    </div>
-                }
-
-                <div class="input-group input-group-sm" style="max-width: 300px;">
-                    <span class="input-group-text">@Localization.T("page.runningOrder.role")</span>
-                    <select class="form-select" @bind="_byRoleSelection[ro.Id]">
-                        @foreach (var r in Enum.GetValues<ContactRole>())
-                        {
-                            <option value="@r">@Localization.T($"enum.ContactRole.{r}")</option>
-                        }
-                    </select>
-                    <button class="btn btn-outline-secondary" @onclick="() => PrintRole(ro)">@Localization.T("page.runningOrder.print")</button>
-                </div>
             </div>
         </RiderSection>
     }
@@ -160,10 +108,6 @@ else
     private Guid? _pendingDeleteId;
     private string _deleteMessage = string.Empty;
 
-    private readonly Dictionary<Guid, int> _byStageSelection = new();
-    private readonly Dictionary<Guid, Guid> _byBandSelection = new();
-    private readonly Dictionary<Guid, ContactRole> _byRoleSelection = new();
-
     protected override void OnInitialized()
     {
         BandService.OnChange += HandleChange;
@@ -180,12 +124,6 @@ else
     private void Reload()
     {
         _show = BandService.FindShow(BandService.ActiveShowId) ?? new ShowData();
-        foreach (var o in BandService.RunningOrders)
-        {
-            _byStageSelection.TryAdd(o.Id, 0);
-            _byBandSelection.TryAdd(o.Id, Guid.Empty);
-            _byRoleSelection.TryAdd(o.Id, ContactRole.FOHEngineer);
-        }
     }
 
     private string TitleFor(RoModel ro)
@@ -267,65 +205,8 @@ else
 
     private void ConfirmDelete()
     {
-        if (_pendingDeleteId is { } id)
-        {
-            BandService.DeleteRunningOrder(id);
-            _byStageSelection.Remove(id);
-            _byBandSelection.Remove(id);
-            _byRoleSelection.Remove(id);
-        }
+        if (_pendingDeleteId is { } id) BandService.DeleteRunningOrder(id);
         _pendingDeleteId = null;
-    }
-
-    private async Task ExportFull(RoModel ro)
-    {
-        var csv = Export.ExportRunningOrderCsv(ro);
-        await Download(csv, $"running-order-day{ro.ShowDayNumber}.csv");
-    }
-
-    private async Task ExportByStage(RoModel ro)
-    {
-        if (!_byStageSelection.TryGetValue(ro.Id, out var sid) || sid <= 0)
-        {
-            Toasts.Show(Localization.T("toast.runningOrder.pickStage"), ToastLevel.Info);
-            return;
-        }
-        var csv = Export.ExportRunningOrderByStageCsv(ro, sid);
-        var stageName = BandService.FindStage(sid)?.Name ?? $"stage-{sid}";
-        await Download(csv, $"running-order-day{ro.ShowDayNumber}-{Sanitize(stageName)}.csv");
-    }
-
-    private async Task ExportByBand(RoModel ro)
-    {
-        if (!_byBandSelection.TryGetValue(ro.Id, out var bid) || bid == Guid.Empty)
-        {
-            Toasts.Show(Localization.T("toast.runningOrder.pickBand"), ToastLevel.Info);
-            return;
-        }
-        var csv = Export.ExportRunningOrderByBandCsv(ro, bid);
-        var bandName = BandService.FindBand(bid)?.Name ?? "band";
-        await Download(csv, $"running-order-day{ro.ShowDayNumber}-{Sanitize(bandName)}.csv");
-    }
-
-    private void PrintStage(RoModel ro)
-    {
-        if (!_byStageSelection.TryGetValue(ro.Id, out var sid) || sid <= 0)
-        {
-            Toasts.Show(Localization.T("toast.runningOrder.pickStage"), ToastLevel.Info);
-            return;
-        }
-        Nav.NavigateTo($"print/stage/{ro.Id}:{sid}");
-    }
-
-    private void PrintRole(RoModel ro)
-    {
-        if (!_byRoleSelection.TryGetValue(ro.Id, out var role)) role = ContactRole.FOHEngineer;
-        Nav.NavigateTo($"print/role/{ro.Id}:{role}");
-    }
-
-    private async Task Download(string text, string filename)
-    {
-        await JS.InvokeVoidAsync("festivalRiderCsv.downloadText", filename, "text/csv;charset=utf-8", text);
     }
 
     private static int ParseInt(object? value)
@@ -333,12 +214,6 @@ else
         if (value is null) return 0;
         return int.TryParse(value.ToString(), System.Globalization.NumberStyles.Integer,
             System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 0;
-    }
-
-    private static string Sanitize(string s)
-    {
-        var safe = new string((s ?? "untitled").Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());
-        return string.IsNullOrWhiteSpace(safe) ? "untitled" : safe.Trim('-');
     }
 
     public void Dispose()

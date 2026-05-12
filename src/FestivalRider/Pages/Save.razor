@@ -1,0 +1,296 @@
+@page "/save"
+@using System.Globalization
+@implements IDisposable
+@inject IBandService BandService
+@inject ILocalizationService Localization
+@inject IExportService Export
+@inject IBundleService Bundle
+@inject IStorageService Storage
+@inject IToastService Toasts
+@inject IJSRuntime JS
+
+<PageTitle>@Localization.T("page.save.title")</PageTitle>
+
+<h1 class="h3 mb-3">@Localization.T("page.save.heading")</h1>
+
+<RiderSection Title="@Localization.T("section.status.title")">
+    <p class="text-muted small mb-0">
+        @Localization.T("page.save.status.schemaVersion"): <strong>@_snapshot.SchemaVersion</strong>
+        &middot; @Localization.T("page.save.status.bands"): <strong>@_snapshot.Bands.Count</strong>
+        &middot; @Localization.T("page.save.status.runningOrders"): <strong>@_snapshot.RunningOrders.Count</strong>
+    </p>
+</RiderSection>
+
+<RiderSection Title="@Localization.T("section.bundle.title")">
+    <p class="text-muted small">@Localization.T("page.settings.bundle.description")</p>
+    <div class="mb-2">
+        <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" id="bundleModeReplace"
+                   checked="@(_bundleImportMode == BundleImportMode.Replace)"
+                   @onchange="() => _bundleImportMode = BundleImportMode.Replace" />
+            <label class="form-check-label" for="bundleModeReplace">@Localization.T("page.settings.bundle.replace")</label>
+        </div>
+        <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" id="bundleModeMerge"
+                   checked="@(_bundleImportMode == BundleImportMode.Merge)"
+                   @onchange="() => _bundleImportMode = BundleImportMode.Merge" />
+            <label class="form-check-label" for="bundleModeMerge">@Localization.T("page.settings.bundle.merge")</label>
+        </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2 mb-2">
+        <button type="button" class="btn btn-outline-primary" @onclick="ExportBundle">@Localization.T("page.settings.bundle.exportBtn")</button>
+        <label class="btn btn-outline-secondary mb-0">
+            @Localization.T("page.settings.bundle.importBtn")
+            <InputFile OnChange="StageBundleImport" accept=".zip" class="d-none" />
+        </label>
+    </div>
+</RiderSection>
+
+<ConfirmDialog Show="_pendingBundle is not null"
+               Title="@_bundleConfirmTitle"
+               Message="@_bundleConfirmMessage"
+               ConfirmLabel="@_bundleConfirmLabel"
+               OnConfirm="ConfirmBundleImport"
+               OnCancel="() => _pendingBundle = null" />
+
+<RiderSection Title="@Localization.T("section.showCsv.title")">
+    <p class="text-muted small">@Localization.T("page.settings.showCsv.description")</p>
+    <div class="d-flex flex-wrap gap-2 mb-2">
+        <button type="button" class="btn btn-outline-primary" @onclick="ExportShowCsv">@Localization.T("page.settings.showCsv.exportBtn")</button>
+        <label class="btn btn-outline-secondary mb-0">
+            @Localization.T("page.settings.showCsv.importBtn")
+            <InputFile OnChange="ImportShowCsv" accept=".csv" class="d-none" />
+        </label>
+    </div>
+</RiderSection>
+
+<RiderSection Title="@Localization.T("section.bandsCsv.title")">
+    <p class="text-muted small">@Localization.T("page.settings.bandsCsv.description")</p>
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        <label class="btn btn-outline-secondary mb-0">
+            @Localization.T("page.settings.bandsCsv.importBtn")
+            <InputFile OnChange="ImportBandCsv" accept=".csv" class="d-none" />
+        </label>
+    </div>
+    @if (BandService.Bands.Count == 0)
+    {
+        <div class="text-muted small">@Localization.T("page.settings.bandsCsv.noBands")</div>
+    }
+    else
+    {
+        <ul class="list-group">
+            @foreach (var band in BandService.Bands)
+            {
+                <li class="list-group-item d-flex justify-content-between align-items-center" @key="band.Id">
+                    <span>@band.Name</span>
+                    <button type="button" class="btn btn-sm btn-outline-primary"
+                            @onclick="() => ExportBandCsv(band)">@Localization.T("page.settings.bandsCsv.exportBtn")</button>
+                </li>
+            }
+        </ul>
+    }
+</RiderSection>
+
+@code {
+    private AppState _snapshot = new();
+    private ShowData _show = new();
+    private BundleImportMode _bundleImportMode = BundleImportMode.Replace;
+    private BundleImportResult? _pendingBundle;
+    private BundleImportMode _pendingBundleMode = BundleImportMode.Replace;
+    private string _bundleConfirmTitle = string.Empty;
+    private string _bundleConfirmMessage = string.Empty;
+    private string _bundleConfirmLabel = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        BandService.OnChange += HandleChange;
+        Localization.OnLocaleChanged += HandleChange;
+        Reload();
+    }
+
+    private void HandleChange()
+    {
+        Reload();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void Reload()
+    {
+        _snapshot = BandService.Snapshot();
+        _show = BandService.FindShow(BandService.ActiveShowId) ?? _snapshot.Shows.FirstOrDefault() ?? new ShowData();
+    }
+
+    private async Task ExportShowCsv()
+    {
+        var csv = Export.ExportShowCsv(_show);
+        var fname = $"show-{Sanitize(_show.Name)}.csv";
+        await Download(csv, fname);
+    }
+
+    private async Task ExportBandCsv(Band band)
+    {
+        var csv = Export.ExportBandCsv(band);
+        var fname = $"band-{Sanitize(band.Name)}.csv";
+        await Download(csv, fname);
+    }
+
+    private async Task ImportShowCsv(InputFileChangeEventArgs e)
+    {
+        var csv = await ReadAllAsync(e.File);
+        if (csv is null) return;
+        try
+        {
+            var show = Export.ImportShowCsv(csv);
+            show.Id = BandService.ActiveShowId;
+            await BandService.UpdateShow(show);
+            Toasts.Show(Localization.T("toast.settings.showImported", show.Name, show.Stages.Count), ToastLevel.Success);
+        }
+        catch (Exception ex)
+        {
+            Toasts.Show(Localization.T("toast.settings.importFailed", ex.Message), ToastLevel.Error);
+        }
+    }
+
+    private async Task ImportBandCsv(InputFileChangeEventArgs e)
+    {
+        var csv = await ReadAllAsync(e.File);
+        if (csv is null) return;
+        try
+        {
+            var band = Export.ImportBandCsv(csv);
+            var existing = BandService.FindBand(band.Id);
+            if (existing is null)
+            {
+                BandService.AddBand(band);
+                Toasts.Show(Localization.T("toast.settings.bandImported", band.Name), ToastLevel.Success);
+            }
+            else
+            {
+                BandService.DeleteBand(existing.Id);
+                BandService.AddBand(band);
+                Toasts.Show(Localization.T("toast.settings.bandReplaced", band.Name), ToastLevel.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            Toasts.Show(Localization.T("toast.settings.importFailed", ex.Message), ToastLevel.Error);
+        }
+    }
+
+    private static async Task<string?> ReadAllAsync(IBrowserFile file)
+    {
+        const long maxSize = 5 * 1024 * 1024;
+        try
+        {
+            await using var s = file.OpenReadStream(maxSize);
+            using var reader = new StreamReader(s);
+            return await reader.ReadToEndAsync();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private async Task Download(string text, string filename)
+    {
+        await JS.InvokeVoidAsync("festivalRiderCsv.downloadText", filename, "text/csv;charset=utf-8", text);
+    }
+
+    private async Task ExportBundle()
+    {
+        var bytes = Bundle.ExportBundle(BandService.Snapshot());
+        var stamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+        var fname = $"festivalrider-{Sanitize(_show.Name)}-{stamp}.zip";
+        await JS.InvokeVoidAsync("festivalRiderCsv.downloadBytes", fname, "application/zip", bytes);
+        Toasts.Show(Localization.T("toast.settings.bundleExported", bytes.Length / 1024), ToastLevel.Success);
+    }
+
+    private async Task StageBundleImport(InputFileChangeEventArgs e)
+    {
+        const long maxSize = 20L * 1024 * 1024;
+        var mode = _bundleImportMode;
+        BundleImportResult result;
+        try
+        {
+            await using var s = e.File.OpenReadStream(maxSize);
+            using var ms = new MemoryStream();
+            await s.CopyToAsync(ms);
+            ms.Position = 0;
+            var current = mode == BundleImportMode.Merge ? BandService.Snapshot() : null;
+            result = Bundle.ImportBundle(ms, mode, current);
+        }
+        catch (IOException)
+        {
+            Toasts.Show(Localization.T("toast.settings.bundleSizeExceeded", maxSize / (1024 * 1024)), ToastLevel.Error);
+            return;
+        }
+        catch (Exception ex)
+        {
+            Toasts.Show(Localization.T("toast.settings.bundleReadFailed", ex.Message), ToastLevel.Error);
+            return;
+        }
+
+        if (result.Error is not null || result.State is null)
+        {
+            Toasts.Show(Localization.T("toast.settings.bundleRejected", result.Error), ToastLevel.Error);
+            return;
+        }
+
+        _pendingBundle = result;
+        _pendingBundleMode = mode;
+        if (mode == BundleImportMode.Merge)
+        {
+            _bundleConfirmTitle = Localization.T("confirm.bundleMerge.title");
+            _bundleConfirmLabel = Localization.T("confirm.bundleMerge.label");
+            _bundleConfirmMessage = Localization.T("confirm.bundleMerge.message", result.BandCount, result.RunningOrderCount);
+        }
+        else
+        {
+            _bundleConfirmTitle = Localization.T("confirm.bundleReplace.title");
+            _bundleConfirmLabel = Localization.T("confirm.bundleReplace.label");
+            _bundleConfirmMessage = Localization.T("confirm.bundleReplace.message", result.BandCount, result.RunningOrderCount);
+        }
+    }
+
+    private void ConfirmBundleImport()
+    {
+        var result = _pendingBundle;
+        var mode = _pendingBundleMode;
+        _pendingBundle = null;
+        if (result?.State is null) return;
+        BandService.ReplaceState(result.State);
+
+        string summary;
+        if (mode == BundleImportMode.Merge && result.Merge is { } m)
+        {
+            summary = Localization.T("toast.settings.bundleMergeApplied", m.BandsAdded, m.BandsUpdated, m.BandsSkipped, m.RunningOrdersAdded, m.RunningOrdersUpdated, m.RunningOrdersSkipped);
+        }
+        else
+        {
+            summary = Localization.T("toast.settings.bundleImported", result.BandCount, result.RunningOrderCount);
+        }
+
+        if (result.Warnings.Count == 0)
+        {
+            Toasts.Show(summary, ToastLevel.Success);
+        }
+        else
+        {
+            var head = string.Join(" ", result.Warnings.Take(2));
+            Toasts.Show($"{summary} {head}", ToastLevel.Warning);
+        }
+    }
+
+    private static string Sanitize(string s)
+    {
+        var safe = new string((s ?? "untitled").Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());
+        return string.IsNullOrWhiteSpace(safe) ? "untitled" : safe.Trim('-');
+    }
+
+    public void Dispose()
+    {
+        BandService.OnChange -= HandleChange;
+        Localization.OnLocaleChanged -= HandleChange;
+    }
+}

@@ -12,7 +12,6 @@
     <td>
         <div class="d-flex gap-1 justify-content-end">
             <button type="button" class="btn btn-sm btn-outline-primary" @onclick="HandleEdit">@EditLabel</button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="HandlePrint">@PrintLabel</button>
             <button type="button" class="btn btn-sm btn-outline-danger" @onclick="HandleDelete">@DeleteLabel</button>
         </div>
     </td>
@@ -22,12 +21,9 @@
     [Parameter, EditorRequired] public Band Band { get; set; } = default!;
     [Parameter] public EventCallback<Guid> OnEdit { get; set; }
     [Parameter] public EventCallback<Guid> OnDelete { get; set; }
-    [Parameter] public EventCallback<Guid> OnPrint { get; set; }
     [Parameter] public string EditLabel { get; set; } = "Edit";
-    [Parameter] public string PrintLabel { get; set; } = "Print";
     [Parameter] public string DeleteLabel { get; set; } = "Delete";
 
     private Task HandleEdit() => OnEdit.InvokeAsync(Band.Id);
     private Task HandleDelete() => OnDelete.InvokeAsync(Band.Id);
-    private Task HandlePrint() => OnPrint.InvokeAsync(Band.Id);
 }

@@ -6,6 +6,8 @@
   "nav.settings": "Paramètres",
   "nav.show.label": "Spectacle",
   "nav.show.untitled": "Spectacle sans titre",
+  "nav.export": "Exporter",
+  "nav.save": "Sauvegarder",
 
   "banner.multitab": "Cette application est modifiée dans un autre onglet. Les modifications sont désactivées pour éviter les conflits. Fermez l'autre onglet, puis rechargez l'application.",
 
@@ -40,6 +42,13 @@
   "page.editor.tech.heading": "Fiche technique",
   "page.editor.hospitality.heading": "Accueil",
 
+  "page.export.title": "Exporter · FestivalRider",
+  "page.save.title": "Sauvegarder · FestivalRider",
+  "page.export.heading": "Exporter",
+  "page.save.heading": "Sauvegarder",
+  "page.export.noRunningOrders": "Aucun ordre de passage à exporter.",
+  "page.export.noBands": "Aucun groupe à imprimer.",
+
   "section.band.title": "Groupe",
   "section.contacts.title": "Contacts",
   "section.travelParty.title": "Équipe de tournée",
@@ -57,6 +66,8 @@
   "section.bandsCsv.title": "CSV des groupes",
   "section.bundle.title": "Archive",
   "section.storage.title": "Stockage",
+  "section.status.title": "État",
+  "section.dangerZone.title": "Zone dangereuse",
 
   "field.name": "Nom",
   "field.notes": "Notes",
@@ -204,6 +215,11 @@
   "page.settings.storage.runningOrders": "Ordres de passage",
   "page.settings.storage.forceSave": "Forcer l'enregistrement",
   "page.settings.storage.clearAll": "Effacer toutes les données",
+  "page.save.status.schemaVersion": "Version du schéma",
+  "page.save.status.bands": "Groupes",
+  "page.save.status.runningOrders": "Ordres de passage",
+  "page.dangerZone.forceSave": "Forcer l'enregistrement",
+  "page.dangerZone.clearAll": "Effacer toutes les données",
 
   "confirm.clearData.title": "Effacer toutes les données",
   "confirm.clearData.message": "Effacer tous les groupes, ordres de passage et données du spectacle de ce navigateur ? Cette action est irréversible.",

@@ -4,7 +4,6 @@
 @inject ILocalizationService Localization
 @inject IExportService Export
 @inject IToastService Toasts
-@inject IJSRuntime JS
 @inject NavigationManager Nav
 
 <PageTitle>@(_band?.Name ?? "Band") · FestivalRider</PageTitle>
@@ -20,12 +19,10 @@ else
     <div class="d-flex justify-content-between align-items-center mb-2">
         <div>
             <a href="/" class="text-decoration-none small">@Localization.T("page.editor.backToBands")</a>
-            <h1 class="h4 m-0">@_band.Name</h1>
+            <InputText class="form-control form-control-sm fw-bold" style="font-size: 1.5rem; max-width: 400px;" @bind-Value="_band.Name" />
         </div>
         <div class="d-flex flex-wrap gap-1">
             <button class="btn btn-sm btn-primary" @onclick="Save">@Localization.T("page.editor.save")</button>
-            <button class="btn btn-sm btn-outline-secondary" @onclick="PrintBand">@Localization.T("page.editor.print")</button>
-            <button class="btn btn-sm btn-outline-secondary" @onclick="ExportCsv">@Localization.T("page.editor.exportCsv")</button>
             <label class="btn btn-sm btn-outline-secondary mb-0">
                 @Localization.T("page.editor.importCsv")
                 <InputFile OnChange="ImportCsv" accept=".csv" class="d-none" />
@@ -39,18 +36,7 @@ else
         <ValidationSummary />
 
         <RiderSection Title="@Localization.T("section.band.title")" InitiallyExpanded="true">
-            <div class="row g-1 mb-2">
-                <div class="col-md-6">
-                    <label class="form-label small mb-0">@Localization.T("field.name")</label>
-                    <InputText class="form-control form-control-sm" @bind-Value="_band.Name" />
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label small mb-0">@Localization.T("field.notes")</label>
-                    <InputTextArea class="form-control form-control-sm" rows="1" @bind-Value="_band.Notes" />
-                </div>
-            </div>
-
-            <h6 class="mb-1">@Localization.T("section.contacts.title")</h6>
+            <h6 class="mb-1 fw-bold">@Localization.T("section.contacts.title")</h6>
             <table class="table table-sm fr-table-dense align-middle mb-2">
                 <thead>
                     <tr>
@@ -90,7 +76,7 @@ else
                 </tfoot>
             </table>
 
-            <h6 class="mb-1">@Localization.T("section.travelParty.title")</h6>
+            <h6 class="mb-1 fw-bold">@Localization.T("section.travelParty.title")</h6>
             <table class="table table-sm fr-table-dense align-middle mb-1">
                 <thead>
                     <tr>
@@ -127,6 +113,13 @@ else
                     </tr>
                 </tfoot>
             </table>
+
+            <div class="row g-1 mb-1">
+                <div class="col-12">
+                    <label class="form-label small mb-0">@Localization.T("field.notes")</label>
+                    <InputTextArea class="form-control form-control-sm" rows="2" @bind-Value="_band.Notes" />
+                </div>
+            </div>
         </RiderSection>
 
         <h2 class="h5 mt-3 mb-1">@Localization.T("page.editor.tech.heading")</h2>
@@ -136,10 +129,10 @@ else
                 <table class="table table-sm fr-table-dense align-middle mb-1">
                     <thead>
                         <tr>
-                            <th>@Localization.T("field.cable.source")</th>
-                            <th>@Localization.T("field.cable.target")</th>
-                            <th>@Localization.T("field.cable.type")</th>
-                            <th>@Localization.T("field.spec")</th>
+                            <th style="width: 110px;">@Localization.T("field.cable.source")</th>
+                            <th style="width: 110px;">@Localization.T("field.cable.target")</th>
+                            <th style="width: 100px;">@Localization.T("field.cable.type")</th>
+                            <th style="width: 100px;">@Localization.T("field.spec")</th>
                             <th style="width: 90px;">@Localization.T("field.cable.minLength")</th>
                             <th style="width: 90px;">@Localization.T("field.cable.maxLength")</th>
                             <th style="width: 100px;">@Localization.T("field.provider")</th>
@@ -189,8 +182,8 @@ else
                                     }
                                 </td>
                                 <td><InputText class="form-control form-control-sm fr-form-ultra-sm" @bind-Value="cable.CategoryOrSpec" /></td>
-                                <td><InputNumber class="form-control form-control-sm fr-form-ultra-sm" @bind-Value="cable.MinLengthMeters" /></td>
-                                <td><InputNumber class="form-control form-control-sm fr-form-ultra-sm" @bind-Value="cable.MaxLengthMeters" /></td>
+                                <td><InputNumber class="form-control form-control-sm fr-form-ultra-sm" step="5" @bind-Value="cable.MinLengthMeters" /></td>
+                                <td><InputNumber class="form-control form-control-sm fr-form-ultra-sm" step="5" @bind-Value="cable.MaxLengthMeters" /></td>
                                 <td>
                                     <InputSelect class="form-select form-select-sm fr-form-ultra-sm" @bind-Value="cable.Provider">
                                         @foreach (var p in Enum.GetValues<CableProvider>())
@@ -231,7 +224,7 @@ else
                 </div>
             </div>
 
-            <h6 class="mb-1">@Localization.T("field.lighting.floorMachines")</h6>
+            <h6 class="mb-1 fw-bold">@Localization.T("field.lighting.floorMachines")</h6>
             <table class="table table-sm fr-table-dense align-middle mb-1">
                 <thead>
                     <tr>
@@ -292,10 +285,12 @@ else
 
         <RiderSection Title="@Localization.T("section.foh.title")" InitiallyExpanded="true">
             <div class="row g-1 mb-1">
-                <div class="col-md-6">
+                <div class="col-12">
                     <label class="form-label small mb-0">@Localization.T("field.foh.ownConsole")</label>
                     <InputText class="form-control form-control-sm" @bind-Value="_band.Rider.Tech.Foh.OwnConsoleModel" />
                 </div>
+            </div>
+            <div class="row g-1 mb-1">
                 <div class="col-md-3">
                     <label class="form-label small mb-0">@Localization.T("field.foh.outputProtocol")</label>
                     <InputSelect class="form-select form-select-sm" @bind-Value="_band.Rider.Tech.Foh.OutputProtocol">
@@ -326,10 +321,8 @@ else
                     <label class="form-label small mb-0">@Localization.T("field.foh.outputNotes")</label>
                     <InputText class="form-control form-control-sm" @bind-Value="_band.Rider.Tech.Foh.OutputNotes" />
                 </div>
-                <div class="col-md-6">
-                    <label class="form-label small mb-0">@Localization.T("field.foh.additionalHardware")</label>
-                    <InputText class="form-control form-control-sm" @bind-Value="_band.Rider.Tech.Foh.AdditionalHardware" />
-                </div>
+            </div>
+            <div class="row g-1 mb-1">
                 <div class="col-md-3">
                     <label class="form-label small mb-0">@Localization.T("field.foh.stageToFohSends")</label>
                     <InputNumber class="form-control form-control-sm" @bind-Value="_band.Rider.Tech.Foh.StageToFohSendCount" />
@@ -338,6 +331,8 @@ else
                     <label class="form-label small mb-0">@Localization.T("field.foh.roundTripCount")</label>
                     <InputNumber class="form-control form-control-sm" @bind-Value="_band.Rider.Tech.Foh.StageToFohRoundTripCount" />
                 </div>
+            </div>
+            <div class="row g-1 mb-1">
                 <div class="col-md-3">
                     <label class="form-label small mb-0">@Localization.T("field.foh.footprintWidth")</label>
                     <InputNumber class="form-control form-control-sm" @bind-Value="_band.Rider.Tech.Foh.FootprintWidthMeters" />
@@ -346,6 +341,14 @@ else
                     <label class="form-label small mb-0">@Localization.T("field.foh.footprintLength")</label>
                     <InputNumber class="form-control form-control-sm" @bind-Value="_band.Rider.Tech.Foh.FootprintLengthMeters" />
                 </div>
+            </div>
+            <div class="row g-1 mb-1">
+                <div class="col-12">
+                    <label class="form-label small mb-0">@Localization.T("field.foh.additionalHardware")</label>
+                    <InputText class="form-control form-control-sm" @bind-Value="_band.Rider.Tech.Foh.AdditionalHardware" />
+                </div>
+            </div>
+            <div class="row g-1 mb-1">
                 <div class="col-12">
                     <label class="form-label small mb-0">@Localization.T("field.notes")</label>
                     <InputTextArea class="form-control form-control-sm" rows="2" @bind-Value="_band.Rider.Tech.Foh.Notes" />
@@ -364,8 +367,10 @@ else
                         }
                     </InputSelect>
                 </div>
-                @if (_band.Rider.Tech.Monitors.SourceMode == MonitorSourceMode.OwnConsole)
-                {
+            </div>
+            @if (_band.Rider.Tech.Monitors.SourceMode == MonitorSourceMode.OwnConsole)
+            {
+                <div class="row g-1 mb-1">
                     <div class="col-md-5">
                         <label class="form-label small mb-0">@Localization.T("field.monitors.ownConsole")</label>
                         <InputText class="form-control form-control-sm" @bind-Value="_band.Rider.Tech.Monitors.OwnConsoleModel" />
@@ -379,10 +384,10 @@ else
                             }
                         </InputSelect>
                     </div>
-                }
-            </div>
+                </div>
+            }
 
-            <h6 class="mb-1">@Localization.T("field.monitors.wedges")</h6>
+            <h6 class="mb-1 fw-bold">@Localization.T("field.monitors.wedges")</h6>
             <table class="table table-sm fr-table-dense align-middle mb-2">
                 <thead>
                     <tr>
@@ -415,7 +420,7 @@ else
                 </tfoot>
             </table>
 
-            <h6 class="mb-1">@Localization.T("field.monitors.inEars")</h6>
+            <h6 class="mb-1 fw-bold">@Localization.T("field.monitors.inEars")</h6>
             <table class="table table-sm fr-table-dense align-middle mb-1">
                 <thead>
                     <tr>
@@ -468,7 +473,7 @@ else
         </RiderSection>
 
         <RiderSection Title="@Localization.T("section.stage.title")" InitiallyExpanded="true">
-            <h6 class="mb-1">@Localization.T("field.stage.risers")</h6>
+            <h6 class="mb-1 fw-bold">@Localization.T("field.stage.risers")</h6>
             <table class="table table-sm fr-table-dense align-middle mb-2">
                 <thead>
                     <tr>
@@ -486,9 +491,9 @@ else
                         var r = _band.Rider.Tech.Stage.Risers[idx];
                         <tr @key="idx">
                             <td><InputText class="form-control form-control-sm fr-form-ultra-sm" @bind-Value="r.Where" /></td>
-                            <td><InputNumber class="form-control form-control-sm fr-form-ultra-sm" @bind-Value="r.WidthMeters" /></td>
-                            <td><InputNumber class="form-control form-control-sm fr-form-ultra-sm" @bind-Value="r.LengthMeters" /></td>
-                            <td><InputNumber class="form-control form-control-sm fr-form-ultra-sm" @bind-Value="r.HeightCm" /></td>
+                            <td><InputNumber class="form-control form-control-sm fr-form-ultra-sm" step="0.5" @bind-Value="r.WidthMeters" /></td>
+                            <td><InputNumber class="form-control form-control-sm fr-form-ultra-sm" step="0.5" @bind-Value="r.LengthMeters" /></td>
+                            <td><InputNumber class="form-control form-control-sm fr-form-ultra-sm" step="20" @bind-Value="r.HeightCm" /></td>
                             <td><button type="button" class="btn btn-sm btn-outline-danger fr-form-ultra-sm" @onclick="() => _band.Rider.Tech.Stage.Risers.RemoveAt(idx)">&#10005;</button></td>
                         </tr>
                     }
@@ -501,7 +506,7 @@ else
                 </tfoot>
             </table>
 
-            <h6 class="mb-1">@Localization.T("field.stage.otherRisers")</h6>
+            <h6 class="mb-1 fw-bold">@Localization.T("field.stage.otherRisers")</h6>
             <table class="table table-sm fr-table-dense align-middle mb-2">
                 <thead>
                     <tr>
@@ -539,7 +544,7 @@ else
                 </tfoot>
             </table>
 
-            <h6 class="mb-1">@Localization.T("field.stage.wirelessMics")</h6>
+            <h6 class="mb-1 fw-bold">@Localization.T("field.stage.wirelessMics")</h6>
             <table class="table table-sm fr-table-dense align-middle mb-1">
                 <thead>
                     <tr>
@@ -627,7 +632,7 @@ else
                     <InputTextArea class="form-control form-control-sm" rows="2" @bind-Value="_band.Rider.Hospitality.Accommodations" />
                 </div>
             </div>
-            <h6 class="mb-1">@Localization.T("field.hospitality.drinks")</h6>
+            <h6 class="mb-1 fw-bold">@Localization.T("field.hospitality.drinks")</h6>
             <table class="table table-sm fr-table-dense align-middle mb-1">
                 <thead>
                     <tr>
@@ -688,15 +693,6 @@ else
         BandService.UpdateBand(_band);
     }
 
-    private async Task ExportCsv()
-    {
-        if (_band is null) return;
-        var csv = Export.ExportBandCsv(_band);
-        var safe = new string((_band.Name ?? "band").Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');
-        if (string.IsNullOrEmpty(safe)) safe = "band";
-        await JS.InvokeVoidAsync("festivalRiderCsv.downloadText", $"band-{safe}.csv", "text/csv;charset=utf-8", csv);
-    }
-
     private async Task ImportCsv(InputFileChangeEventArgs e)
     {
         if (_band is null) return;
@@ -719,12 +715,6 @@ else
     }
 
     private void GoBack() => Nav.NavigateTo("/");
-
-    private void PrintBand()
-    {
-        if (_band is null) return;
-        Nav.NavigateTo($"/print/band/{_band.Id}");
-    }
 
     public void Dispose()
     {

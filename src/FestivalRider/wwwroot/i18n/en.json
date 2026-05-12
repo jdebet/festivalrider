@@ -6,6 +6,8 @@
   "nav.settings": "Settings",
   "nav.show.label": "Show",
   "nav.show.untitled": "Untitled show",
+  "nav.export": "Export",
+  "nav.save": "Save",
 
   "banner.multitab": "Another tab is editing this app. Editing is disabled here to avoid conflicting writes. Close the other tab, then reload.",
 
@@ -40,6 +42,13 @@
   "page.editor.tech.heading": "Tech rider",
   "page.editor.hospitality.heading": "Hospitality",
 
+  "page.export.title": "Export · FestivalRider",
+  "page.save.title": "Save · FestivalRider",
+  "page.export.heading": "Export",
+  "page.save.heading": "Save",
+  "page.export.noRunningOrders": "No running orders to export.",
+  "page.export.noBands": "No bands to print.",
+
   "section.band.title": "Band",
   "section.contacts.title": "Contacts",
   "section.travelParty.title": "Travel party",
@@ -57,6 +66,8 @@
   "section.bandsCsv.title": "Bands CSV",
   "section.bundle.title": "Bundle",
   "section.storage.title": "Storage",
+  "section.status.title": "Status",
+  "section.dangerZone.title": "Danger Zone",
 
   "field.name": "Name",
   "field.notes": "Notes",
@@ -204,6 +215,11 @@
   "page.settings.storage.runningOrders": "Running orders",
   "page.settings.storage.forceSave": "Force save",
   "page.settings.storage.clearAll": "Clear all data",
+  "page.save.status.schemaVersion": "Schema version",
+  "page.save.status.bands": "Bands",
+  "page.save.status.runningOrders": "Running orders",
+  "page.dangerZone.forceSave": "Force save",
+  "page.dangerZone.clearAll": "Clear all data",
 
   "confirm.clearData.title": "Clear all data",
   "confirm.clearData.message": "Erase all bands, running orders, and show data from this browser? This cannot be undone.",

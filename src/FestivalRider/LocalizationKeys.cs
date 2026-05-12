@@ -9,6 +9,8 @@ public static class LocalizationKeys
         public const string RunningOrder = "nav.runningOrder";
         public const string RunningOrderV2 = "nav.runningOrderV2";
         public const string Settings = "nav.settings";
+        public const string Export = "nav.export";
+        public const string Save = "nav.save";
         public static class Show
         {
             public const string Label = "nav.show.label";
@@ -64,6 +66,32 @@ public static class LocalizationKeys
             public const string Back = "page.editor.back";
             public const string TechHeading = "page.editor.tech.heading";
             public const string HospitalityHeading = "page.editor.hospitality.heading";
+        }
+
+        public static class Export
+        {
+            public const string Title = "page.export.title";
+            public const string Heading = "page.export.heading";
+            public const string NoRunningOrders = "page.export.noRunningOrders";
+            public const string NoBands = "page.export.noBands";
+        }
+
+        public static class Save
+        {
+            public const string Title = "page.save.title";
+            public const string Heading = "page.save.heading";
+            public static class Status
+            {
+                public const string SchemaVersion = "page.save.status.schemaVersion";
+                public const string Bands = "page.save.status.bands";
+                public const string RunningOrders = "page.save.status.runningOrders";
+            }
+        }
+
+        public static class DangerZone
+        {
+            public const string ForceSave = "page.dangerZone.forceSave";
+            public const string ClearAll = "page.dangerZone.clearAll";
         }
 
         public static class RunningOrder
@@ -217,6 +245,8 @@ public static class LocalizationKeys
         public const string BandsCsvTitle = "section.bandsCsv.title";
         public const string BundleTitle = "section.bundle.title";
         public const string StorageTitle = "section.storage.title";
+        public const string StatusTitle = "section.status.title";
+        public const string DangerZoneTitle = "section.dangerZone.title";
     }
 
     public static class Field
