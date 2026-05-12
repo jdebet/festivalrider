@@ -2,6 +2,7 @@
 @implements IDisposable
 @inject IBandService BandService
 @inject ILocalizationService Localization
+@inject IToastService Toasts
 @inject NavigationManager Nav
 
 <PageTitle>@Localization.T("page.bandsV2.title")</PageTitle>
@@ -11,13 +12,21 @@
     <button class="btn btn-primary btn-sm" @onclick="AddBand">@Localization.T("page.bands.addBand")</button>
 </div>
 
-<div class="mb-2">
+<div class="d-flex flex-wrap gap-2 mb-2 align-items-center">
     <input type="text"
            class="form-control form-control-sm"
-           style="max-width: 320px;"
-           placeholder="@Localization.T("page.bandsV2.filterPlaceholder")"
+           style="max-width: 220px;"
+           placeholder="@Localization.T(LocalizationKeys.Page.BandsV2.FilterPlaceholder)"
            @bind="_filter"
            @bind:event="oninput" />
+    <select class="form-select form-select-sm" style="max-width: 160px;" @bind="_sortBy">
+        <option value="">@Localization.T(LocalizationKeys.Page.BandsV2.Sort.Label)</option>
+        <option value="nameAsc">@Localization.T(LocalizationKeys.Page.BandsV2.Sort.NameAsc)</option>
+        <option value="nameDesc">@Localization.T(LocalizationKeys.Page.BandsV2.Sort.NameDesc)</option>
+        <option value="travelParty">@Localization.T(LocalizationKeys.Page.BandsV2.Sort.TravelParty)</option>
+        <option value="createdAt">@Localization.T(LocalizationKeys.Page.BandsV2.Sort.CreatedAt)</option>
+        <option value="updatedAt">@Localization.T(LocalizationKeys.Page.BandsV2.Sort.UpdatedAt)</option>
+    </select>
 </div>
 
 @if (FilteredBands.Count == 0)
@@ -61,14 +70,34 @@ else
     private Guid? _pendingDeleteId;
     private string _deleteMessage = string.Empty;
     private string _filter = string.Empty;
+    private string _sortBy = string.Empty;
 
-    private IReadOnlyList<Band> FilteredBands =>
-        string.IsNullOrWhiteSpace(_filter)
-            ? BandService.Bands
-            : BandService.Bands.Where(b =>
-                b.Name.Contains(_filter, StringComparison.OrdinalIgnoreCase) ||
-                (!string.IsNullOrWhiteSpace(b.Notes) && b.Notes.Contains(_filter, StringComparison.OrdinalIgnoreCase))
-            ).ToList();
+    private IReadOnlyList<Band> FilteredBands
+    {
+        get
+        {
+            var query = BandService.Bands.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(_filter))
+            {
+                query = query.Where(b =>
+                    b.Name.Contains(_filter, StringComparison.OrdinalIgnoreCase) ||
+                    (!string.IsNullOrWhiteSpace(b.Notes) && b.Notes.Contains(_filter, StringComparison.OrdinalIgnoreCase)));
+            }
+
+            query = _sortBy switch
+            {
+                "nameAsc" => query.OrderBy(b => b.Name),
+                "nameDesc" => query.OrderByDescending(b => b.Name),
+                "travelParty" => query.OrderByDescending(b => b.TravelParty.Members.Count).ThenBy(b => b.Name),
+                "createdAt" => query.OrderByDescending(b => b.CreatedAt),
+                "updatedAt" => query.OrderByDescending(b => b.UpdatedAt),
+                _ => query.OrderBy(b => b.Name)
+            };
+
+            return query.ToList();
+        }
+    }
 
     protected override void OnInitialized()
     {
@@ -82,6 +111,7 @@ else
     {
         var band = new Band { Name = Localization.T("page.bands.newBandDefault") };
         BandService.AddBand(band);
+        Toasts.Show(Localization.T(LocalizationKeys.Toast.Bands.Created, band.Name), ToastLevel.Success);
         Nav.NavigateTo($"/band/{band.Id}");
     }
 
@@ -96,7 +126,11 @@ else
 
     private void ConfirmDelete()
     {
-        if (_pendingDeleteId is { } id) BandService.DeleteBand(id);
+        if (_pendingDeleteId is { } id)
+        {
+            BandService.DeleteBand(id);
+            Toasts.Show(Localization.T(LocalizationKeys.Toast.Bands.Deleted), ToastLevel.Info);
+        }
         _pendingDeleteId = null;
     }
 

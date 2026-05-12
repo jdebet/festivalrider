@@ -18,6 +18,12 @@
   "page.bands.title": "Bands · FestivalRider",
   "page.bandsV2.title": "Bands v2 · FestivalRider",
   "page.bandsV2.filterPlaceholder": "Filter bands...",
+  "page.bandsV2.sort.label": "Sort",
+  "page.bandsV2.sort.nameAsc": "Name A–Z",
+  "page.bandsV2.sort.nameDesc": "Name Z–A",
+  "page.bandsV2.sort.travelParty": "Travel party",
+  "page.bandsV2.sort.createdAt": "Created",
+  "page.bandsV2.sort.updatedAt": "Last updated",
   "page.bands.heading": "Bands",
   "page.bands.addBand": "+ New band",
   "page.bands.empty": "No bands yet. Click {0} to add one.",
@@ -269,8 +275,13 @@
   "toast.editor.imported": "Imported \"{0}\" from CSV.",
   "toast.editor.importFailed": "Import failed: {0}",
 
+  "toast.bands.deleted": "Band deleted.",
+  "toast.bands.created": "Band \"{0}\" created.",
+  "toast.bands.updated": "Band \"{0}\" updated.",
+
   "toast.runningOrder.pickStage": "Pick a stage first.",
   "toast.runningOrder.pickBand": "Pick a band first.",
+  "toast.runningOrder.deleted": "Running order deleted.",
 
   "toast.settings.showDetailsSaved": "Show details saved.",
   "toast.settings.stageAdded": "Stage \"{0}\" added (#{1}).",

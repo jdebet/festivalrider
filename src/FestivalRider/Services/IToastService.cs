@@ -2,7 +2,13 @@ namespace FestivalRider.Services;
 
 public enum ToastLevel { Info, Success, Warning, Error }
 
-public sealed record ToastMessage(Guid Id, ToastLevel Level, string Text);
+public sealed class ToastMessage(Guid id, ToastLevel level, string text)
+{
+    public Guid Id { get; } = id;
+    public ToastLevel Level { get; } = level;
+    public string Text { get; } = text;
+    public bool IsExiting { get; set; }
+}
 
 public interface IToastService
 {

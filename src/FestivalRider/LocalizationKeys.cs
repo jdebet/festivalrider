@@ -53,6 +53,15 @@ public static class LocalizationKeys
         {
             public const string Title = "page.bandsV2.title";
             public const string FilterPlaceholder = "page.bandsV2.filterPlaceholder";
+            public static class Sort
+            {
+                public const string Label = "page.bandsV2.sort.label";
+                public const string NameAsc = "page.bandsV2.sort.nameAsc";
+                public const string NameDesc = "page.bandsV2.sort.nameDesc";
+                public const string TravelParty = "page.bandsV2.sort.travelParty";
+                public const string CreatedAt = "page.bandsV2.sort.createdAt";
+                public const string UpdatedAt = "page.bandsV2.sort.updatedAt";
+            }
         }
 
         public static class Editor
@@ -372,10 +381,17 @@ public static class LocalizationKeys
             public const string Imported = "toast.editor.imported";
             public const string ImportFailed = "toast.editor.importFailed";
         }
+        public static class Bands
+        {
+            public const string Created = "toast.bands.created";
+            public const string Updated = "toast.bands.updated";
+            public const string Deleted = "toast.bands.deleted";
+        }
         public static class RunningOrder
         {
             public const string PickStage = "toast.runningOrder.pickStage";
             public const string PickBand = "toast.runningOrder.pickBand";
+            public const string Deleted = "toast.runningOrder.deleted";
         }
         public static class Settings
         {

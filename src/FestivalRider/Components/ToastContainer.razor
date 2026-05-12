@@ -1,7 +1,7 @@
 <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
     @foreach (var t in Toasts)
     {
-        <div class="toast show align-items-center text-bg-@CssLevel(t.Level) border-0 mb-2" role="alert" @key="t.Id">
+        <div class="toast show align-items-center text-bg-@CssLevel(t.Level) border-0 mb-2 @AnimationClass(t)" role="alert" @key="t.Id">
             <div class="d-flex">
                 <div class="toast-body">@t.Text</div>
                 <button type="button" class="btn-close btn-close-white me-2 m-auto" aria-label="Close" @onclick="() => OnDismiss.InvokeAsync(t.Id)"></button>
@@ -21,4 +21,6 @@
         ToastLevel.Error => "danger",
         _ => "primary"
     };
+
+    private static string AnimationClass(ToastMessage t) => t.IsExiting ? "fr-toast-exit" : "fr-toast-enter";
 }

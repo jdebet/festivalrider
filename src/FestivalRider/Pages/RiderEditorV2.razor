@@ -16,11 +16,11 @@
 }
 else
 {
+    <div class="mb-2">
+        <a href="/" class="text-decoration-none small">@Localization.T("page.editor.backToBands")</a>
+    </div>
     <div class="d-flex justify-content-between align-items-center mb-2">
-        <div>
-            <a href="/" class="text-decoration-none small">@Localization.T("page.editor.backToBands")</a>
-            <InputText class="form-control form-control-sm fw-bold" style="font-size: 1.5rem; max-width: 400px;" @bind-Value="_band.Name" />
-        </div>
+        <InputText class="form-control form-control-sm fw-bold" style="font-size: 1.5rem; max-width: 400px;" @bind-Value="_band.Name" />
         <div class="d-flex flex-wrap gap-1">
             <button class="btn btn-sm btn-primary" @onclick="Save">@Localization.T("page.editor.save")</button>
             <label class="btn btn-sm btn-outline-secondary mb-0">
@@ -691,6 +691,8 @@ else
     {
         if (_band is null) return;
         BandService.UpdateBand(_band);
+        Toasts.Show(Localization.T(LocalizationKeys.Toast.Bands.Updated, _band.Name), ToastLevel.Success);
+        Nav.NavigateTo("/");
     }
 
     private async Task ImportCsv(InputFileChangeEventArgs e)

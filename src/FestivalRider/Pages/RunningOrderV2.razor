@@ -3,6 +3,7 @@
 @implements IDisposable
 @inject IBandService BandService
 @inject ILocalizationService Localization
+@inject IToastService Toasts
 
 <PageTitle>@Localization.T("page.runningOrder.title")</PageTitle>
 
@@ -205,7 +206,11 @@ else
 
     private void ConfirmDelete()
     {
-        if (_pendingDeleteId is { } id) BandService.DeleteRunningOrder(id);
+        if (_pendingDeleteId is { } id)
+        {
+            BandService.DeleteRunningOrder(id);
+            Toasts.Show(Localization.T(LocalizationKeys.Toast.RunningOrder.Deleted), ToastLevel.Info);
+        }
         _pendingDeleteId = null;
     }
 

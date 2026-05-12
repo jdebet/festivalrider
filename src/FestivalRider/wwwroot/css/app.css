@@ -114,6 +114,10 @@ code {
 }
 
 /* Density utilities (plan 015) */
+.fr-table-dense {
+    table-layout: fixed;
+}
+
 .fr-table-dense > tbody > tr > td,
 .fr-table-dense > tbody > tr > th,
 .fr-table-dense > thead > tr > td,
@@ -138,4 +142,29 @@ code {
 
 .fr-table-dense th {
     font-weight: normal;
+}
+
+/* Toast animations */
+@keyframes toast-slide-in {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes toast-fade-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+.fr-toast-enter {
+    animation: toast-slide-in 300ms ease-out forwards;
+}
+
+.fr-toast-exit {
+    animation: toast-fade-out 400ms ease-in forwards;
 }
