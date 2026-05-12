@@ -64,6 +64,7 @@ public class ToastService : IToastService
             _ =>
             {
                 _active.RemoveAll(t => t.Id == id);
+                _timers.Remove(id);
                 OnChange?.Invoke();
                 exitTimer?.Dispose();
             },
