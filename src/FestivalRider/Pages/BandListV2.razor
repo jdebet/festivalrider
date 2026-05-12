@@ -1,4 +1,4 @@
-@page "/bands-v2"
+@page "/"
 @implements IDisposable
 @inject IBandService BandService
 @inject ILocalizationService Localization
@@ -84,10 +84,10 @@ else
     {
         var band = new Band { Name = Localization.T("page.bands.newBandDefault") };
         BandService.AddBand(band);
-        Nav.NavigateTo($"/band-v2/{band.Id}");
+        Nav.NavigateTo($"/band/{band.Id}");
     }
 
-    private void EditBand(Guid id) => Nav.NavigateTo($"/band-v2/{id}");
+    private void EditBand(Guid id) => Nav.NavigateTo($"/band/{id}");
 
     private void PrintBand(Guid id) => Nav.NavigateTo($"/print/band/{id}");
 

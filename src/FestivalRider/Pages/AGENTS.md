@@ -1,9 +1,9 @@
 # Pages — Agent rules
 
 - Route map (locked):
-  - `/` → `BandList.razor`.
-  - `/band/{Id:guid}` → `RiderEditor.razor`.
-  - `/running-order` → `RunningOrder.razor`.
+  - `/` → `BandListV2.razor`.
+  - `/band/{Id:guid}` → `RiderEditorV2.razor`.
+  - `/running-order` → `RunningOrderV2.razor`.
   - `/print/{StrategyKey}/{ContextId}` → `RiderPrint.razor` with `@layout EmptyLayout`.
   - `/settings` → `Settings.razor`.
 - Pages consuming `BandService` state MUST subscribe to `OnChange` in `OnInitialized[Async]`, implement `IDisposable`, and unsubscribe in `Dispose`.
