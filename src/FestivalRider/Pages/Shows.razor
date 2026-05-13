@@ -1,14 +1,17 @@
-@page "/settings"
+@page "/shows"
 @using System.Globalization
 @implements IDisposable
 @inject IBandService BandService
 @inject ILocalizationService Localization
 @inject IStorageService Storage
 @inject IToastService Toasts
+@inject IBundleService Bundle
+@inject IExportService Export
+@inject IJSRuntime JS
 
-<PageTitle>@Localization.T("page.settings.title")</PageTitle>
+<PageTitle>@Localization.T("page.shows.title")</PageTitle>
 
-<h1 class="h3 mb-3">@Localization.T("page.settings.heading")</h1>
+<h1 class="h3 mb-3">@Localization.T("page.shows.heading")</h1>
 
 <RiderSection Title="@Localization.T("section.shows.title")">
     <p class="text-muted small">@Localization.T("page.settings.shows.description")</p>
@@ -38,6 +41,8 @@
                             <button type="button" class="btn btn-outline-primary"
                                     @onclick="() => SetActiveShow(sid)">@Localization.T("page.settings.shows.setActive")</button>
                         }
+                        <button type="button" class="btn btn-outline-primary"
+                                @onclick="() => ExportShow(s)">@Localization.T("page.shows.exportShow")</button>
                         <button type="button" class="btn btn-outline-danger"
                                 @onclick="() => RequestDeleteShow(sid)">@Localization.T("page.settings.shows.delete")</button>
                     </div>
@@ -154,6 +159,7 @@
     private string _deleteStageMessage = string.Empty;
     private Guid? _pendingDeleteShowId;
     private string _deleteShowMessage = string.Empty;
+
     protected override void OnInitialized()
     {
         BandService.OnChange += HandleChange;
@@ -231,7 +237,7 @@
     private void RequestDeleteShow(Guid id)
     {
         var show = BandService.FindShow(id);
-        var roCount = BandService.RunningOrders.Count(o => o.ShowId == id);
+        var roCount = show?.RunningOrders.Count ?? 0;
         _pendingDeleteShowId = id;
         _deleteShowMessage = roCount == 0
             ? Localization.T("confirm.deleteShow.message", show?.Name ?? id.ToString())
@@ -242,9 +248,12 @@
     {
         if (_pendingDeleteShowId is { } id)
         {
-            // Running orders tied to this show would otherwise orphan; remove them first.
-            foreach (var ro in BandService.RunningOrders.Where(o => o.ShowId == id).Select(o => o.Id).ToList())
-                BandService.DeleteRunningOrder(ro);
+            var show = BandService.FindShow(id);
+            if (show is not null)
+            {
+                foreach (var ro in show.RunningOrders.Select(o => o.Id).ToList())
+                    BandService.DeleteRunningOrder(ro);
+            }
             await BandService.DeleteShow(id);
             Toasts.Show(Localization.T("toast.settings.showDeleted"), ToastLevel.Info);
         }
@@ -262,6 +271,15 @@
         _confirmClear = false;
         await Storage.ClearAsync();
         Toasts.Show(Localization.T("toast.settings.cleared"), ToastLevel.Warning);
+    }
+
+    private async Task ExportShow(ShowData show)
+    {
+        var bytes = Bundle.ExportBundle(show);
+        var stamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+        var fname = $"festivalrider-{Export.SanitizeFilename(show.Name)}-{stamp}.zip";
+        await JS.InvokeVoidAsync("festivalRiderCsv.downloadBytes", fname, "application/zip", bytes);
+        Toasts.Show(Localization.T("toast.shows.bundleExported", show.Name), ToastLevel.Success);
     }
 
     public void Dispose()

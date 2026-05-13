@@ -6,20 +6,23 @@
             <button type="button" class="btn btn-link btn-sm p-0 lh-1" @onclick="() => OnMoveDown.InvokeAsync(Index)" disabled="@(IsLast)">&#9660;</button>
         </div>
     </td>
-    <td class="fr-py-tight">
-        <select class="form-select form-select-sm fr-form-ultra-sm"
-                value="@Slot.StageId"
-                @onchange="e => OnUpdate.InvokeAsync((Index, Slot with { StageId = ParseInt(e.Value) }))">
-            @if (FindStage(Slot.StageId) is null)
-            {
-                <option value="@Slot.StageId">@UnknownStageLabel</option>
-            }
-            @foreach (var s in Stages)
-            {
-                <option value="@s.Id">@s.Name</option>
-            }
-        </select>
-    </td>
+    @if (Stages.Count > 0)
+    {
+        <td class="fr-py-tight">
+            <select class="form-select form-select-sm fr-form-ultra-sm"
+                    value="@Slot.StageId"
+                    @onchange="e => OnUpdate.InvokeAsync((Index, Slot with { StageId = ParseInt(e.Value) }))">
+                @if (FindStage(Slot.StageId) is null)
+                {
+                    <option value="@Slot.StageId">@UnknownStageLabel</option>
+                }
+                @foreach (var s in Stages)
+                {
+                    <option value="@s.Id">@s.Name</option>
+                }
+            </select>
+        </td>
+    }
     <td class="fr-py-tight">
         <input type="time" class="form-control form-control-sm fr-form-ultra-sm"
                value="@Slot.StartTime.ToString("HH:mm")"

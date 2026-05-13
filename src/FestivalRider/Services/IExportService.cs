@@ -14,4 +14,9 @@ public interface IExportService
     string ExportRunningOrderByStageCsv(RunningOrder order, int stageId);
     string ExportRunningOrderByBandCsv(RunningOrder order, Guid bandId);
     RunningOrder ImportRunningOrderCsv(string csv, ShowData show, IReadOnlyList<Band> bands);
+
+    string ResolveBandName(Guid bandId);
+    string ResolveBandName(Guid showId, Guid bandId);
+
+    string SanitizeFilename(string name);
 }

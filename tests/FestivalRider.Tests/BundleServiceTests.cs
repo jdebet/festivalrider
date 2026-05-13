@@ -21,7 +21,7 @@ public sealed class BundleServiceTests
 
     private static BundleService CreateWithV2Migrator()
     {
-        var (svc, _, _) = Create(new IBundleMigrator[] { new V2ToV3BundleMigrator(), new V3ToV4BundleMigrator() });
+        var (svc, _, _) = Create(new IBundleMigrator[] { new V2ToV3BundleMigrator(), new V3ToV4BundleMigrator(), new V4ToV5BundleMigrator() });
         return svc;
     }
 
@@ -33,17 +33,17 @@ public sealed class BundleServiceTests
             Shows = new List<ShowData> { show },
             ActiveShowId = show.Id,
         };
-        state.Bands.Add(TestDataFactory.FullBand(Guid.NewGuid()));
-        state.Bands.Add(TestDataFactory.FullBand(Guid.NewGuid()));
-        state.RunningOrders.Add(new RunningOrder
+        state.Shows[0].Bands.Add(TestDataFactory.FullBand(Guid.NewGuid()));
+        state.Shows[0].Bands.Add(TestDataFactory.FullBand(Guid.NewGuid()));
+        state.Shows[0].RunningOrders.Add(new RunningOrder
         {
             Id = Guid.NewGuid(),
             ShowId = show.Id,
             ShowDayNumber = 1,
             Slots =
             {
-                new(state.Bands[0].Id, 1, new TimeOnly(18, 0), 60, 15, "Headliner"),
-                new(state.Bands[1].Id, 2, new TimeOnly(14, 0), 30, 10, "Warmup"),
+                new(state.Shows[0].Bands[0].Id, 1, new TimeOnly(18, 0), 60, 15, "Headliner"),
+                new(state.Shows[0].Bands[1].Id, 2, new TimeOnly(14, 0), 30, 10, "Warmup"),
             }
         });
         return state;
@@ -85,18 +85,18 @@ public sealed class BundleServiceTests
         var original = FullState();
         bands.ReplaceState(original);
 
-        var zip = svc.ExportBundle(original);
+        var zip = svc.ExportBundle(original.Shows[0]);
         Assert.NotNull(zip);
         Assert.True(zip.Length > 0);
 
-        var result = svc.ImportBundle(new MemoryStream(zip));
+        var result = svc.ImportBundle(new MemoryStream(zip), original.Shows[0].Id);
         Assert.Null(result.Error);
         Assert.Equal(2, result.BandCount);
         Assert.Equal(1, result.RunningOrderCount);
-        Assert.Equal(original.Bands[0].Name, result.State!.Bands[0].Name);
-        Assert.Equal(original.Bands[0].Rider.Tech.Foh.OwnConsoleModel, result.State.Bands[0].Rider.Tech.Foh.OwnConsoleModel);
+        Assert.Equal(original.Shows[0].Bands[0].Name, result.State!.Shows[0].Bands[0].Name);
+        Assert.Equal(original.Shows[0].Bands[0].Rider.Tech.Foh.OwnConsoleModel, result.State.Shows[0].Bands[0].Rider.Tech.Foh.OwnConsoleModel);
         Assert.Equal(original.Shows[0].Name, result.State.Shows[0].Name);
-        Assert.Equal(original.RunningOrders[0].Slots.Count, result.State.RunningOrders[0].Slots.Count);
+        Assert.Equal(original.Shows[0].RunningOrders[0].Slots.Count, result.State.Shows[0].RunningOrders[0].Slots.Count);
         Assert.Null(result.Merge);
     }
 
@@ -107,7 +107,7 @@ public sealed class BundleServiceTests
         var original = FullState();
         bands.ReplaceState(original);
 
-        var zip = svc.ExportBundle(bands.Snapshot());
+        var zip = svc.ExportBundle(bands.Snapshot().Shows[0]);
         using var ms = new MemoryStream(zip);
         using var archive = new ZipArchive(ms, ZipArchiveMode.Read);
         var names = archive.Entries.Select(e => e.FullName).ToList();
@@ -124,7 +124,7 @@ public sealed class BundleServiceTests
         var (svc, _, bands) = Create();
         var original = FullState();
         bands.ReplaceState(original);
-        var zip = svc.ExportBundle(original);
+        var zip = svc.ExportBundle(original.Shows[0]);
 
         var tampered = RebuildZip(zip, (name, content) =>
         {
@@ -135,7 +135,7 @@ public sealed class BundleServiceTests
             return JsonSerializer.Serialize(copy);
         });
 
-        var result = svc.ImportBundle(new MemoryStream(tampered));
+        var result = svc.ImportBundle(new MemoryStream(tampered), original.Shows[0].Id);
         Assert.NotNull(result.Error);
         Assert.Contains("schema", result.Error!, StringComparison.OrdinalIgnoreCase);
     }
@@ -146,7 +146,7 @@ public sealed class BundleServiceTests
         var (svc, _, bands) = Create();
         var original = FullState();
         bands.ReplaceState(original);
-        var zip = svc.ExportBundle(original);
+        var zip = svc.ExportBundle(original.Shows[0]);
 
         var tampered = RebuildZip(zip, (name, content) =>
         {
@@ -157,7 +157,7 @@ public sealed class BundleServiceTests
             return JsonSerializer.Serialize(copy);
         });
 
-        var result = svc.ImportBundle(new MemoryStream(tampered));
+        var result = svc.ImportBundle(new MemoryStream(tampered), original.Shows[0].Id);
         Assert.NotNull(result.Error);
         Assert.Contains("format", result.Error!, StringComparison.OrdinalIgnoreCase);
     }
@@ -168,12 +168,12 @@ public sealed class BundleServiceTests
         var (svc, _, bands) = Create();
         var original = FullState();
         bands.ReplaceState(original);
-        var zip = svc.ExportBundle(original);
+        var zip = svc.ExportBundle(original.Shows[0]);
 
         var tampered = RebuildZip(zip, (_, content) => content,
             extras: new[] { ("unlisted.txt", "extra") });
 
-        var result = svc.ImportBundle(new MemoryStream(tampered));
+        var result = svc.ImportBundle(new MemoryStream(tampered), original.Shows[0].Id);
         Assert.Null(result.Error);
         Assert.Contains(result.Warnings, w => w.Contains("unlisted", StringComparison.OrdinalIgnoreCase));
     }
@@ -182,7 +182,7 @@ public sealed class BundleServiceTests
     public void Import_EmptyZip_Fails()
     {
         var (svc, _, _) = Create();
-        var result = svc.ImportBundle(new MemoryStream(Array.Empty<byte>()));
+        var result = svc.ImportBundle(new MemoryStream(Array.Empty<byte>()), Guid.NewGuid());
         Assert.NotNull(result.Error);
     }
 
@@ -220,16 +220,16 @@ public sealed class BundleServiceTests
         {
             Shows = new List<ShowData> { bundleSenderShow },
             ActiveShowId = bundleSenderShow.Id,
-            Bands = { BandWith(Guid.NewGuid(), "Incoming", new DateTimeOffset(2024, 5, 1, 0, 0, 0, TimeSpan.Zero)) },
         };
+        bundleState.Shows[0].Bands.Add(BandWith(Guid.NewGuid(), "Incoming", new DateTimeOffset(2024, 5, 1, 0, 0, 0, TimeSpan.Zero)));
         bundleSender.ReplaceState(bundleState);
-        var zip = svc.ExportBundle(bundleState);
+        var zip = svc.ExportBundle(bundleState.Shows[0]);
 
         // Local has a different band.
         var localOnlyId = Guid.NewGuid();
-        var local = BuildLocalState(s => s.Bands.Add(BandWith(localOnlyId, "Local", DateTimeOffset.UtcNow)));
+        var local = BuildLocalState(s => s.Shows[0].Bands.Add(BandWith(localOnlyId, "Local", DateTimeOffset.UtcNow)));
 
-        var result = svc.ImportBundle(new MemoryStream(zip), BundleImportMode.Merge, local);
+        var result = svc.ImportBundle(new MemoryStream(zip), local.Shows[0].Id, BundleImportMode.Merge, local);
 
         Assert.Null(result.Error);
         Assert.NotNull(result.Merge);
@@ -237,9 +237,9 @@ public sealed class BundleServiceTests
         Assert.Equal(0, result.Merge.BandsUpdated);
         Assert.Equal(0, result.Merge.BandsSkipped);
         Assert.Equal(1, result.BandCount);
-        Assert.Equal(2, result.State!.Bands.Count);
-        Assert.Contains(result.State.Bands, b => b.Id == localOnlyId);
-        Assert.Contains(result.State.Bands, b => b.Name == "Incoming");
+        Assert.Equal(2, result.State!.Shows[0].Bands.Count);
+        Assert.Contains(result.State.Shows[0].Bands, b => b.Id == localOnlyId);
+        Assert.Contains(result.State.Shows[0].Bands, b => b.Name == "Incoming");
     }
 
     [Fact]
@@ -253,18 +253,18 @@ public sealed class BundleServiceTests
         {
             Shows = new List<ShowData> { olderShow },
             ActiveShowId = olderShow.Id,
-            Bands = { BandWith(sharedId, "OldName", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero)) },
         };
-        var zipOlder = svc.ExportBundle(olderBundle);
+        olderBundle.Shows[0].Bands.Add(BandWith(sharedId, "OldName", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero)));
+        var zipOlder = svc.ExportBundle(olderBundle.Shows[0]);
 
-        var local = BuildLocalState(s => s.Bands.Add(
+        var local = BuildLocalState(s => s.Shows[0].Bands.Add(
             BandWith(sharedId, "LocalName", new DateTimeOffset(2024, 6, 1, 0, 0, 0, TimeSpan.Zero))));
 
-        var skipResult = svc.ImportBundle(new MemoryStream(zipOlder), BundleImportMode.Merge, local);
+        var skipResult = svc.ImportBundle(new MemoryStream(zipOlder), local.Shows[0].Id, BundleImportMode.Merge, local);
         Assert.Null(skipResult.Error);
         Assert.Equal(1, skipResult.Merge!.BandsSkipped);
         Assert.Equal(0, skipResult.Merge.BandsUpdated);
-        Assert.Equal("LocalName", skipResult.State!.Bands.Single(b => b.Id == sharedId).Name);
+        Assert.Equal("LocalName", skipResult.State!.Shows[0].Bands.Single(b => b.Id == sharedId).Name);
         Assert.Contains(skipResult.Warnings, w => w.Contains("skipped", StringComparison.OrdinalIgnoreCase));
 
         // Newer incoming wins.
@@ -273,13 +273,13 @@ public sealed class BundleServiceTests
         {
             Shows = new List<ShowData> { newerShow },
             ActiveShowId = newerShow.Id,
-            Bands = { BandWith(sharedId, "NewerName", new DateTimeOffset(2024, 12, 1, 0, 0, 0, TimeSpan.Zero)) },
         };
-        var zipNewer = svc.ExportBundle(newerBundle);
-        var updateResult = svc.ImportBundle(new MemoryStream(zipNewer), BundleImportMode.Merge, local);
+        newerBundle.Shows[0].Bands.Add(BandWith(sharedId, "NewerName", new DateTimeOffset(2024, 12, 1, 0, 0, 0, TimeSpan.Zero)));
+        var zipNewer = svc.ExportBundle(newerBundle.Shows[0]);
+        var updateResult = svc.ImportBundle(new MemoryStream(zipNewer), local.Shows[0].Id, BundleImportMode.Merge, local);
         Assert.Equal(1, updateResult.Merge!.BandsUpdated);
         Assert.Equal(0, updateResult.Merge.BandsSkipped);
-        Assert.Equal("NewerName", updateResult.State!.Bands.Single(b => b.Id == sharedId).Name);
+        Assert.Equal("NewerName", updateResult.State!.Shows[0].Bands.Single(b => b.Id == sharedId).Name);
     }
 
     [Fact]
@@ -294,14 +294,14 @@ public sealed class BundleServiceTests
         {
             Shows = new List<ShowData> { equalShow },
             ActiveShowId = equalShow.Id,
-            Bands = { BandWith(sharedId, "Incoming", ts) },
         };
-        var zip = svc.ExportBundle(bundle);
-        var local = BuildLocalState(s => s.Bands.Add(BandWith(sharedId, "Local", ts)));
+        bundle.Shows[0].Bands.Add(BandWith(sharedId, "Incoming", ts));
+        var zip = svc.ExportBundle(bundle.Shows[0]);
+        var local = BuildLocalState(s => s.Shows[0].Bands.Add(BandWith(sharedId, "Local", ts)));
 
-        var result = svc.ImportBundle(new MemoryStream(zip), BundleImportMode.Merge, local);
+        var result = svc.ImportBundle(new MemoryStream(zip), local.Shows[0].Id, BundleImportMode.Merge, local);
         Assert.Equal(1, result.Merge!.BandsSkipped);
-        Assert.Equal("Local", result.State!.Bands.Single(b => b.Id == sharedId).Name);
+        Assert.Equal("Local", result.State!.Shows[0].Bands.Single(b => b.Id == sharedId).Name);
     }
 
     [Fact]
@@ -313,12 +313,12 @@ public sealed class BundleServiceTests
         bundleShow.Name = "Sender Festival";
         bundleShow.Stages[0].Name = "RenamedMain";
         var bundle = new AppState { Shows = new List<ShowData> { bundleShow }, ActiveShowId = bundleShow.Id };
-        var zip = svc.ExportBundle(bundle);
+        var zip = svc.ExportBundle(bundle.Shows[0]);
 
         var local = BuildLocalState();
         var localShowRef = local.Shows[0];
 
-        var result = svc.ImportBundle(new MemoryStream(zip), BundleImportMode.Merge, local);
+        var result = svc.ImportBundle(new MemoryStream(zip), local.Shows[0].Id, BundleImportMode.Merge, local);
         Assert.Null(result.Error);
         Assert.Same(localShowRef, result.State!.Shows[0]);
         Assert.Equal("Festival 2024", result.State.Shows[0].Name);
@@ -346,32 +346,29 @@ public sealed class BundleServiceTests
         {
             Shows = new List<ShowData> { senderShow },
             ActiveShowId = senderShow.Id,
-            Bands = { BandWith(bandId, "B", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero)) },
-            RunningOrders =
-            {
-                new RunningOrder
-                {
-                    Id = Guid.NewGuid(),
-                    ShowId = senderShow.Id,
-                    ShowDayNumber = 1,
-                    Slots =
-                    {
-                        new(bandId, 42, new TimeOnly(18, 0), 60, 15, null),
-                        new(bandId, 99, new TimeOnly(14, 0), 30, 10, null),
-                    },
-                },
-            },
         };
+        bundle.Shows[0].Bands.Add(BandWith(bandId, "B", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero)));
+        bundle.Shows[0].RunningOrders.Add(new RunningOrder
+        {
+            Id = Guid.NewGuid(),
+            ShowId = senderShow.Id,
+            ShowDayNumber = 1,
+            Slots =
+            {
+                new(bandId, 42, new TimeOnly(18, 0), 60, 15, null),
+                new(bandId, 99, new TimeOnly(14, 0), 30, 10, null),
+            },
+        });
         bands.ReplaceState(bundle);
-        var zip = svc.ExportBundle(bundle);
+        var zip = svc.ExportBundle(bundle.Shows[0]);
 
         var local = BuildLocalState(); // local stages: 1=Main, 2=Acoustic
-        var result = svc.ImportBundle(new MemoryStream(zip), BundleImportMode.Merge, local);
+        var result = svc.ImportBundle(new MemoryStream(zip), local.Shows[0].Id, BundleImportMode.Merge, local);
 
         Assert.Null(result.Error);
         Assert.Equal(1, result.Merge!.RunningOrdersAdded);
         Assert.Equal(0, result.Merge.RunningOrdersSkipped);
-        var ro = Assert.Single(result.State!.RunningOrders);
+        var ro = Assert.Single(result.State!.Shows[0].RunningOrders);
         // CSV export sorts slots by StartTime: 14:00 (Acoustic→2) then 18:00 (Main→1).
         Assert.Equal(new[] { 2, 1 }, ro.Slots.Select(s => s.StageId).ToArray());
     }
@@ -391,32 +388,29 @@ public sealed class BundleServiceTests
         {
             Shows = new List<ShowData> { senderShow },
             ActiveShowId = senderShow.Id,
-            Bands = { BandWith(bandId, "B", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero)) },
-            RunningOrders =
-            {
-                new RunningOrder
-                {
-                    Id = Guid.NewGuid(),
-                    ShowId = senderShow.Id,
-                    ShowDayNumber = 1,
-                    Slots =
-                    {
-                        new(bandId, 1, new TimeOnly(18, 0), 60, 15, null),
-                        new(bandId, 2, new TimeOnly(20, 0), 60, 15, null),
-                    },
-                },
-            },
         };
+        bundle.Shows[0].Bands.Add(BandWith(bandId, "B", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero)));
+        bundle.Shows[0].RunningOrders.Add(new RunningOrder
+        {
+            Id = Guid.NewGuid(),
+            ShowId = senderShow.Id,
+            ShowDayNumber = 1,
+            Slots =
+            {
+                new(bandId, 1, new TimeOnly(18, 0), 60, 15, null),
+                new(bandId, 2, new TimeOnly(20, 0), 60, 15, null),
+            },
+        });
         bands.ReplaceState(bundle);
-        var zip = svc.ExportBundle(bundle);
+        var zip = svc.ExportBundle(bundle.Shows[0]);
 
         var local = BuildLocalState();
-        var result = svc.ImportBundle(new MemoryStream(zip), BundleImportMode.Merge, local);
+        var result = svc.ImportBundle(new MemoryStream(zip), local.Shows[0].Id, BundleImportMode.Merge, local);
 
         Assert.Null(result.Error);
         Assert.Equal(1, result.Merge!.RunningOrdersSkipped);
         Assert.Equal(0, result.Merge.RunningOrdersAdded);
-        Assert.Empty(result.State!.RunningOrders);
+        Assert.Empty(result.State!.Shows[0].RunningOrders);
         Assert.Contains(result.Warnings, w => w.Contains("Tent", StringComparison.Ordinal));
     }
 
@@ -432,26 +426,23 @@ public sealed class BundleServiceTests
         {
             Shows = new List<ShowData> { collisionShow },
             ActiveShowId = collisionShow.Id,
-            Bands = { BandWith(bandId, "B", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero)) },
-            RunningOrders =
-            {
-                new RunningOrder
-                {
-                    Id = sharedRoId,
-                    ShowId = collisionShow.Id,
-                    ShowDayNumber = 2,
-                    Slots = { new(bandId, 1, new TimeOnly(18, 0), 60, 15, "incoming") },
-                },
-            },
         };
+        bundle.Shows[0].Bands.Add(BandWith(bandId, "B", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero)));
+        bundle.Shows[0].RunningOrders.Add(new RunningOrder
+        {
+            Id = sharedRoId,
+            ShowId = collisionShow.Id,
+            ShowDayNumber = 2,
+            Slots = { new(bandId, 1, new TimeOnly(18, 0), 60, 15, "incoming") },
+        });
         bands.ReplaceState(bundle);
-        var zip = svc.ExportBundle(bundle);
+        var zip = svc.ExportBundle(bundle.Shows[0]);
 
         var local = BuildLocalState(s =>
         {
-            s.Bands.Add(BandWith(bandId, "Local B", DateTimeOffset.UtcNow));
+            s.Shows[0].Bands.Add(BandWith(bandId, "Local B", DateTimeOffset.UtcNow));
             // Local show name matches sender ("Festival 2024") so the merge can remap.
-            s.RunningOrders.Add(new RunningOrder
+            s.Shows[0].RunningOrders.Add(new RunningOrder
             {
                 Id = sharedRoId,
                 ShowId = s.Shows[0].Id,
@@ -460,10 +451,10 @@ public sealed class BundleServiceTests
             });
         });
 
-        var result = svc.ImportBundle(new MemoryStream(zip), BundleImportMode.Merge, local);
+        var result = svc.ImportBundle(new MemoryStream(zip), local.Shows[0].Id, BundleImportMode.Merge, local);
         Assert.Null(result.Error);
         Assert.Equal(1, result.Merge!.RunningOrdersUpdated);
-        var ro = Assert.Single(result.State!.RunningOrders);
+        var ro = Assert.Single(result.State!.Shows[0].RunningOrders);
         Assert.Equal("incoming", ro.Slots[0].Notes);
         Assert.Contains(result.Warnings, w => w.Contains("replaced", StringComparison.OrdinalIgnoreCase));
     }
@@ -478,20 +469,20 @@ public sealed class BundleServiceTests
         {
             Shows = new List<ShowData> { sortShow },
             ActiveShowId = sortShow.Id,
-            Bands =
-            {
-                BandWith(new Guid("ffffffff-ffff-ffff-ffff-ffffffffffff"), "Z", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero)),
-                BandWith(new Guid("00000000-0000-0000-0000-000000000001"), "A", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero)),
-            },
         };
-        var zip = svc.ExportBundle(bundle);
+        bundle.Shows[0].Bands.Add(
+            BandWith(new Guid("ffffffff-ffff-ffff-ffff-ffffffffffff"), "Z", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero)));
+        bundle.Shows[0].Bands.Add(
+            BandWith(new Guid("00000000-0000-0000-0000-000000000001"), "A", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero)));
+
+        var zip = svc.ExportBundle(bundle.Shows[0]);
 
         var local = BuildLocalState(s =>
-            s.Bands.Add(BandWith(new Guid("88888888-8888-8888-8888-888888888888"), "M", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero))));
+            s.Shows[0].Bands.Add(BandWith(new Guid("88888888-8888-8888-8888-888888888888"), "M", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero))));
 
-        var result = svc.ImportBundle(new MemoryStream(zip), BundleImportMode.Merge, local);
+        var result = svc.ImportBundle(new MemoryStream(zip), local.Shows[0].Id, BundleImportMode.Merge, local);
         Assert.Null(result.Error);
-        var ids = result.State!.Bands.Select(b => b.Id).ToList();
+        var ids = result.State!.Shows[0].Bands.Select(b => b.Id).ToList();
         Assert.Equal(ids.OrderBy(g => g).ToList(), ids);
     }
 
@@ -501,7 +492,7 @@ public sealed class BundleServiceTests
         var (svc, _, _) = Create();
         var schemaShow = TestDataFactory.FullShow();
         var bundle = new AppState { Shows = new List<ShowData> { schemaShow }, ActiveShowId = schemaShow.Id };
-        var zip = svc.ExportBundle(bundle);
+        var zip = svc.ExportBundle(bundle.Shows[0]);
 
         var tampered = RebuildZip(zip, (name, content) =>
         {
@@ -513,7 +504,7 @@ public sealed class BundleServiceTests
         });
 
         var local = BuildLocalState();
-        var result = svc.ImportBundle(new MemoryStream(tampered), BundleImportMode.Merge, local);
+        var result = svc.ImportBundle(new MemoryStream(tampered), local.Shows[0].Id, BundleImportMode.Merge, local);
         Assert.NotNull(result.Error);
         Assert.Null(result.State);
         Assert.Null(result.Merge);
@@ -525,9 +516,9 @@ public sealed class BundleServiceTests
         var (svc, _, _) = Create();
         var nullShow = TestDataFactory.FullShow();
         var bundle = new AppState { Shows = new List<ShowData> { nullShow }, ActiveShowId = nullShow.Id };
-        var zip = svc.ExportBundle(bundle);
+        var zip = svc.ExportBundle(bundle.Shows[0]);
         Assert.Throws<ArgumentNullException>(
-            () => svc.ImportBundle(new MemoryStream(zip), BundleImportMode.Merge, currentState: null));
+            () => svc.ImportBundle(new MemoryStream(zip), Guid.NewGuid(), BundleImportMode.Merge, currentState: null));
     }
 
     // -------- Bundle migration (plan 013) --------
@@ -557,18 +548,18 @@ public sealed class BundleServiceTests
     {
         var svc = CreateWithV2Migrator();
         var zip = TestDataFactory.BuildV2BundleZip();
-        var result = svc.ImportBundle(new MemoryStream(zip));
+        var result = svc.ImportBundle(new MemoryStream(zip), Guid.NewGuid());
 
         Assert.Null(result.Error);
         Assert.NotNull(result.State);
-        Assert.Equal(4, result.State!.SchemaVersion);
+        Assert.Equal(5, result.State!.SchemaVersion);
         Assert.Single(result.State.Shows);
         Assert.Equal("V2 Festival", result.State.Shows[0].Name);
         Assert.Equal(result.State.Shows[0].Id, result.State.ActiveShowId);
-        Assert.Single(result.State.Bands);
-        Assert.Equal("Alpha", result.State.Bands[0].Name);
-        Assert.Single(result.State.RunningOrders);
-        Assert.Equal(result.State.Shows[0].Id, result.State.RunningOrders[0].ShowId);
+        Assert.Single(result.State.Shows[0].Bands);
+        Assert.Equal("Alpha", result.State.Shows[0].Bands[0].Name);
+        Assert.Single(result.State.Shows[0].RunningOrders);
+        Assert.Equal(result.State.Shows[0].Id, result.State.Shows[0].RunningOrders[0].ShowId);
     }
 
     [Fact]
@@ -577,8 +568,8 @@ public sealed class BundleServiceTests
         var svc = CreateWithV2Migrator();
         var zip = TestDataFactory.BuildV2BundleZip();
 
-        var first = svc.ImportBundle(new MemoryStream(zip));
-        var second = svc.ImportBundle(new MemoryStream(zip));
+        var first = svc.ImportBundle(new MemoryStream(zip), Guid.NewGuid());
+        var second = svc.ImportBundle(new MemoryStream(zip), Guid.NewGuid());
 
         Assert.Null(first.Error);
         Assert.Null(second.Error);
@@ -593,7 +584,7 @@ public sealed class BundleServiceTests
 
         // Local has zero bands and no shows by name; merge should add the v2 band.
         var local = new AppState();
-        var result = svc.ImportBundle(new MemoryStream(zip), BundleImportMode.Merge, local);
+        var result = svc.ImportBundle(new MemoryStream(zip), local.Shows[0].Id, BundleImportMode.Merge, local);
 
         Assert.Null(result.Error);
         Assert.NotNull(result.Merge);
@@ -609,7 +600,7 @@ public sealed class BundleServiceTests
 
         // Hand-roll a v0 bundle (only schemaVersion changed; no v0 migrator registered).
         var zip = TamperManifest(TestDataFactory.BuildV2BundleZip(), m => m["schemaVersion"] = 0);
-        var result = svc.ImportBundle(new MemoryStream(zip));
+        var result = svc.ImportBundle(new MemoryStream(zip), Guid.NewGuid());
 
         Assert.NotNull(result.Error);
         Assert.Contains("cannot upgrade", result.Error!, StringComparison.OrdinalIgnoreCase);
@@ -621,7 +612,7 @@ public sealed class BundleServiceTests
     {
         var (svc, _, _) = Create(); // no migrators
         var zip = TestDataFactory.BuildV2BundleZip();
-        var result = svc.ImportBundle(new MemoryStream(zip));
+        var result = svc.ImportBundle(new MemoryStream(zip), Guid.NewGuid());
 
         Assert.NotNull(result.Error);
         Assert.Contains("too old", result.Error!, StringComparison.OrdinalIgnoreCase);
@@ -630,9 +621,9 @@ public sealed class BundleServiceTests
     [Fact]
     public void Import_Throwing_Migrator_Fails()
     {
-        var (svc, _, _) = Create(new IBundleMigrator[] { new ThrowingBundleMigrator(), new V3ToV4BundleMigrator() });
+        var (svc, _, _) = Create(new IBundleMigrator[] { new ThrowingBundleMigrator(), new V3ToV4BundleMigrator(), new V4ToV5BundleMigrator() });
         var zip = TestDataFactory.BuildV2BundleZip();
-        var result = svc.ImportBundle(new MemoryStream(zip));
+        var result = svc.ImportBundle(new MemoryStream(zip), Guid.NewGuid());
 
         Assert.NotNull(result.Error);
         Assert.Contains("migration failed", result.Error!, StringComparison.OrdinalIgnoreCase);
@@ -647,9 +638,9 @@ public sealed class BundleServiceTests
         var (exporter, _, bands) = Create();
         var state = FullState();
         bands.ReplaceState(state);
-        var zip = exporter.ExportBundle(state);
+        var zip = exporter.ExportBundle(state.Shows[0]);
 
-        var result = svc.ImportBundle(new MemoryStream(zip));
+        var result = svc.ImportBundle(new MemoryStream(zip), state.Shows[0].Id);
         Assert.Null(result.Error);
     }
 
@@ -659,16 +650,109 @@ public sealed class BundleServiceTests
         var svc = CreateWithV2Migrator();
         var (exporter, _, bands) = Create();
 
-        var first = svc.ImportBundle(new MemoryStream(TestDataFactory.BuildV2BundleZip()));
+        var first = svc.ImportBundle(new MemoryStream(TestDataFactory.BuildV2BundleZip()), Guid.NewGuid());
         Assert.Null(first.Error);
 
         bands.ReplaceState(first.State!);
-        var v3Zip = exporter.ExportBundle(first.State!);
+        var v3Zip = exporter.ExportBundle(first.State!.Shows[0]);
 
         // Second import of the re-exported bundle goes through the no-migration short-circuit.
-        var second = svc.ImportBundle(new MemoryStream(v3Zip));
+        var second = svc.ImportBundle(new MemoryStream(v3Zip), first.State!.Shows[0].Id);
         Assert.Null(second.Error);
         Assert.Equal(first.State!.Shows[0].Id, second.State!.Shows[0].Id);
+    }
+
+    // -------- Master bundle --------
+
+    [Fact]
+    public void ImportMasterBundle_Replace_PreservesMultipleShows()
+    {
+        var (svc, _, bands) = Create();
+
+        var showA = TestDataFactory.FullShow();
+        showA.Name = "Show A";
+        var bandA = TestDataFactory.FullBand(Guid.NewGuid());
+        bandA.Name = "Band A";
+        showA.Bands.Add(bandA);
+        showA.RunningOrders.Add(new RunningOrder
+        {
+            Id = Guid.NewGuid(),
+            ShowId = showA.Id,
+            ShowDayNumber = 1,
+            Slots = { new(bandA.Id, 1, new TimeOnly(18, 0), 60, 15, "Headliner") },
+        });
+
+        var showB = TestDataFactory.FullShow();
+        showB.Name = "Show B";
+        var bandB = TestDataFactory.FullBand(Guid.NewGuid());
+        bandB.Name = "Band B";
+        showB.Bands.Add(bandB);
+        showB.RunningOrders.Add(new RunningOrder
+        {
+            Id = Guid.NewGuid(),
+            ShowId = showB.Id,
+            ShowDayNumber = 1,
+            Slots = { new(bandB.Id, 1, new TimeOnly(14, 0), 30, 10, "Warmup") },
+        });
+
+        var state = new AppState { Shows = new List<ShowData> { showA, showB }, ActiveShowId = showA.Id };
+        bands.ReplaceState(state);
+
+        var masterZip = svc.ExportMasterBundle(state);
+
+        var result = svc.ImportMasterBundle(new MemoryStream(masterZip), BundleImportMode.Replace);
+
+        Assert.Null(result.Error);
+        Assert.NotNull(result.State);
+        Assert.Equal(2, result.State!.Shows.Count);
+
+        var importedA = result.State.Shows.First(s => s.Id == showA.Id);
+        var importedB = result.State.Shows.First(s => s.Id == showB.Id);
+
+        Assert.Equal("Show A", importedA.Name);
+        Assert.Single(importedA.Bands);
+        Assert.Equal("Band A", importedA.Bands[0].Name);
+        Assert.Single(importedA.RunningOrders);
+        Assert.Equal("Headliner", importedA.RunningOrders[0].Slots[0].Notes);
+
+        Assert.Equal("Show B", importedB.Name);
+        Assert.Single(importedB.Bands);
+        Assert.Equal("Band B", importedB.Bands[0].Name);
+        Assert.Single(importedB.RunningOrders);
+        Assert.Equal("Warmup", importedB.RunningOrders[0].Slots[0].Notes);
+    }
+
+    [Fact]
+    public void ImportMasterBundle_Merge_AddsNewShow()
+    {
+        var (svc, _, bands) = Create();
+
+        var showA = TestDataFactory.FullShow();
+        showA.Name = "Show A";
+        var bandA = TestDataFactory.FullBand(Guid.NewGuid());
+        bandA.Name = "Band A";
+        showA.Bands.Add(bandA);
+
+        var showB = TestDataFactory.FullShow();
+        showB.Name = "Show B";
+        var bandB = TestDataFactory.FullBand(Guid.NewGuid());
+        bandB.Name = "Band B";
+        showB.Bands.Add(bandB);
+
+        var state = new AppState { Shows = new List<ShowData> { showA, showB }, ActiveShowId = showA.Id };
+        bands.ReplaceState(state);
+
+        var masterZip = svc.ExportMasterBundle(state);
+
+        var local = new AppState { Shows = new List<ShowData> { showA }, ActiveShowId = showA.Id };
+
+        var result = svc.ImportMasterBundle(new MemoryStream(masterZip), BundleImportMode.Merge, local);
+
+        Assert.Null(result.Error);
+        Assert.NotNull(result.State);
+        Assert.Equal(2, result.State!.Shows.Count);
+        Assert.Contains(result.State.Shows, s => s.Id == showA.Id);
+        Assert.Contains(result.State.Shows, s => s.Id == showB.Id);
     }
 
     private static byte[] TamperManifest(byte[] zip, Action<Dictionary<string, object>> mutate)

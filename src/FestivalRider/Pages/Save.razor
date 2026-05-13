@@ -16,8 +16,8 @@
 <RiderSection Title="@Localization.T("section.status.title")">
     <p class="text-muted small mb-0">
         @Localization.T("page.save.status.schemaVersion"): <strong>@_snapshot.SchemaVersion</strong>
-        &middot; @Localization.T("page.save.status.bands"): <strong>@_snapshot.Bands.Count</strong>
-        &middot; @Localization.T("page.save.status.runningOrders"): <strong>@_snapshot.RunningOrders.Count</strong>
+        &middot; @Localization.T("page.save.status.bands"): <strong>@_show.Bands.Count</strong>
+        &middot; @Localization.T("page.save.status.runningOrders"): <strong>@_show.RunningOrders.Count</strong>
     </p>
 </RiderSection>
 
@@ -42,6 +42,17 @@
         <label class="btn btn-outline-secondary mb-0">
             @Localization.T("page.settings.bundle.importBtn")
             <InputFile OnChange="StageBundleImport" accept=".zip" class="d-none" />
+        </label>
+    </div>
+</RiderSection>
+
+<RiderSection Title="@Localization.T("section.masterBundle.title")">
+    <p class="text-muted small">@Localization.T("page.save.masterBundle.description")</p>
+    <div class="d-flex flex-wrap gap-2 mb-2">
+        <button type="button" class="btn btn-outline-primary" @onclick="ExportMasterBundle">@Localization.T("page.save.masterBundle.exportBtn")</button>
+        <label class="btn btn-outline-secondary mb-0">
+            @Localization.T("page.save.masterBundle.importBtn")
+            <InputFile OnChange="StageMasterBundleImport" accept=".zip" class="d-none" />
         </label>
     </div>
 </RiderSection>
@@ -123,14 +134,14 @@
     private async Task ExportShowCsv()
     {
         var csv = Export.ExportShowCsv(_show);
-        var fname = $"show-{Sanitize(_show.Name)}.csv";
+        var fname = $"show-{Export.SanitizeFilename(_show.Name)}.csv";
         await Download(csv, fname);
     }
 
     private async Task ExportBandCsv(Band band)
     {
         var csv = Export.ExportBandCsv(band);
-        var fname = $"band-{Sanitize(band.Name)}.csv";
+        var fname = $"band-{Export.SanitizeFilename(band.Name)}.csv";
         await Download(csv, fname);
     }
 
@@ -199,11 +210,21 @@
 
     private async Task ExportBundle()
     {
-        var bytes = Bundle.ExportBundle(BandService.Snapshot());
+        var activeShow = BandService.FindShow(BandService.ActiveShowId) ?? new ShowData();
+        var bytes = Bundle.ExportBundle(activeShow);
         var stamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
-        var fname = $"festivalrider-{Sanitize(_show.Name)}-{stamp}.zip";
+        var fname = $"festivalrider-{Export.SanitizeFilename(_show.Name)}-{stamp}.zip";
         await JS.InvokeVoidAsync("festivalRiderCsv.downloadBytes", fname, "application/zip", bytes);
         Toasts.Show(Localization.T("toast.settings.bundleExported", bytes.Length / 1024), ToastLevel.Success);
+    }
+
+    private async Task ExportMasterBundle()
+    {
+        var bytes = Bundle.ExportMasterBundle(BandService.Snapshot());
+        var stamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+        var fname = $"festivalrider-master-{stamp}.zip";
+        await JS.InvokeVoidAsync("festivalRiderCsv.downloadBytes", fname, "application/zip", bytes);
+        Toasts.Show(Localization.T("toast.shows.masterBundleExported", bytes.Length / 1024), ToastLevel.Success);
     }
 
     private async Task StageBundleImport(InputFileChangeEventArgs e)
@@ -218,7 +239,54 @@
             await s.CopyToAsync(ms);
             ms.Position = 0;
             var current = mode == BundleImportMode.Merge ? BandService.Snapshot() : null;
-            result = Bundle.ImportBundle(ms, mode, current);
+            result = Bundle.ImportBundle(ms, BandService.ActiveShowId, mode, current);
+        }
+        catch (IOException)
+        {
+            Toasts.Show(Localization.T("toast.settings.bundleSizeExceeded", maxSize / (1024 * 1024)), ToastLevel.Error);
+            return;
+        }
+        catch (Exception ex)
+        {
+            Toasts.Show(Localization.T("toast.settings.bundleReadFailed", ex.Message), ToastLevel.Error);
+            return;
+        }
+
+        if (result.Error is not null || result.State is null)
+        {
+            Toasts.Show(Localization.T("toast.settings.bundleRejected", result.Error), ToastLevel.Error);
+            return;
+        }
+
+        _pendingBundle = result;
+        _pendingBundleMode = mode;
+        if (mode == BundleImportMode.Merge)
+        {
+            _bundleConfirmTitle = Localization.T("confirm.bundleMerge.title");
+            _bundleConfirmLabel = Localization.T("confirm.bundleMerge.label");
+            _bundleConfirmMessage = Localization.T("confirm.bundleMerge.message", result.BandCount, result.RunningOrderCount);
+        }
+        else
+        {
+            _bundleConfirmTitle = Localization.T("confirm.bundleReplace.title");
+            _bundleConfirmLabel = Localization.T("confirm.bundleReplace.label");
+            _bundleConfirmMessage = Localization.T("confirm.bundleReplace.message", result.BandCount, result.RunningOrderCount);
+        }
+    }
+
+    private async Task StageMasterBundleImport(InputFileChangeEventArgs e)
+    {
+        const long maxSize = 50L * 1024 * 1024;
+        var mode = _bundleImportMode;
+        BundleImportResult result;
+        try
+        {
+            await using var s = e.File.OpenReadStream(maxSize);
+            using var ms = new MemoryStream();
+            await s.CopyToAsync(ms);
+            ms.Position = 0;
+            var current = mode == BundleImportMode.Merge ? BandService.Snapshot() : null;
+            result = Bundle.ImportMasterBundle(ms, mode, current);
         }
         catch (IOException)
         {
@@ -280,12 +348,6 @@
             var head = string.Join(" ", result.Warnings.Take(2));
             Toasts.Show($"{summary} {head}", ToastLevel.Warning);
         }
-    }
-
-    private static string Sanitize(string s)
-    {
-        var safe = new string((s ?? "untitled").Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());
-        return string.IsNullOrWhiteSpace(safe) ? "untitled" : safe.Trim('-');
     }
 
     public void Dispose()

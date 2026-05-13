@@ -35,7 +35,7 @@ else
             }
 
             <div class="d-flex flex-wrap gap-2 align-items-end">
-                @if (stagesUsed.Count > 0)
+                @if (_show.Stages.Count > 0 && stagesUsed.Count > 0)
                 {
                     <div class="input-group input-group-sm" style="max-width: 280px;">
                         <span class="input-group-text">@Localization.T("page.runningOrder.stage")</span>
@@ -174,7 +174,7 @@ else
         }
         var csv = Exporter.ExportRunningOrderByStageCsv(ro, sid);
         var stageName = BandService.FindStage(sid)?.Name ?? $"stage-{sid}";
-        await Download(csv, $"running-order-day{ro.ShowDayNumber}-{Sanitize(stageName)}.csv");
+        await Download(csv, $"running-order-day{ro.ShowDayNumber}-{Exporter.SanitizeFilename(stageName)}.csv");
     }
 
     private async Task ExportByBand(RoModel ro)
@@ -186,7 +186,7 @@ else
         }
         var csv = Exporter.ExportRunningOrderByBandCsv(ro, bid);
         var bandName = BandService.FindBand(bid)?.Name ?? "band";
-        await Download(csv, $"running-order-day{ro.ShowDayNumber}-{Sanitize(bandName)}.csv");
+        await Download(csv, $"running-order-day{ro.ShowDayNumber}-{Exporter.SanitizeFilename(bandName)}.csv");
     }
 
     private void PrintStage(RoModel ro)
@@ -210,12 +210,6 @@ else
     private async Task Download(string text, string filename)
     {
         await JS.InvokeVoidAsync("festivalRiderCsv.downloadText", filename, "text/csv;charset=utf-8", text);
-    }
-
-    private static string Sanitize(string s)
-    {
-        var safe = new string((s ?? "untitled").Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());
-        return string.IsNullOrWhiteSpace(safe) ? "untitled" : safe.Trim('-');
     }
 
     public void Dispose()

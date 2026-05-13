@@ -9,6 +9,7 @@ public static class LocalizationKeys
         public const string RunningOrder = "nav.runningOrder";
         public const string RunningOrderV2 = "nav.runningOrderV2";
         public const string Settings = "nav.settings";
+        public const string Shows = "nav.shows";
         public const string Export = "nav.export";
         public const string Save = "nav.save";
         public static class Show
@@ -95,6 +96,12 @@ public static class LocalizationKeys
                 public const string Bands = "page.save.status.bands";
                 public const string RunningOrders = "page.save.status.runningOrders";
             }
+            public static class MasterBundle
+            {
+                public const string Description = "page.save.masterBundle.description";
+                public const string ExportBtn = "page.save.masterBundle.exportBtn";
+                public const string ImportBtn = "page.save.masterBundle.importBtn";
+            }
         }
 
         public static class DangerZone
@@ -140,6 +147,13 @@ public static class LocalizationKeys
                 public const string WithDate = "page.runningOrder.dayTitle";
                 public const string NoDate = "page.runningOrder.dayTitle.noDate";
             }
+        }
+
+        public static class Shows
+        {
+            public const string Title = "page.shows.title";
+            public const string Heading = "page.shows.heading";
+            public const string ExportShow = "page.shows.exportShow";
         }
 
         public static class Settings
@@ -253,6 +267,7 @@ public static class LocalizationKeys
         public const string ShowCsvTitle = "section.showCsv.title";
         public const string BandsCsvTitle = "section.bandsCsv.title";
         public const string BundleTitle = "section.bundle.title";
+        public const string MasterBundleTitle = "section.masterBundle.title";
         public const string StorageTitle = "section.storage.title";
         public const string StatusTitle = "section.status.title";
         public const string DangerZoneTitle = "section.dangerZone.title";
@@ -392,6 +407,11 @@ public static class LocalizationKeys
             public const string PickStage = "toast.runningOrder.pickStage";
             public const string PickBand = "toast.runningOrder.pickBand";
             public const string Deleted = "toast.runningOrder.deleted";
+        }
+        public static class Shows
+        {
+            public const string BundleExported = "toast.shows.bundleExported";
+            public const string MasterBundleExported = "toast.shows.masterBundleExported";
         }
         public static class Settings
         {

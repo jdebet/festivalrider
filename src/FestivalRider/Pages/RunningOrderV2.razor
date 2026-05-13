@@ -12,10 +12,6 @@
     <button class="btn btn-primary btn-sm" @onclick="AddRunningOrder">@Localization.T("page.runningOrder.addBtn")</button>
 </div>
 
-@if (_show.Stages.Count == 0)
-{
-    <div class="alert alert-warning py-2 small">@Localization.T("page.runningOrder.noStages")</div>
-}
 @if (BandService.Bands.Count == 0)
 {
     <div class="alert alert-warning py-2 small">@Localization.T("page.runningOrder.noBands")</div>
@@ -58,7 +54,10 @@ else
                         <thead>
                             <tr>
                                 <th style="width: 32px"></th>
-                                <th style="width: 18%">@Localization.T("page.runningOrder.col.stage")</th>
+                                @if (_show.Stages.Count > 0)
+                                {
+                                    <th style="width: 18%">@Localization.T("page.runningOrder.col.stage")</th>
+                                }
                                 <th style="width: 12%">@Localization.T("page.runningOrder.col.start")</th>
                                 <th style="width: 22%">@Localization.T("page.runningOrder.col.band")</th>
                                 <th style="width: 10%">@Localization.T("page.runningOrder.col.setMin")</th>
@@ -91,7 +90,7 @@ else
 
             <div class="d-flex flex-wrap gap-2 align-items-end py-2">
                 <button class="btn btn-sm btn-outline-primary" @onclick="() => AddSlot(ro)"
-                        disabled="@(BandService.Bands.Count == 0 || _show.Stages.Count == 0)">@Localization.T("page.runningOrder.addSlotBtn")</button>
+                        disabled="@(BandService.Bands.Count == 0)">@Localization.T("page.runningOrder.addSlotBtn")</button>
             </div>
         </RiderSection>
     }
@@ -167,7 +166,7 @@ else
 
     private void AddSlot(RoModel ro)
     {
-        var stageId = _show.Stages.FirstOrDefault()?.Id ?? 0;
+        var stageId = _show.Stages.Count > 0 ? (_show.Stages.FirstOrDefault()?.Id ?? 0) : 0;
         var bandId = BandService.Bands.FirstOrDefault()?.Id ?? Guid.Empty;
         ro.Slots.Add(new RunningOrderSlot(bandId, stageId, new TimeOnly(12, 0), 45, 15, null));
         BandService.UpdateRunningOrder(ro);

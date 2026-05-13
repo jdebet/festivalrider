@@ -50,9 +50,9 @@ public class RolePrintStrategy : IPrintStrategy
             }
             foreach (var s in slots)
             {
-                var band = _bands.FindBand(s.BandId);
+                var band = _bands.FindBand(order.ShowId, s.BandId);
                 if (band is null) continue;
-                BuildBandBlock(builder, ref seq, band, s, role);
+                BuildBandBlock(builder, ref seq, band, s, role, order.ShowId);
             }
         };
     }
@@ -92,9 +92,9 @@ public class RolePrintStrategy : IPrintStrategy
         b.CloseElement();
     }
 
-    private void BuildBandBlock(RenderTreeBuilder b, ref int seq, Band band, RunningOrderSlot slot, ContactRole role)
+    private void BuildBandBlock(RenderTreeBuilder b, ref int seq, Band band, RunningOrderSlot slot, ContactRole role, Guid showId)
     {
-        var stage = _bands.FindStage(slot.StageId);
+        var stage = _bands.FindStage(showId, slot.StageId);
         var stageLabel = stage?.Name ?? _loc.T("page.runningOrder.unknownStage", slot.StageId);
         var contacts = band.Contacts.Where(c => c.Role == role).ToList();
 
@@ -103,7 +103,10 @@ public class RolePrintStrategy : IPrintStrategy
 
         b.OpenElement(seq++, "h2");
         b.AddAttribute(seq++, "class", "h5");
-        b.AddContent(seq++, $"{band.Name} — {slot.StartTime:HH\\:mm} @ {stageLabel}");
+        var title = $"{band.Name} — {slot.StartTime:HH\\:mm}";
+        if (!string.IsNullOrEmpty(stageLabel))
+            title += $" @ {stageLabel}";
+        b.AddContent(seq++, title);
         b.CloseElement();
 
         // Contact(s) for the role

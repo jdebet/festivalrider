@@ -85,6 +85,22 @@ public static class TestDataFactory
         };
         show.Stages.Add(new Stage { Id = 1, Name = "Main" });
         show.Stages.Add(new Stage { Id = 2, Name = "Acoustic" });
+        show.Bands = new List<Band>();
+        show.RunningOrders = new List<RunningOrder>();
+        return show;
+    }
+
+    public static ShowData ShowWithNoStages()
+    {
+        var show = new ShowData
+        {
+            Name = "No Stages Show",
+            Address = "Nowhere",
+            DateOfOpening = new DateOnly(2024, 6, 15),
+            ShowDayCount = 1,
+        };
+        show.Bands = new List<Band>();
+        show.RunningOrders = new List<RunningOrder>();
         return show;
     }
 
@@ -163,7 +179,7 @@ public static class TestDataFactory
 
     public static RunningOrder FullRunningOrder(ShowData show, Band band)
     {
-        return new RunningOrder
+        var ro = new RunningOrder
         {
             Id = Guid.NewGuid(),
             ShowId = show.Id,
@@ -174,5 +190,7 @@ public static class TestDataFactory
                 new(band.Id, show.Stages[1].Id, new TimeOnly(14, 0), 30, 10, "Warmup"),
             }
         };
+        show.RunningOrders.Add(ro);
+        return ro;
     }
 }

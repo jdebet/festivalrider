@@ -12,7 +12,7 @@ public class StorageService : IStorageService, IAsyncDisposable
     private const string StateKey = "festivalrider.state";
     private const string LockKey = "festivalrider.tab-lock";
     private const string BackupKeyPrefix = "festivalrider.backup.v";
-    private const int CurrentSchemaVersion = 4;
+    private const int CurrentSchemaVersion = 5;
     private const int DebounceMs = 1000;
     private const int HeartbeatMs = 2000;
 
@@ -183,7 +183,8 @@ public class StorageService : IStorageService, IAsyncDisposable
                 return;
             }
             _bands.ReplaceState(state);
-            _toasts.Show(_loc.T("toast.storage.restored", state.Bands.Count), ToastLevel.Info);
+            var totalBands = state.Shows.Sum(s => s.Bands.Count);
+            _toasts.Show(_loc.T("toast.storage.restored", totalBands), ToastLevel.Info);
         }
         catch (Exception ex)
         {

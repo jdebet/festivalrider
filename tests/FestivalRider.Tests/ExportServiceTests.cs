@@ -133,4 +133,51 @@ public sealed class ExportServiceTests
         var csv = svc.ExportRunningOrderByBandCsv(ro, band.Id);
         Assert.Contains("Test Band", csv);
     }
+
+    [Fact]
+    public void RunningOrderCsv_NoStage_RoundTrip()
+    {
+        var bands = new BandService(NullLogger<BandService>.Instance);
+        var svc = Create(bands);
+        var show = TestDataFactory.ShowWithNoStages();
+        bands.ReplaceState(new AppState { Shows = new List<ShowData> { show }, ActiveShowId = show.Id });
+        var band = TestDataFactory.FullBand();
+        bands.AddBand(band);
+        var ro = new RunningOrder
+        {
+            Id = Guid.NewGuid(),
+            ShowId = show.Id,
+            ShowDayNumber = 1,
+            Slots = { new(band.Id, 0, new TimeOnly(18, 0), 60, 15, "Headliner") },
+        };
+        show.RunningOrders.Add(ro);
+
+        var csv = svc.ExportRunningOrderCsv(ro);
+        Assert.DoesNotContain("Stage", csv);
+
+        var imported = svc.ImportRunningOrderCsv(csv, show, bands.Bands);
+        Assert.Single(imported.Slots);
+        Assert.Equal(0, imported.Slots[0].StageId);
+        Assert.Equal("Headliner", imported.Slots[0].Notes);
+    }
+
+    [Fact]
+    public void RunningOrderCsv_WithStage_MissingStageColumn_Fails()
+    {
+        var bands = new BandService(NullLogger<BandService>.Instance);
+        var svc = Create(bands);
+        var show = TestDataFactory.FullShow();
+        bands.ReplaceState(new AppState { Shows = new List<ShowData> { show }, ActiveShowId = show.Id });
+        var band = TestDataFactory.FullBand();
+        bands.AddBand(band);
+
+        // CSV missing the Stage column — should fail for a show that has stages.
+        var badCsv =
+            "ShowId,StartTime,BandName,SetLengthMinutes,ChangeoverMinutes,Notes\n" +
+            $"{show.Id},18:00,{band.Name},60,15,Headliner\n";
+
+        var ex = Assert.Throws<CsvHelper.HeaderValidationException>(() =>
+            svc.ImportRunningOrderCsv(badCsv, show, bands.Bands));
+        Assert.Contains("Stage", ex.Message, StringComparison.Ordinal);
+    }
 }

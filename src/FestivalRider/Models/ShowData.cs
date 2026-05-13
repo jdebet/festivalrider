@@ -16,4 +16,6 @@ public class ShowData
     public int ShowDayCount { get; set; } = 1;
 
     public List<Stage> Stages { get; set; } = new();
+    public List<Band> Bands { get; set; } = new();
+    public List<RunningOrder> RunningOrders { get; set; } = new();
 }

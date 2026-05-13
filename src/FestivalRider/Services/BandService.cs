@@ -15,76 +15,94 @@ public class BandService : IBandService
         _logger = logger;
     }
 
-    public IReadOnlyList<Band> Bands => _state.Bands;
-    public IReadOnlyList<RunningOrder> RunningOrders => _state.RunningOrders;
+    public IReadOnlyList<Band> Bands => ActiveShow?.Bands ?? new List<Band>();
+    public IReadOnlyList<RunningOrder> RunningOrders => ActiveShow?.RunningOrders ?? new List<RunningOrder>();
     public IReadOnlyList<ShowData> Shows => _state.Shows;
     public Guid ActiveShowId => _state.ActiveShowId;
+
+    private ShowData? ActiveShow => FindShow(_state.ActiveShowId);
 
     public event Action? OnChange;
 
     public void AddBand(Band band)
     {
         if (band is null) throw new ArgumentNullException(nameof(band));
-        if (_state.Bands.Any(b => b.Id == band.Id))
+        var show = ActiveShow ?? throw new InvalidOperationException("No active show.");
+        if (show.Bands.Any(b => b.Id == band.Id))
             throw new InvalidOperationException($"Band with id {band.Id} already exists.");
         var now = DateTimeOffset.UtcNow;
         band.CreatedAt = now;
         band.UpdatedAt = now;
-        _state.Bands.Add(band);
-        _logger.LogInformation("Added band {Id} {Name}", band.Id, band.Name);
+        show.Bands.Add(band);
+        _logger.LogInformation("Added band {Id} {Name} to show {ShowId}", band.Id, band.Name, show.Id);
         Raise();
     }
 
     public void UpdateBand(Band band)
     {
         if (band is null) throw new ArgumentNullException(nameof(band));
-        var index = _state.Bands.FindIndex(b => b.Id == band.Id);
-        if (index < 0) throw new InvalidOperationException($"Band {band.Id} not found.");
+        var show = ActiveShow ?? throw new InvalidOperationException("No active show.");
+        var index = show.Bands.FindIndex(b => b.Id == band.Id);
+        if (index < 0) throw new InvalidOperationException($"Band {band.Id} not found in active show.");
         band.UpdatedAt = DateTimeOffset.UtcNow;
-        _state.Bands[index] = band;
+        show.Bands[index] = band;
         Raise();
     }
 
     public void DeleteBand(Guid id)
     {
-        var removed = _state.Bands.RemoveAll(b => b.Id == id);
+        var show = ActiveShow;
+        if (show is null) return;
+        var removed = show.Bands.RemoveAll(b => b.Id == id);
         if (removed == 0) return;
         // Drop slots referencing the deleted band so running orders stay consistent.
-        foreach (var ro in _state.RunningOrders)
+        foreach (var ro in show.RunningOrders)
             ro.Slots.RemoveAll(s => s.BandId == id);
         Raise();
     }
 
-    public Band? FindBand(Guid id) => _state.Bands.FirstOrDefault(b => b.Id == id);
+    public Band? FindBand(Guid id) =>
+        _state.Shows.SelectMany(s => s.Bands).FirstOrDefault(b => b.Id == id);
+
+    public Band? FindBand(Guid showId, Guid id) =>
+        FindShow(showId)?.Bands.FirstOrDefault(b => b.Id == id);
 
     public void AddRunningOrder(RunningOrder order)
     {
         if (order is null) throw new ArgumentNullException(nameof(order));
-        if (_state.RunningOrders.Any(o => o.Id == order.Id))
+        var show = ActiveShow ?? throw new InvalidOperationException("No active show.");
+        if (show.RunningOrders.Any(o => o.Id == order.Id))
             throw new InvalidOperationException($"RunningOrder {order.Id} already exists.");
         if (order.ShowId == Guid.Empty) order.ShowId = _state.ActiveShowId;
-        _state.RunningOrders.Add(order);
+        show.RunningOrders.Add(order);
         Raise();
     }
 
     public void UpdateRunningOrder(RunningOrder order)
     {
         if (order is null) throw new ArgumentNullException(nameof(order));
-        var index = _state.RunningOrders.FindIndex(o => o.Id == order.Id);
-        if (index < 0) throw new InvalidOperationException($"RunningOrder {order.Id} not found.");
-        _state.RunningOrders[index] = order;
+        var show = ActiveShow ?? throw new InvalidOperationException("No active show.");
+        var index = show.RunningOrders.FindIndex(o => o.Id == order.Id);
+        if (index < 0) throw new InvalidOperationException($"RunningOrder {order.Id} not found in active show.");
+        show.RunningOrders[index] = order;
         Raise();
     }
 
     public void DeleteRunningOrder(Guid id)
     {
-        if (_state.RunningOrders.RemoveAll(o => o.Id == id) > 0) Raise();
+        var show = ActiveShow;
+        if (show is null) return;
+        if (show.RunningOrders.RemoveAll(o => o.Id == id) > 0) Raise();
     }
 
-    public RunningOrder? FindRunningOrder(Guid id) => _state.RunningOrders.FirstOrDefault(o => o.Id == id);
+    public RunningOrder? FindRunningOrder(Guid id) =>
+        _state.Shows.SelectMany(s => s.RunningOrders).FirstOrDefault(o => o.Id == id);
+
+    public RunningOrder? FindRunningOrder(Guid showId, Guid id) =>
+        FindShow(showId)?.RunningOrders.FirstOrDefault(o => o.Id == id);
 
     public IEnumerable<RunningOrder> RunningOrdersForActiveShow =>
-        _state.RunningOrders.Where(o => o.ShowId == _state.ActiveShowId);
+        ActiveShow?.RunningOrders ?? Enumerable.Empty<RunningOrder>();
 
     // ---- Stage CRUD (per-show; default targets the active show) ----
 
@@ -122,8 +140,14 @@ public class BandService : IBandService
 
     public Stage? FindStage(int id) => FindStage(_state.ActiveShowId, id);
 
-    public Stage? FindStage(Guid showId, int id) =>
-        FindShow(showId)?.Stages.FirstOrDefault(s => s.Id == id);
+    public Stage? FindStage(Guid showId, int id)
+    {
+        var show = FindShow(showId);
+        if (show is null) return null;
+        if (show.Stages.Count == 0 && id == 0)
+            return new Stage { Id = 0, Name = string.Empty };
+        return show.Stages.FirstOrDefault(s => s.Id == id);
+    }
 
     public ShowData? FindShow(Guid id) => _state.Shows.FirstOrDefault(s => s.Id == id);
 
@@ -131,7 +155,12 @@ public class BandService : IBandService
 
     public Guid AddShow(string name)
     {
-        var show = new ShowData { Name = string.IsNullOrWhiteSpace(name) ? "Untitled show" : name };
+        var show = new ShowData
+        {
+            Name = string.IsNullOrWhiteSpace(name) ? "Untitled show" : name,
+            Bands = new(),
+            RunningOrders = new(),
+        };
         _state.Shows.Add(show);
         _logger.LogInformation("Added show {Id} {Name}", show.Id, show.Name);
         Raise();
@@ -143,7 +172,13 @@ public class BandService : IBandService
         if (show is null) throw new ArgumentNullException(nameof(show));
         var index = _state.Shows.FindIndex(s => s.Id == show.Id);
         if (index < 0) throw new InvalidOperationException($"Show {show.Id} not found.");
-        _state.Shows[index] = show;
+        var existing = _state.Shows[index];
+        existing.Name = show.Name;
+        existing.Address = show.Address;
+        existing.DateOfOpening = show.DateOfOpening;
+        existing.ShowDayCount = show.ShowDayCount;
+        existing.Stages = show.Stages;
+        // Preserve existing Bands and RunningOrders lists.
         Raise();
         return Task.CompletedTask;
     }
@@ -157,7 +192,7 @@ public class BandService : IBandService
         if (_state.Shows.Count == 0)
         {
             // Empty list is invalid — seed a fresh "Untitled show".
-            var seed = new ShowData { Name = "Untitled show" };
+            var seed = new ShowData { Name = "Untitled show", Bands = new(), RunningOrders = new() };
             _state.Shows.Add(seed);
             _state.ActiveShowId = seed.Id;
         }
@@ -198,10 +233,15 @@ public class BandService : IBandService
     {
         if (state.Shows.Count == 0)
         {
-            var seed = new ShowData { Name = "Untitled show" };
+            var seed = new ShowData { Name = "Untitled show", Bands = new(), RunningOrders = new() };
             state.Shows.Add(seed);
             state.ActiveShowId = seed.Id;
             return;
+        }
+        foreach (var show in state.Shows)
+        {
+            show.Bands ??= new List<Band>();
+            show.RunningOrders ??= new List<RunningOrder>();
         }
         if (state.Shows.All(s => s.Id != state.ActiveShowId))
             state.ActiveShowId = state.Shows[0].Id;

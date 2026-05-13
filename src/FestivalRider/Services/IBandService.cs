@@ -15,11 +15,13 @@ public interface IBandService
     void UpdateBand(Band band);
     void DeleteBand(Guid id);
     Band? FindBand(Guid id);
+    Band? FindBand(Guid showId, Guid id);
 
     void AddRunningOrder(RunningOrder order);
     void UpdateRunningOrder(RunningOrder order);
     void DeleteRunningOrder(Guid id);
     RunningOrder? FindRunningOrder(Guid id);
+    RunningOrder? FindRunningOrder(Guid showId, Guid id);
     IEnumerable<RunningOrder> RunningOrdersForActiveShow { get; }
 
     int AddStage(string name);

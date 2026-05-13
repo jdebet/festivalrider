@@ -94,6 +94,12 @@ public class ExportService : IExportService
         DateOnly.TryParseExact(s, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var v)
             ? v : fallback;
 
+    public string SanitizeFilename(string name)
+    {
+        var safe = new string((name ?? "untitled").Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());
+        return string.IsNullOrWhiteSpace(safe) ? "untitled" : safe.Trim('-');
+    }
+
     private sealed class RowIndex
     {
         public Dictionary<string, List<Row>> BySection { get; } = new();
@@ -550,10 +556,26 @@ public class ExportService : IExportService
     private string ResolveStageName(Guid showId, int stageId) =>
         _bands.FindStage(showId, stageId)?.Name ?? "Unknown stage";
 
-    private string ResolveBandName(Guid bandId) =>
+    public string ResolveBandName(Guid bandId) =>
         _bands.FindBand(bandId)?.Name ?? "Unknown band";
 
-    private string WriteSlotRows(RunningOrder order, IEnumerable<RunningOrderSlot> slots)
+    public string ResolveBandName(Guid showId, Guid bandId) =>
+        _bands.FindBand(showId, bandId)?.Name ?? "Unknown band";
+
+    private sealed class NoStageSlotRowMap : ClassMap<SlotRow>
+    {
+        public NoStageSlotRowMap()
+        {
+            Map(m => m.ShowId);
+            Map(m => m.StartTime);
+            Map(m => m.BandName);
+            Map(m => m.SetLengthMinutes);
+            Map(m => m.ChangeoverMinutes);
+            Map(m => m.Notes);
+        }
+    }
+
+    private string WriteSlotRows(RunningOrder order, ShowData show, IEnumerable<RunningOrderSlot> slots)
     {
         // Stable ordering: by start time then stage name so diffs stay readable.
         var ordered = slots
@@ -563,6 +585,8 @@ public class ExportService : IExportService
         using var sw = new StringWriter { NewLine = "\n" };
         using (var csv = new CsvWriter(sw, SlotConfig))
         {
+            if (show.Stages.Count == 0)
+                csv.Context.RegisterClassMap<NoStageSlotRowMap>();
             csv.WriteHeader<SlotRow>();
             csv.NextRecord();
             foreach (var s in ordered)
@@ -584,18 +608,29 @@ public class ExportService : IExportService
     }
 
     public string ExportRunningOrderCsv(RunningOrder order)
-        => WriteSlotRows(order, order.Slots);
+    {
+        var show = _bands.FindShow(order.ShowId) ?? new ShowData();
+        return WriteSlotRows(order, show, order.Slots);
+    }
 
     public string ExportRunningOrderByStageCsv(RunningOrder order, int stageId)
-        => WriteSlotRows(order, order.Slots.Where(s => s.StageId == stageId));
+    {
+        var show = _bands.FindShow(order.ShowId) ?? new ShowData();
+        return WriteSlotRows(order, show, order.Slots.Where(s => s.StageId == stageId));
+    }
 
     public string ExportRunningOrderByBandCsv(RunningOrder order, Guid bandId)
-        => WriteSlotRows(order, order.Slots.Where(s => s.BandId == bandId));
+    {
+        var show = _bands.FindShow(order.ShowId) ?? new ShowData();
+        return WriteSlotRows(order, show, order.Slots.Where(s => s.BandId == bandId));
+    }
 
     public RunningOrder ImportRunningOrderCsv(string csv, ShowData show, IReadOnlyList<Band> bands)
     {
         using var sr = new StringReader(csv);
         using var rd = new CsvReader(sr, SlotConfig);
+        if (show.Stages.Count == 0)
+            rd.Context.RegisterClassMap<NoStageSlotRowMap>();
         var rows = rd.GetRecords<SlotRow>().ToList();
 
         var stageByName = show.Stages
@@ -612,7 +647,7 @@ public class ExportService : IExportService
             // show passed in by the caller so legacy rows with empty ShowId still import.
             if (Guid.TryParse(r.ShowId, out var rowShowId) && rowShowId != Guid.Empty)
                 order.ShowId = rowShowId;
-            var stageId = stageByName.TryGetValue(r.Stage, out var sid) ? sid : 0;
+            var stageId = show.Stages.Count == 0 ? 0 : (stageByName.TryGetValue(r.Stage, out var sid) ? sid : 0);
             var bandId = bandByName.TryGetValue(r.BandName, out var bid) ? bid : Guid.Empty;
             var startTime = TimeOnly.TryParseExact(r.StartTime, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var t)
                 ? t : default;

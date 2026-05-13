@@ -40,8 +40,8 @@ public class StagePrintStrategy : IPrintStrategy
         {
             var seq = 0;
             BuildHeader(builder, ref seq, stage, order, show);
-            BuildScheduleTable(builder, ref seq, slots);
-            BuildTechSummary(builder, ref seq, slots);
+            BuildScheduleTable(builder, ref seq, order.ShowId, slots);
+            BuildTechSummary(builder, ref seq, order.ShowId, slots);
         };
     }
 
@@ -64,10 +64,13 @@ public class StagePrintStrategy : IPrintStrategy
     {
         b.OpenElement(seq++, "header");
         b.AddAttribute(seq++, "class", "print-section mb-3");
-        b.OpenElement(seq++, "h1");
-        b.AddAttribute(seq++, "class", "h3");
-        b.AddContent(seq++, stage.Name);
-        b.CloseElement();
+        if (!string.IsNullOrEmpty(stage.Name))
+        {
+            b.OpenElement(seq++, "h1");
+            b.AddAttribute(seq++, "class", "h3");
+            b.AddContent(seq++, stage.Name);
+            b.CloseElement();
+        }
         b.OpenElement(seq++, "div");
         b.AddAttribute(seq++, "class", "text-muted");
         if (!string.IsNullOrWhiteSpace(show.Name))
@@ -85,7 +88,7 @@ public class StagePrintStrategy : IPrintStrategy
         b.CloseElement();
     }
 
-    private void BuildScheduleTable(RenderTreeBuilder b, ref int seq, IReadOnlyList<RunningOrderSlot> slots)
+    private void BuildScheduleTable(RenderTreeBuilder b, ref int seq, Guid showId, IReadOnlyList<RunningOrderSlot> slots)
     {
         b.OpenElement(seq++, "section");
         b.AddAttribute(seq++, "class", "print-section mb-3");
@@ -118,7 +121,7 @@ public class StagePrintStrategy : IPrintStrategy
         b.OpenElement(seq++, "tbody");
         foreach (var s in slots)
         {
-            var band = _bands.FindBand(s.BandId);
+            var band = _bands.FindBand(showId, s.BandId);
             b.OpenElement(seq++, "tr");
             foreach (var v in new[]
             {
@@ -140,7 +143,7 @@ public class StagePrintStrategy : IPrintStrategy
         b.CloseElement();
     }
 
-    private void BuildTechSummary(RenderTreeBuilder b, ref int seq, IReadOnlyList<RunningOrderSlot> slots)
+    private void BuildTechSummary(RenderTreeBuilder b, ref int seq, Guid showId, IReadOnlyList<RunningOrderSlot> slots)
     {
         if (slots.Count == 0) return;
         b.OpenElement(seq++, "section");
@@ -165,7 +168,7 @@ public class StagePrintStrategy : IPrintStrategy
         b.OpenElement(seq++, "tbody");
         foreach (var s in slots)
         {
-            var band = _bands.FindBand(s.BandId);
+            var band = _bands.FindBand(showId, s.BandId);
             var t = band?.Rider.Tech;
             b.OpenElement(seq++, "tr");
             foreach (var v in new[]

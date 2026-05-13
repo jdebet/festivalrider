@@ -2,15 +2,13 @@ namespace FestivalRider.Models;
 
 public class AppState
 {
-    public int SchemaVersion { get; set; } = 4;
+    public int SchemaVersion { get; set; } = 5;
     public List<ShowData> Shows { get; set; } = new();
     public Guid ActiveShowId { get; set; }
-    public List<Band> Bands { get; set; } = new();
-    public List<RunningOrder> RunningOrders { get; set; } = new();
 
     public AppState()
     {
-        var seed = new ShowData { Name = "Untitled show" };
+        var seed = new ShowData { Name = "Untitled show", Bands = new(), RunningOrders = new() };
         Shows.Add(seed);
         ActiveShowId = seed.Id;
     }

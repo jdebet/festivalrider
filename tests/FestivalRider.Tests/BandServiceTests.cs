@@ -159,7 +159,7 @@ public sealed class BandServiceTests
         svc.AddStage("Main");
 
         var replacement = new AppState();
-        replacement.Bands.Add(new Band { Id = Guid.NewGuid(), Name = "B" });
+        replacement.Shows[0].Bands.Add(new Band { Id = Guid.NewGuid(), Name = "B" });
         replacement.Shows[0].Stages.Add(new Stage { Id = 5, Name = "Big" });
 
         svc.ReplaceState(replacement);
@@ -174,8 +174,8 @@ public sealed class BandServiceTests
     {
         var svc = Create();
         var snap = svc.Snapshot();
-        Assert.Empty(snap.Bands);
+        Assert.Empty(snap.Shows[0].Bands);
         svc.AddBand(new Band { Id = Guid.NewGuid(), Name = "A" });
-        Assert.Single(snap.Bands); // same reference
+        Assert.Single(snap.Shows[0].Bands); // same reference
     }
 }
