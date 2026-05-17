@@ -76,7 +76,7 @@ public sealed class BandServiceTests
         {
             Id = Guid.NewGuid(),
             ShowDayNumber = 1,
-            Slots = new List<RunningOrderSlot> { new(id, 1, TimeOnly.Parse("12:00"), 30, 0, null) }
+            Slots = new List<RunningOrderSlot> { new RunningOrderSlot { BandId = id, StageId = 1, OnStageTime = DateTime.Today.AddHours(12), SetLengthMinutes = 30 } }
         });
 
         var fired = false;

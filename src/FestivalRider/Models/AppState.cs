@@ -2,7 +2,7 @@ namespace FestivalRider.Models;
 
 public class AppState
 {
-    public int SchemaVersion { get; set; } = 5;
+    public int SchemaVersion { get; set; } = 6;
     public List<ShowData> Shows { get; set; } = new();
     public Guid ActiveShowId { get; set; }
 

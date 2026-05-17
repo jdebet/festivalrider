@@ -538,12 +538,28 @@ public class ExportService : IExportService
 
     private sealed class SlotRow
     {
+        public string Id { get; set; } = string.Empty;
         public string ShowId { get; set; } = string.Empty;
-        public string Stage { get; set; } = string.Empty;
-        public string StartTime { get; set; } = string.Empty;
         public string BandName { get; set; } = string.Empty;
+        public string Stage { get; set; } = string.Empty;
+        public string OnStageTime { get; set; } = string.Empty;
+        public string OnStageDayOffset { get; set; } = "0";
+        public string IsOnStagePinned { get; set; } = string.Empty;
         public string SetLengthMinutes { get; set; } = string.Empty;
-        public string ChangeoverMinutes { get; set; } = string.Empty;
+        public string SoundcheckOrderIndex { get; set; } = "0";
+        public string BackstageTime { get; set; } = string.Empty;
+        public string BackstageDayOffset { get; set; } = "0";
+        public string IsBackstageTimePinned { get; set; } = string.Empty;
+        public string BackstageLeadMinutes { get; set; } = string.Empty;
+        public string BackstageCurfewTime { get; set; } = string.Empty;
+        public string BackstageCurfewDayOffset { get; set; } = "0";
+        public string IsBackstageCurfewPinned { get; set; } = string.Empty;
+        public string CateringStart { get; set; } = string.Empty;
+        public string CateringStartDayOffset { get; set; } = "0";
+        public string CateringEnd { get; set; } = string.Empty;
+        public string CateringEndDayOffset { get; set; } = "0";
+        public string Flags { get; set; } = string.Empty;
+        public string OverrideFlags { get; set; } = string.Empty;
         public string Notes { get; set; } = string.Empty;
     }
 
@@ -566,20 +582,87 @@ public class ExportService : IExportService
     {
         public NoStageSlotRowMap()
         {
+            Map(m => m.Id);
             Map(m => m.ShowId);
-            Map(m => m.StartTime);
             Map(m => m.BandName);
+            Map(m => m.OnStageTime);
+            Map(m => m.OnStageDayOffset);
+            Map(m => m.IsOnStagePinned);
             Map(m => m.SetLengthMinutes);
-            Map(m => m.ChangeoverMinutes);
+            Map(m => m.SoundcheckOrderIndex);
+            Map(m => m.BackstageTime);
+            Map(m => m.BackstageDayOffset);
+            Map(m => m.IsBackstageTimePinned);
+            Map(m => m.BackstageLeadMinutes);
+            Map(m => m.BackstageCurfewTime);
+            Map(m => m.BackstageCurfewDayOffset);
+            Map(m => m.IsBackstageCurfewPinned);
+            Map(m => m.CateringStart);
+            Map(m => m.CateringStartDayOffset);
+            Map(m => m.CateringEnd);
+            Map(m => m.CateringEndDayOffset);
+            Map(m => m.Flags);
+            Map(m => m.OverrideFlags);
             Map(m => m.Notes);
         }
     }
 
+    private static DateTime BaseDate(ShowData show, RunningOrder order)
+        => show.DateOfOpening == default
+            ? default
+            : show.DateOfOpening.AddDays(Math.Max(0, order.ShowDayNumber - 1)).ToDateTime(TimeOnly.MinValue);
+
+    private static (string time, string offset) FormatTime(DateTime? value, DateTime baseDate)
+    {
+        if (value is null) return (string.Empty, "0");
+        var v = value.Value;
+        var offset = baseDate == default ? 0 : (v.Date - baseDate.Date).Days;
+        return (v.ToString("HH:mm", CultureInfo.InvariantCulture), offset.ToString(CultureInfo.InvariantCulture));
+    }
+
+    private static DateTime? ParseTime(string time, string offset, DateTime baseDate)
+    {
+        if (string.IsNullOrEmpty(time)) return null;
+        if (!TimeOnly.TryParseExact(time, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var t))
+            return null;
+        var off = ParseInt(offset);
+        var date = baseDate == default ? DateTime.MinValue : baseDate.Date.AddDays(off);
+        return new DateTime(date.Year, date.Month, date.Day, t.Hour, t.Minute, 0, DateTimeKind.Unspecified);
+    }
+
+    private static string FormatFlags<T>(T flags) where T : struct, Enum
+    {
+        if (Convert.ToInt64(flags) == 0) return string.Empty;
+        var parts = new List<string>();
+        foreach (var name in Enum.GetNames<T>())
+        {
+            var value = (T)Enum.Parse(typeof(T), name);
+            if (Convert.ToInt64(value) == 0) continue;
+            if (flags.HasFlag(value)) parts.Add(name);
+        }
+        return string.Join(",", parts);
+    }
+
+    private static T ParseFlags<T>(string s) where T : struct, Enum
+    {
+        if (string.IsNullOrWhiteSpace(s)) return default;
+        long acc = 0;
+        foreach (var part in s.Split(','))
+        {
+            var trimmed = part.Trim();
+            if (trimmed.Length == 0) continue;
+            if (Enum.TryParse<T>(trimmed, ignoreCase: true, out var v))
+                acc |= Convert.ToInt64(v);
+        }
+        return (T)Enum.ToObject(typeof(T), acc);
+    }
+
     private string WriteSlotRows(RunningOrder order, ShowData show, IEnumerable<RunningOrderSlot> slots)
     {
-        // Stable ordering: by start time then stage name so diffs stay readable.
+        var baseDate = BaseDate(show, order);
+        // Stable ordering: by on-stage time then stage name so diffs stay readable.
         var ordered = slots
-            .OrderBy(s => s.StartTime)
+            .OrderBy(s => s.OnStageTime ?? DateTime.MaxValue)
             .ThenBy(s => ResolveStageName(order.ShowId, s.StageId), StringComparer.Ordinal);
 
         using var sw = new StringWriter { NewLine = "\n" };
@@ -591,14 +674,35 @@ public class ExportService : IExportService
             csv.NextRecord();
             foreach (var s in ordered)
             {
+                var (onStage, onStageOffset) = FormatTime(s.OnStageTime, baseDate);
+                var (backstage, backstageOffset) = FormatTime(s.BackstageTime, baseDate);
+                var (curfew, curfewOffset) = FormatTime(s.BackstageCurfewTime, baseDate);
+                var (cateringStart, cateringStartOffset) = FormatTime(s.CateringSlot?.Start, baseDate);
+                var (cateringEnd, cateringEndOffset) = FormatTime(s.CateringSlot?.End, baseDate);
                 csv.WriteRecord(new SlotRow
                 {
+                    Id = s.Id.ToString(),
                     ShowId = order.ShowId.ToString(),
-                    Stage = ResolveStageName(order.ShowId, s.StageId),
-                    StartTime = s.StartTime.ToString("HH:mm", CultureInfo.InvariantCulture),
                     BandName = ResolveBandName(s.BandId),
-                    SetLengthMinutes = Inv(s.SetLengthMinutes),
-                    ChangeoverMinutes = Inv(s.ChangeoverMinutes),
+                    Stage = ResolveStageName(order.ShowId, s.StageId),
+                    OnStageTime = onStage,
+                    OnStageDayOffset = onStageOffset,
+                    IsOnStagePinned = s.IsOnStagePinned ? "true" : "false",
+                    SetLengthMinutes = s.SetLengthMinutes is int sl ? Inv(sl) : string.Empty,
+                    SoundcheckOrderIndex = Inv(s.SoundcheckOrderIndex),
+                    BackstageTime = backstage,
+                    BackstageDayOffset = backstageOffset,
+                    IsBackstageTimePinned = s.IsBackstageTimePinned ? "true" : "false",
+                    BackstageLeadMinutes = s.BackstageLeadMinutes is int bl ? Inv(bl) : string.Empty,
+                    BackstageCurfewTime = curfew,
+                    BackstageCurfewDayOffset = curfewOffset,
+                    IsBackstageCurfewPinned = s.IsBackstageCurfewPinned ? "true" : "false",
+                    CateringStart = cateringStart,
+                    CateringStartDayOffset = cateringStartOffset,
+                    CateringEnd = cateringEnd,
+                    CateringEndDayOffset = cateringEndOffset,
+                    Flags = FormatFlags(s.Flags),
+                    OverrideFlags = FormatFlags(s.OverrideFlags),
                     Notes = s.Notes ?? string.Empty,
                 });
                 csv.NextRecord();
@@ -641,6 +745,7 @@ public class ExportService : IExportService
             .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.Ordinal);
 
         var order = new RunningOrder { ShowId = show.Id };
+        var baseDate = BaseDate(show, order);
         foreach (var r in rows)
         {
             // Prefer the ShowId embedded in the row if present and parseable; falls back to the
@@ -649,15 +754,36 @@ public class ExportService : IExportService
                 order.ShowId = rowShowId;
             var stageId = show.Stages.Count == 0 ? 0 : (stageByName.TryGetValue(r.Stage, out var sid) ? sid : 0);
             var bandId = bandByName.TryGetValue(r.BandName, out var bid) ? bid : Guid.Empty;
-            var startTime = TimeOnly.TryParseExact(r.StartTime, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var t)
-                ? t : default;
-            order.Slots.Add(new RunningOrderSlot(
-                bandId,
-                stageId,
-                startTime,
-                ParseInt(r.SetLengthMinutes),
-                ParseInt(r.ChangeoverMinutes),
-                NullIfEmpty(r.Notes ?? string.Empty)));
+
+            var onStage = ParseTime(r.OnStageTime, r.OnStageDayOffset, baseDate);
+            var backstage = ParseTime(r.BackstageTime, r.BackstageDayOffset, baseDate);
+            var curfew = ParseTime(r.BackstageCurfewTime, r.BackstageCurfewDayOffset, baseDate);
+            var cateringStart = ParseTime(r.CateringStart, r.CateringStartDayOffset, baseDate);
+            var cateringEnd = ParseTime(r.CateringEnd, r.CateringEndDayOffset, baseDate);
+            TimeSlot? cateringSlot = cateringStart is null
+                ? null
+                : new TimeSlot { Start = cateringStart.Value, End = cateringEnd };
+
+            var slot = new RunningOrderSlot
+            {
+                Id = Guid.TryParse(r.Id, out var sidg) && sidg != Guid.Empty ? sidg : Guid.NewGuid(),
+                BandId = bandId,
+                StageId = stageId,
+                OnStageTime = onStage,
+                IsOnStagePinned = ParseBool(r.IsOnStagePinned),
+                SetLengthMinutes = string.IsNullOrEmpty(r.SetLengthMinutes) ? null : ParseInt(r.SetLengthMinutes),
+                SoundcheckOrderIndex = ParseInt(r.SoundcheckOrderIndex),
+                BackstageTime = backstage,
+                IsBackstageTimePinned = ParseBool(r.IsBackstageTimePinned),
+                BackstageLeadMinutes = string.IsNullOrEmpty(r.BackstageLeadMinutes) ? null : ParseInt(r.BackstageLeadMinutes),
+                BackstageCurfewTime = curfew,
+                IsBackstageCurfewPinned = ParseBool(r.IsBackstageCurfewPinned),
+                CateringSlot = cateringSlot,
+                Flags = ParseFlags<BandScheduleFlags>(r.Flags),
+                OverrideFlags = ParseFlags<UserOverrideFlags>(r.OverrideFlags),
+                Notes = NullIfEmpty(r.Notes ?? string.Empty),
+            };
+            order.Slots.Add(slot);
         }
         return order;
     }

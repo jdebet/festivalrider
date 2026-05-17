@@ -186,11 +186,28 @@ public static class TestDataFactory
             ShowDayNumber = 1,
             Slots = new List<RunningOrderSlot>
             {
-                new(band.Id, show.Stages[0].Id, new TimeOnly(18, 0), 60, 15, "Headliner"),
-                new(band.Id, show.Stages[1].Id, new TimeOnly(14, 0), 30, 10, "Warmup"),
+                Slot(band.Id, show.Stages[0].Id, show, 1, new TimeOnly(18, 0), 60, "Headliner"),
+                Slot(band.Id, show.Stages[1].Id, show, 1, new TimeOnly(14, 0), 30, "Warmup"),
             }
         };
         show.RunningOrders.Add(ro);
         return ro;
+    }
+
+    public static RunningOrderSlot Slot(Guid bandId, int stageId, ShowData show, int showDayNumber,
+        TimeOnly onStage, int setLengthMinutes, string? notes = null)
+    {
+        var baseDate = show.DateOfOpening == default
+            ? DateTime.Today
+            : show.DateOfOpening.AddDays(Math.Max(0, showDayNumber - 1)).ToDateTime(TimeOnly.MinValue);
+        return new RunningOrderSlot
+        {
+            BandId = bandId,
+            StageId = stageId,
+            OnStageTime = baseDate.Add(onStage.ToTimeSpan()),
+            IsOnStagePinned = true,
+            SetLengthMinutes = setLengthMinutes,
+            Notes = notes,
+        };
     }
 }

@@ -89,7 +89,7 @@ public sealed class ExportServiceTests
         var ro = TestDataFactory.FullRunningOrder(show, band);
 
         var csv = svc.ExportRunningOrderCsv(ro);
-        Assert.Contains("ShowId,Stage,StartTime,BandName,SetLengthMinutes,ChangeoverMinutes,Notes", csv);
+        Assert.Contains("Id,ShowId,BandName,Stage,OnStageTime,OnStageDayOffset,IsOnStagePinned,SetLengthMinutes,SoundcheckOrderIndex,BackstageTime,BackstageDayOffset,IsBackstageTimePinned,BackstageLeadMinutes,BackstageCurfewTime,BackstageCurfewDayOffset,IsBackstageCurfewPinned,CateringStart,CateringStartDayOffset,CateringEnd,CateringEndDayOffset,Flags,OverrideFlags,Notes", csv);
         Assert.Contains(show.Id.ToString(), csv);
         Assert.Contains("14:00", csv);
         Assert.Contains("18:00", csv);
@@ -148,12 +148,14 @@ public sealed class ExportServiceTests
             Id = Guid.NewGuid(),
             ShowId = show.Id,
             ShowDayNumber = 1,
-            Slots = { new(band.Id, 0, new TimeOnly(18, 0), 60, 15, "Headliner") },
+            Slots = { new RunningOrderSlot { BandId = band.Id, StageId = 0, OnStageTime = new DateTime(2024, 6, 15, 18, 0, 0), SetLengthMinutes = 60, Notes = "Headliner" } },
         };
         show.RunningOrders.Add(ro);
 
         var csv = svc.ExportRunningOrderCsv(ro);
-        Assert.DoesNotContain("Stage", csv);
+        // No standalone Stage column when show has zero stages.
+        Assert.DoesNotContain(",Stage,", csv);
+        Assert.DoesNotContain("BandName,Stage,", csv);
 
         var imported = svc.ImportRunningOrderCsv(csv, show, bands.Bands);
         Assert.Single(imported.Slots);
@@ -173,8 +175,8 @@ public sealed class ExportServiceTests
 
         // CSV missing the Stage column — should fail for a show that has stages.
         var badCsv =
-            "ShowId,StartTime,BandName,SetLengthMinutes,ChangeoverMinutes,Notes\n" +
-            $"{show.Id},18:00,{band.Name},60,15,Headliner\n";
+            "Id,ShowId,BandName,OnStageTime,OnStageDayOffset,IsOnStagePinned,SetLengthMinutes,SoundcheckOrderIndex,BackstageTime,BackstageDayOffset,IsBackstageTimePinned,BackstageLeadMinutes,BackstageCurfewTime,BackstageCurfewDayOffset,IsBackstageCurfewPinned,CateringStart,CateringStartDayOffset,CateringEnd,CateringEndDayOffset,Flags,OverrideFlags,Notes\n" +
+            $"{Guid.NewGuid()},{show.Id},{band.Name},18:00,0,true,60,0,,0,false,,,0,false,,0,,0,,,Headliner\n";
 
         var ex = Assert.Throws<CsvHelper.HeaderValidationException>(() =>
             svc.ImportRunningOrderCsv(badCsv, show, bands.Bands));

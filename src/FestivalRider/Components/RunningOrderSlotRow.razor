@@ -11,7 +11,7 @@
         <td class="fr-py-tight">
             <select class="form-select form-select-sm fr-form-ultra-sm"
                     value="@Slot.StageId"
-                    @onchange="e => OnUpdate.InvokeAsync((Index, Slot with { StageId = ParseInt(e.Value) }))">
+                    @onchange="e => Mutate(s => s.StageId = ParseInt(e.Value))">
                 @if (FindStage(Slot.StageId) is null)
                 {
                     <option value="@Slot.StageId">@UnknownStageLabel</option>
@@ -25,13 +25,13 @@
     }
     <td class="fr-py-tight">
         <input type="time" class="form-control form-control-sm fr-form-ultra-sm"
-               value="@Slot.StartTime.ToString("HH:mm")"
-               @onchange="e => OnUpdate.InvokeAsync((Index, Slot with { StartTime = ParseTime(e.Value, Slot.StartTime) }))" />
+               value="@(Slot.OnStageTime?.ToString("HH:mm") ?? string.Empty)"
+               @onchange="e => Mutate(s => s.OnStageTime = ParseDateTime(e.Value, s.OnStageTime))" />
     </td>
     <td class="fr-py-tight">
         <select class="form-select form-select-sm fr-form-ultra-sm"
                 value="@Slot.BandId"
-                @onchange="e => OnUpdate.InvokeAsync((Index, Slot with { BandId = ParseGuid(e.Value, Slot.BandId) }))">
+                @onchange="e => Mutate(s => s.BandId = ParseGuid(e.Value, s.BandId))">
             @if (FindBand(Slot.BandId) is null)
             {
                 <option value="@Slot.BandId">@UnknownBandLabel</option>
@@ -44,18 +44,13 @@
     </td>
     <td class="fr-py-tight">
         <input type="number" min="0" class="form-control form-control-sm fr-form-ultra-sm"
-               value="@Slot.SetLengthMinutes"
-               @onchange="e => OnUpdate.InvokeAsync((Index, Slot with { SetLengthMinutes = ParseInt(e.Value) }))" />
-    </td>
-    <td class="fr-py-tight">
-        <input type="number" min="0" class="form-control form-control-sm fr-form-ultra-sm"
-               value="@Slot.ChangeoverMinutes"
-               @onchange="e => OnUpdate.InvokeAsync((Index, Slot with { ChangeoverMinutes = ParseInt(e.Value) }))" />
+               value="@(Slot.SetLengthMinutes?.ToString() ?? string.Empty)"
+               @onchange="e => Mutate(s => s.SetLengthMinutes = ParseIntNullable(e.Value))" />
     </td>
     <td class="fr-py-tight">
         <input class="form-control form-control-sm fr-form-ultra-sm"
                value="@(Slot.Notes ?? string.Empty)"
-               @onchange="e => OnUpdate.InvokeAsync((Index, Slot with { Notes = NullIfEmpty((string?)e.Value) }))" />
+               @onchange="e => Mutate(s => s.Notes = NullIfEmpty((string?)e.Value))" />
     </td>
     <td class="text-end fr-py-tight">
         <button type="button" class="btn btn-sm btn-outline-danger fr-form-ultra-sm"
@@ -91,9 +86,32 @@
     private static Guid ParseGuid(object? value, Guid fallback)
         => Guid.TryParse(value?.ToString(), out var g) ? g : fallback;
 
-    private static TimeOnly ParseTime(object? value, TimeOnly fallback)
-        => TimeOnly.TryParse(value?.ToString(), out var t) ? t : fallback;
+    private static int? ParseIntNullable(object? value)
+    {
+        var s = value?.ToString();
+        if (string.IsNullOrWhiteSpace(s)) return null;
+        return int.TryParse(s, System.Globalization.NumberStyles.Integer,
+            System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : null;
+    }
+
+    private static DateTime? ParseDateTime(object? value, DateTime? fallback)
+    {
+        var s = value?.ToString();
+        if (string.IsNullOrWhiteSpace(s)) return null;
+        if (TimeOnly.TryParse(s, out var t))
+        {
+            var date = fallback?.Date ?? DateTime.Today;
+            return new DateTime(date.Year, date.Month, date.Day, t.Hour, t.Minute, 0, DateTimeKind.Unspecified);
+        }
+        return fallback;
+    }
 
     private static string? NullIfEmpty(string? s)
         => string.IsNullOrWhiteSpace(s) ? null : s;
+
+    private void Mutate(Action<RunningOrderSlot> mutator)
+    {
+        mutator(Slot);
+        OnUpdate.InvokeAsync((Index, Slot));
+    }
 }

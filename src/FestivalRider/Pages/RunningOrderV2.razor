@@ -61,7 +61,6 @@ else
                                 <th style="width: 12%">@Localization.T("page.runningOrder.col.start")</th>
                                 <th style="width: 22%">@Localization.T("page.runningOrder.col.band")</th>
                                 <th style="width: 10%">@Localization.T("page.runningOrder.col.setMin")</th>
-                                <th style="width: 10%">@Localization.T("page.runningOrder.col.changeover")</th>
                                 <th>@Localization.T("page.runningOrder.col.notes")</th>
                                 <th style="width: 40px"></th>
                             </tr>
@@ -168,7 +167,16 @@ else
     {
         var stageId = _show.Stages.Count > 0 ? (_show.Stages.FirstOrDefault()?.Id ?? 0) : 0;
         var bandId = BandService.Bands.FirstOrDefault()?.Id ?? Guid.Empty;
-        ro.Slots.Add(new RunningOrderSlot(bandId, stageId, new TimeOnly(12, 0), 45, 15, null));
+        var baseDate = _show.DateOfOpening == default
+            ? DateTime.Today
+            : _show.DateOfOpening.AddDays(Math.Max(0, ro.ShowDayNumber - 1)).ToDateTime(TimeOnly.MinValue);
+        ro.Slots.Add(new RunningOrderSlot
+        {
+            BandId = bandId,
+            StageId = stageId,
+            OnStageTime = baseDate.AddHours(12),
+            SetLengthMinutes = 45,
+        });
         BandService.UpdateRunningOrder(ro);
     }
 

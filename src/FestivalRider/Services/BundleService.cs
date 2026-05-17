@@ -89,7 +89,7 @@ public class BundleService : IBundleService
         var manifest = new Manifest
         {
             Format = Format,
-            SchemaVersion = 5,
+            SchemaVersion = 6,
             ExportedAt = DateTimeOffset.UtcNow,
             Show = $"{ShowsPrefix}{show.Id}.csv",
             Bands = bandsSorted.Select(b => $"{BandsPrefix}{b.Id}.csv").ToList(),
@@ -125,7 +125,7 @@ public class BundleService : IBundleService
         var manifest = new MasterManifest
         {
             Format = MasterFormat,
-            SchemaVersion = 5,
+            SchemaVersion = 6,
             ExportedAt = DateTimeOffset.UtcNow,
             Shows = nestedZips.Keys.OrderBy(k => k, StringComparer.Ordinal).ToList(),
         };
@@ -555,7 +555,8 @@ public class BundleService : IBundleService
                     missing.Add(senderName);
                     continue;
                 }
-                remapped.Add(slot with { StageId = localId });
+                slot.StageId = localId;
+                remapped.Add(slot);
             }
 
             if (missing.Count > 0 || ambiguous.Count > 0)

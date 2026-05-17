@@ -63,7 +63,7 @@ public class RolePrintStrategy : IPrintStrategy
             throw new ArgumentException($"RolePrintStrategy expects RoleContext, got {context?.GetType().Name ?? "null"}.", nameof(context));
         var order = _bands.FindRunningOrder(ctx.RunningOrderId)
             ?? throw new InvalidOperationException($"Running order {ctx.RunningOrderId} not found.");
-        var slots = order.Slots.OrderBy(s => s.StartTime).ToList();
+        var slots = order.Slots.OrderBy(s => s.OnStageTime ?? DateTime.MaxValue).ToList();
         return (order, ctx.Role, slots);
     }
 
@@ -103,7 +103,7 @@ public class RolePrintStrategy : IPrintStrategy
 
         b.OpenElement(seq++, "h2");
         b.AddAttribute(seq++, "class", "h5");
-        var title = $"{band.Name} — {slot.StartTime:HH\\:mm}";
+        var title = $"{band.Name} — {(slot.OnStageTime?.ToString("HH:mm") ?? string.Empty)}";
         if (!string.IsNullOrEmpty(stageLabel))
             title += $" @ {stageLabel}";
         b.AddContent(seq++, title);

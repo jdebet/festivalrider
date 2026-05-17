@@ -84,8 +84,30 @@ public class BandService : IBandService
         var show = ActiveShow ?? throw new InvalidOperationException("No active show.");
         var index = show.RunningOrders.FindIndex(o => o.Id == order.Id);
         if (index < 0) throw new InvalidOperationException($"RunningOrder {order.Id} not found in active show.");
+        var prior = show.RunningOrders[index];
+        var dayDelta = order.ShowDayNumber - prior.ShowDayNumber;
+        if (dayDelta != 0)
+        {
+            ShiftRunningOrderTimeSlots(order, dayDelta);
+        }
         show.RunningOrders[index] = order;
         Raise();
+    }
+
+    private static void ShiftRunningOrderTimeSlots(RunningOrder order, int dayDelta)
+    {
+        ShiftSlot(order.BreakfastHoursOverride, dayDelta);
+        ShiftSlot(order.LunchHoursOverride, dayDelta);
+        ShiftSlot(order.DinnerHoursOverride, dayDelta);
+        foreach (var slot in order.Slots)
+            ShiftSlot(slot.CateringSlot, dayDelta);
+    }
+
+    private static void ShiftSlot(TimeSlot? ts, int dayDelta)
+    {
+        if (ts is null) return;
+        ts.Start = ts.Start.AddDays(dayDelta);
+        if (ts.End is DateTime e) ts.End = e.AddDays(dayDelta);
     }
 
     public void DeleteRunningOrder(Guid id)
@@ -135,7 +157,13 @@ public class BandService : IBandService
     {
         var show = RequireShow(showId);
         // Deleted stage IDs are not reused within a show; orphaned slots surface as "Unknown stage".
-        if (show.Stages.RemoveAll(s => s.Id == id) > 0) Raise();
+        var removed = show.Stages.RemoveAll(s => s.Id == id);
+        if (removed == 0) return;
+        // Prune orphan ids from StageLinkGroups; drop any group left with fewer than 2 ids.
+        foreach (var group in show.StageLinkGroups)
+            group.StageIds.RemoveAll(sid => sid == id);
+        show.StageLinkGroups.RemoveAll(g => g.StageIds.Count < 2);
+        Raise();
     }
 
     public Stage? FindStage(int id) => FindStage(_state.ActiveShowId, id);
@@ -173,12 +201,37 @@ public class BandService : IBandService
         var index = _state.Shows.FindIndex(s => s.Id == show.Id);
         if (index < 0) throw new InvalidOperationException($"Show {show.Id} not found.");
         var existing = _state.Shows[index];
+        var priorDate = existing.DateOfOpening;
         existing.Name = show.Name;
         existing.Address = show.Address;
         existing.DateOfOpening = show.DateOfOpening;
         existing.ShowDayCount = show.ShowDayCount;
         existing.Stages = show.Stages;
+        existing.DefaultScheduleMode = show.DefaultScheduleMode;
+        existing.DefaultAnchorEvent = show.DefaultAnchorEvent;
+        existing.VenueOpenTime = show.VenueOpenTime;
+        existing.VenueCloseTime = show.VenueCloseTime;
+        existing.TechnicalGetInTime = show.TechnicalGetInTime;
+        existing.DoorsOpeningTime = show.DoorsOpeningTime;
+        existing.FirstShowTime = show.FirstShowTime;
+        existing.SoundCurfewTime = show.SoundCurfewTime;
+        existing.BackstageCurfewTime = show.BackstageCurfewTime;
+        existing.BreakfastHours = show.BreakfastHours;
+        existing.LunchHours = show.LunchHours;
+        existing.DinnerHours = show.DinnerHours;
+        existing.BreakTimeMinutes = show.BreakTimeMinutes;
+        existing.SoundcheckGapMinutes = show.SoundcheckGapMinutes;
+        existing.StageLinkGroups = show.StageLinkGroups;
         // Preserve existing Bands and RunningOrders lists.
+        if (priorDate != default && show.DateOfOpening != default && priorDate != show.DateOfOpening)
+        {
+            var dayDelta = (show.DateOfOpening.ToDateTime(TimeOnly.MinValue) - priorDate.ToDateTime(TimeOnly.MinValue)).Days;
+            ShiftSlot(existing.BreakfastHours, dayDelta);
+            ShiftSlot(existing.LunchHours, dayDelta);
+            ShiftSlot(existing.DinnerHours, dayDelta);
+            foreach (var ro in existing.RunningOrders)
+                ShiftRunningOrderTimeSlots(ro, dayDelta);
+        }
         Raise();
         return Task.CompletedTask;
     }

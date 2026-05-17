@@ -19,6 +19,7 @@ builder.Services.AddScoped<IStorageService, StorageService>();
 builder.Services.AddScoped<IExportService, ExportService>();
 builder.Services.AddScoped<IBundleService, BundleService>();
 builder.Services.AddScoped<IPdfExportService, PdfExportService>();
+builder.Services.AddScoped<IRunningOrderScheduler, RunningOrderScheduler>();
 
 builder.Services.AddScoped<IStateMigrator, V1ToV2Migrator>();
 builder.Services.AddScoped<IStateMigrator, V2ToV3Migrator>();

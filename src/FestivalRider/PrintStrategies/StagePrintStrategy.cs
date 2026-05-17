@@ -55,7 +55,7 @@ public class StagePrintStrategy : IPrintStrategy
             ?? throw new InvalidOperationException($"Stage {ctx.StageId} not found in show {order.ShowId}.");
         var slots = order.Slots
             .Where(s => s.StageId == ctx.StageId)
-            .OrderBy(s => s.StartTime)
+            .OrderBy(s => s.OnStageTime ?? DateTime.MaxValue)
             .ToList();
         return (order, stage, slots);
     }
@@ -110,7 +110,7 @@ public class StagePrintStrategy : IPrintStrategy
         b.AddAttribute(seq++, "class", "table table-sm");
         b.OpenElement(seq++, "thead");
         b.OpenElement(seq++, "tr");
-        foreach (var h in new[] { _loc.T("print.stage.col.start"), _loc.T("print.stage.col.set"), _loc.T("print.stage.col.changeover"), _loc.T("print.stage.col.band"), _loc.T("print.stage.col.notes") })
+        foreach (var h in new[] { _loc.T("print.stage.col.start"), _loc.T("print.stage.col.set"), _loc.T("print.stage.col.band"), _loc.T("print.stage.col.notes") })
         {
             b.OpenElement(seq++, "th");
             b.AddContent(seq++, h);
@@ -125,9 +125,8 @@ public class StagePrintStrategy : IPrintStrategy
             b.OpenElement(seq++, "tr");
             foreach (var v in new[]
             {
-                s.StartTime.ToString("HH:mm"),
-                _loc.T("print.stage.min", s.SetLengthMinutes),
-                _loc.T("print.stage.min", s.ChangeoverMinutes),
+                s.OnStageTime?.ToString("HH:mm") ?? string.Empty,
+                _loc.T("print.stage.min", s.SetLengthMinutes ?? 0),
                 band?.Name ?? _loc.T("print.stage.unknownBand"),
                 s.Notes ?? string.Empty,
             })
@@ -173,7 +172,7 @@ public class StagePrintStrategy : IPrintStrategy
             b.OpenElement(seq++, "tr");
             foreach (var v in new[]
             {
-                s.StartTime.ToString("HH:mm"),
+                s.OnStageTime?.ToString("HH:mm") ?? string.Empty,
                 band?.Name ?? _loc.T("print.stage.unknownBand"),
                 t is null ? string.Empty : $"{AmpLabel(t.Power.Amperage)} {PhaseLabel(t.Power.Phase)}",
                 t?.Foh.OwnConsoleModel ?? string.Empty,

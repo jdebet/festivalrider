@@ -725,5 +725,59 @@ public static class LocalizationKeys
             public const string EgoRiser = "enum.OtherRiserType.EgoRiser";
             public const string Custom = "enum.OtherRiserType.Custom";
         }
+        public static class TimingEventType
+        {
+            public const string GetIn = "enum.TimingEventType.GET_IN";
+            public const string LoadInVenue = "enum.TimingEventType.LOAD_IN_VENUE";
+            public const string LoadInStage = "enum.TimingEventType.LOAD_IN_STAGE";
+            public const string BackstageDrop = "enum.TimingEventType.BACKSTAGE_DROP";
+            public const string Catering = "enum.TimingEventType.CATERING";
+            public const string SetupOnStage = "enum.TimingEventType.SETUP_ON_STAGE";
+            public const string Soundcheck = "enum.TimingEventType.SOUNDCHECK";
+            public const string Changeover = "enum.TimingEventType.CHANGEOVER";
+            public const string PreshowLinecheck = "enum.TimingEventType.PRESHOW_LINECHECK";
+            public const string OnStage = "enum.TimingEventType.ON_STAGE";
+            public const string LoadOutStaging = "enum.TimingEventType.LOAD_OUT_STAGING";
+            public const string LoadOutVenue = "enum.TimingEventType.LOAD_OUT_VENUE";
+            public const string BackstageWait = "enum.TimingEventType.BACKSTAGE_WAIT";
+        }
+        public static class ScheduleMode
+        {
+            public const string Traditional = "enum.ScheduleMode.Traditional";
+            public const string Festival = "enum.ScheduleMode.Festival";
+        }
+        public static class ScheduleWarningType
+        {
+            public const string BreakTimeViolation = "enum.ScheduleWarningType.BreakTimeViolation";
+            public const string SoundcheckBlockOverlap = "enum.ScheduleWarningType.SoundcheckBlockOverlap";
+            public const string OnStageOverlap = "enum.ScheduleWarningType.OnStageOverlap";
+            public const string BackwardLockConflict = "enum.ScheduleWarningType.BackwardLockConflict";
+            public const string BarrierConflict = "enum.ScheduleWarningType.BarrierConflict";
+            public const string CateringOutsideHours = "enum.ScheduleWarningType.CateringOutsideHours";
+            public const string CurfewViolation = "enum.ScheduleWarningType.CurfewViolation";
+            public const string SoundcheckShrunk = "enum.ScheduleWarningType.SoundcheckShrunk";
+            public const string SoundcheckOrderOverlap = "enum.ScheduleWarningType.SoundcheckOrderOverlap";
+            public const string UserOverrideOverlap = "enum.ScheduleWarningType.UserOverrideOverlap";
+            public const string EarlySoundcheckAfterOnStage = "enum.ScheduleWarningType.EarlySoundcheckAfterOnStage";
+            public const string ConstraintViolation = "enum.ScheduleWarningType.ConstraintViolation";
+            public const string FirstShowTimeMissing = "enum.ScheduleWarningType.FirstShowTimeMissing";
+            public const string VenueClosed = "enum.ScheduleWarningType.VenueClosed";
+        }
+        public static class BandScheduleFlags
+        {
+            public const string None = "enum.BandScheduleFlags.None";
+            public const string HasPersonalBackstageCurfew = "enum.BandScheduleFlags.HasPersonalBackstageCurfew";
+        }
+        public static class UserOverrideFlags
+        {
+            public const string None = "enum.UserOverrideFlags.None";
+            public const string AllowSoundcheckOverlap = "enum.UserOverrideFlags.AllowSoundcheckOverlap";
+            public const string AllowOnStageOverlap = "enum.UserOverrideFlags.AllowOnStageOverlap";
+        }
+        public static class StageLinkConstraint
+        {
+            public const string All = "enum.StageLinkConstraint.All";
+            public const string OnStageOnly = "enum.StageLinkConstraint.OnStageOnly";
+        }
     }
 }

@@ -42,8 +42,8 @@ public sealed class BundleServiceTests
             ShowDayNumber = 1,
             Slots =
             {
-                new(state.Shows[0].Bands[0].Id, 1, new TimeOnly(18, 0), 60, 15, "Headliner"),
-                new(state.Shows[0].Bands[1].Id, 2, new TimeOnly(14, 0), 30, 10, "Warmup"),
+                new RunningOrderSlot { BandId = state.Shows[0].Bands[0].Id, StageId = 1, OnStageTime = new DateTime(2024, 1, 1, 18, 0, 0), SetLengthMinutes = 60, Notes = "Headliner" },
+                new RunningOrderSlot { BandId = state.Shows[0].Bands[1].Id, StageId = 2, OnStageTime = new DateTime(2024, 1, 1, 14, 0, 0), SetLengthMinutes = 30, Notes = "Warmup" },
             }
         });
         return state;
@@ -355,8 +355,8 @@ public sealed class BundleServiceTests
             ShowDayNumber = 1,
             Slots =
             {
-                new(bandId, 42, new TimeOnly(18, 0), 60, 15, null),
-                new(bandId, 99, new TimeOnly(14, 0), 30, 10, null),
+                new RunningOrderSlot { BandId = bandId, StageId = 42, OnStageTime = new DateTime(2024, 1, 1, 18, 0, 0), SetLengthMinutes = 60 },
+                new RunningOrderSlot { BandId = bandId, StageId = 99, OnStageTime = new DateTime(2024, 1, 1, 14, 0, 0), SetLengthMinutes = 30 },
             },
         });
         bands.ReplaceState(bundle);
@@ -397,8 +397,8 @@ public sealed class BundleServiceTests
             ShowDayNumber = 1,
             Slots =
             {
-                new(bandId, 1, new TimeOnly(18, 0), 60, 15, null),
-                new(bandId, 2, new TimeOnly(20, 0), 60, 15, null),
+                new RunningOrderSlot { BandId = bandId, StageId = 1, OnStageTime = new DateTime(2024, 1, 1, 18, 0, 0), SetLengthMinutes = 60 },
+                new RunningOrderSlot { BandId = bandId, StageId = 2, OnStageTime = new DateTime(2024, 1, 1, 20, 0, 0), SetLengthMinutes = 60 },
             },
         });
         bands.ReplaceState(bundle);
@@ -433,7 +433,7 @@ public sealed class BundleServiceTests
             Id = sharedRoId,
             ShowId = collisionShow.Id,
             ShowDayNumber = 2,
-            Slots = { new(bandId, 1, new TimeOnly(18, 0), 60, 15, "incoming") },
+            Slots = { new RunningOrderSlot { BandId = bandId, StageId = 1, OnStageTime = new DateTime(2024, 1, 1, 18, 0, 0), SetLengthMinutes = 60, Notes = "incoming" } },
         });
         bands.ReplaceState(bundle);
         var zip = svc.ExportBundle(bundle.Shows[0]);
@@ -447,7 +447,7 @@ public sealed class BundleServiceTests
                 Id = sharedRoId,
                 ShowId = s.Shows[0].Id,
                 ShowDayNumber = 1,
-                Slots = { new(bandId, 1, new TimeOnly(10, 0), 30, 5, "local") },
+                Slots = { new RunningOrderSlot { BandId = bandId, StageId = 1, OnStageTime = new DateTime(2024, 1, 1, 10, 0, 0), SetLengthMinutes = 30, Notes = "local" } },
             });
         });
 
@@ -679,7 +679,7 @@ public sealed class BundleServiceTests
             Id = Guid.NewGuid(),
             ShowId = showA.Id,
             ShowDayNumber = 1,
-            Slots = { new(bandA.Id, 1, new TimeOnly(18, 0), 60, 15, "Headliner") },
+            Slots = { new RunningOrderSlot { BandId = bandA.Id, StageId = 1, OnStageTime = new DateTime(2024, 1, 1, 18, 0, 0), SetLengthMinutes = 60, Notes = "Headliner" } },
         });
 
         var showB = TestDataFactory.FullShow();
@@ -692,7 +692,7 @@ public sealed class BundleServiceTests
             Id = Guid.NewGuid(),
             ShowId = showB.Id,
             ShowDayNumber = 1,
-            Slots = { new(bandB.Id, 1, new TimeOnly(14, 0), 30, 10, "Warmup") },
+            Slots = { new RunningOrderSlot { BandId = bandB.Id, StageId = 1, OnStageTime = new DateTime(2024, 1, 1, 14, 0, 0), SetLengthMinutes = 30, Notes = "Warmup" } },
         });
 
         var state = new AppState { Shows = new List<ShowData> { showA, showB }, ActiveShowId = showA.Id };

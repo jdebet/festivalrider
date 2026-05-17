@@ -33,7 +33,7 @@ public sealed class PrintStrategyTests
             Id = Guid.NewGuid(),
             ShowId = show.Id,
             ShowDayNumber = 1,
-            Slots = { new(band.Id, 1, new TimeOnly(20, 0), 60, 15, "Headliner") }
+            Slots = { new RunningOrderSlot { BandId = band.Id, StageId = 1, OnStageTime = new DateTime(2024, 6, 15, 20, 0, 0), SetLengthMinutes = 60, Notes = "Headliner" } }
         });
         return (bands, band);
     }
