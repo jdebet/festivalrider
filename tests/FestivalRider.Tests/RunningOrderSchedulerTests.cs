@@ -258,4 +258,328 @@ public sealed class RunningOrderSchedulerTests
         Assert.Equal(beforeEvents, ro.Slots[0].PreShowEvents.Count);
         _ = warnings;
     }
+
+    // -------- festival helpers --------
+
+    private static (ShowData show, RunningOrder ro) MakeFestivalShow(
+        DateTime firstShow,
+        FestivalTimingTemplate? template = null,
+        ScheduleMode showMode = ScheduleMode.Traditional)
+    {
+        var date = DateOnly.FromDateTime(firstShow);
+        var show = new ShowData
+        {
+            Name = "Test",
+            DateOfOpening = date,
+            ShowDayCount = 1,
+            FirstShowTime = firstShow,
+            DefaultScheduleMode = showMode,
+            DefaultAnchorEvent = TimingEventType.ON_STAGE,
+        };
+        show.Stages.Add(new Stage { Id = 1, Name = "Main" });
+        show.Stages.Add(new Stage { Id = 2, Name = "Tent" });
+        var ro = new RunningOrder
+        {
+            ShowId = show.Id,
+            ShowDayNumber = 1,
+            ModeOverride = ScheduleMode.Festival,
+            FestivalTemplate = template ?? new FestivalTimingTemplate(),
+        };
+        show.RunningOrders.Add(ro);
+        return (show, ro);
+    }
+
+    private static RunningOrderSlot AddFestivalSlot(RunningOrder ro, int stageId, DateTime? onStage, int setLen, bool pinned)
+    {
+        var slot = new RunningOrderSlot
+        {
+            BandId = Guid.NewGuid(),
+            StageId = stageId,
+            OnStageTime = onStage,
+            IsOnStagePinned = pinned,
+            SetLengthMinutes = setLen,
+        };
+        ro.Slots.Add(slot);
+        return slot;
+    }
+
+    // -------- festival pipeline tests --------
+
+    [Fact]
+    public void Recalculate_Festival_TemplateDrivenChainGrowth()
+    {
+        var sut = Create();
+        var first = new DateTime(2024, 6, 15, 20, 0, 0);
+        var template = new FestivalTimingTemplate
+        {
+            PreShowEntries =
+            {
+                new TimingChainEntry { EventType = TimingEventType.PRESHOW_LINECHECK, DefaultDurationMinutes = 10 },
+                new TimingChainEntry { EventType = TimingEventType.SOUNDCHECK, DefaultDurationMinutes = 30 },
+            },
+            PostShowEntries =
+            {
+                new TimingChainEntry { EventType = TimingEventType.LOAD_OUT_STAGING, DefaultDurationMinutes = 20 },
+            },
+            DefaultSetLengthMinutes = 60,
+        };
+        var (show, ro) = MakeFestivalShow(first, template);
+        AddFestivalSlot(ro, 1, first, 60, pinned: true);
+
+        var result = sut.Recalculate(ro, show);
+
+        Assert.Empty(result.Warnings);
+        var slot = ro.Slots[0];
+        // Pre-show: SOUNDCHECK (30 min) then PRESHOW_LINECHECK (10 min), both before ON_STAGE at 20:00.
+        var linecheck = slot.PreShowEvents.First(e => e.EventType == TimingEventType.PRESHOW_LINECHECK);
+        var soundcheck = slot.PreShowEvents.First(e => e.EventType == TimingEventType.SOUNDCHECK);
+        // PRESHOW_LINECHECK closest to anchor: ends at 20:00, starts at 19:50.
+        Assert.Equal(new DateTime(2024, 6, 15, 19, 50, 0), linecheck.StartTime);
+        // SOUNDCHECK next: ends at 19:50, starts at 19:20.
+        Assert.Equal(new DateTime(2024, 6, 15, 19, 20, 0), soundcheck.StartTime);
+        // Post-show: LOAD_OUT_STAGING starts at 21:00 (after 60 min set).
+        var loadOut = slot.PostShowEvents.First(e => e.EventType == TimingEventType.LOAD_OUT_STAGING);
+        Assert.Equal(new DateTime(2024, 6, 15, 21, 0, 0), loadOut.StartTime);
+    }
+
+    [Fact]
+    public void Recalculate_Festival_MultiStageIndependence_NoOverlapWarning()
+    {
+        var sut = Create();
+        var first = new DateTime(2024, 6, 15, 20, 0, 0);
+        var template = new FestivalTimingTemplate { DefaultSetLengthMinutes = 60 };
+        var (show, ro) = MakeFestivalShow(first, template);
+        AddFestivalSlot(ro, 1, first, 60, pinned: true);
+        AddFestivalSlot(ro, 2, first, 60, pinned: true); // same time, different stage
+
+        var result = sut.Recalculate(ro, show);
+
+        Assert.DoesNotContain(result.Warnings, w => w.Type == ScheduleWarningType.OnStageOverlap);
+    }
+
+    [Fact]
+    public void Recalculate_Festival_EarlyChainValidation_PassesWhenBeforeOnStage()
+    {
+        var sut = Create();
+        var first = new DateTime(2024, 6, 15, 20, 0, 0);
+        var template = new FestivalTimingTemplate
+        {
+            EarlyChain =
+            {
+                new TimingChainEntry { EventType = TimingEventType.SOUNDCHECK, DefaultDurationMinutes = 30 },
+            },
+            DefaultSetLengthMinutes = 60,
+        };
+        var (show, ro) = MakeFestivalShow(first, template);
+        AddFestivalSlot(ro, 1, first, 60, pinned: true);
+        sut.Recalculate(ro, show); // seed EarlyChain from template
+        var slot = ro.Slots[0];
+        slot.EarlyChain[0].StartTime = new DateTime(2024, 6, 15, 9, 0, 0); // ends at 09:30, well before 20:00
+        slot.EarlyChain[0].IsPinned = true;
+
+        var result = sut.Recalculate(ro, show);
+
+        Assert.DoesNotContain(result.Warnings, w => w.Type == ScheduleWarningType.EarlySoundcheckAfterOnStage);
+    }
+
+    [Fact]
+    public void Recalculate_Festival_EarlyChainValidation_FailsWhenAfterOnStage()
+    {
+        var sut = Create();
+        var first = new DateTime(2024, 6, 15, 20, 0, 0);
+        var template = new FestivalTimingTemplate
+        {
+            EarlyChain =
+            {
+                new TimingChainEntry { EventType = TimingEventType.SOUNDCHECK, DefaultDurationMinutes = 30 },
+            },
+            DefaultSetLengthMinutes = 60,
+        };
+        var (show, ro) = MakeFestivalShow(first, template);
+        AddFestivalSlot(ro, 1, first, 60, pinned: true);
+        sut.Recalculate(ro, show); // seed EarlyChain from template
+        var slot = ro.Slots[0];
+        slot.EarlyChain[0].StartTime = new DateTime(2024, 6, 15, 19, 50, 0); // ends at 20:20, after 20:00
+        slot.EarlyChain[0].IsPinned = true;
+
+        var result = sut.Recalculate(ro, show);
+
+        Assert.Contains(result.Warnings, w => w.Type == ScheduleWarningType.EarlySoundcheckAfterOnStage);
+    }
+
+    [Fact]
+    public void Recalculate_Festival_AnchorFallback_ThreeStep()
+    {
+        var sut = Create();
+        var first = new DateTime(2024, 6, 15, 20, 0, 0);
+
+        // 1. RO override wins.
+        var template = new FestivalTimingTemplate { DefaultSetLengthMinutes = 60 };
+        var (show1, ro1) = MakeFestivalShow(first, template, showMode: ScheduleMode.Traditional);
+        ro1.AnchorEventOverride = TimingEventType.SOUNDCHECK;
+        AddFestivalSlot(ro1, 1, first, 60, pinned: true);
+        sut.Recalculate(ro1, show1);
+        Assert.Equal(TimingEventType.SOUNDCHECK, ro1.Slots[0].PreShowEvents.First(e => e.EventType == TimingEventType.SOUNDCHECK).EventType);
+
+        // 2. Show default wins when RO override is null.
+        var (show2, ro2) = MakeFestivalShow(first, template, showMode: ScheduleMode.Traditional);
+        show2.DefaultAnchorEvent = TimingEventType.SOUNDCHECK;
+        AddFestivalSlot(ro2, 1, first, 60, pinned: true);
+        sut.Recalculate(ro2, show2);
+        Assert.Equal(TimingEventType.SOUNDCHECK, ro2.Slots[0].PreShowEvents.First(e => e.EventType == TimingEventType.SOUNDCHECK).EventType);
+
+        // 3. Ultimate fallback to ON_STAGE.
+        var (show3, ro3) = MakeFestivalShow(first, template, showMode: ScheduleMode.Traditional);
+        AddFestivalSlot(ro3, 1, first, 60, pinned: true);
+        sut.Recalculate(ro3, show3);
+        // ON_STAGE is not in PreShowEvents, so the slot should have no pre-show events when template is empty.
+        Assert.Empty(ro3.Slots[0].PreShowEvents);
+    }
+
+    [Fact]
+    public void Recalculate_Festival_NonOnStageAnchor_DerivesOnStage()
+    {
+        var sut = Create();
+        var first = new DateTime(2024, 6, 15, 20, 0, 0);
+        var template = new FestivalTimingTemplate
+        {
+            PreShowEntries =
+            {
+                new TimingChainEntry { EventType = TimingEventType.PRESHOW_LINECHECK, DefaultDurationMinutes = 10 },
+            },
+            PostShowEntries =
+            {
+                new TimingChainEntry { EventType = TimingEventType.LOAD_OUT_STAGING, DefaultDurationMinutes = 20 },
+            },
+            DefaultSetLengthMinutes = 60,
+        };
+        var (show, ro) = MakeFestivalShow(first, template);
+        ro.AnchorEventOverride = TimingEventType.SOUNDCHECK;
+        AddFestivalSlot(ro, 1, null, 60, pinned: false);
+
+        sut.Recalculate(ro, show);
+
+        var slot = ro.Slots[0];
+        // SOUNDCHECK anchored at first show (20:00), ends at 20:30.
+        var soundcheck = slot.PreShowEvents.First(e => e.EventType == TimingEventType.SOUNDCHECK);
+        Assert.Equal(first, soundcheck.StartTime);
+        // ON_STAGE derived after SOUNDCHECK end + post-show events.
+        var loadOut = slot.PostShowEvents.First(e => e.EventType == TimingEventType.LOAD_OUT_STAGING);
+        Assert.Equal(new DateTime(2024, 6, 15, 20, 30, 0), loadOut.StartTime);
+        Assert.Equal(new DateTime(2024, 6, 15, 20, 50, 0), slot.OnStageTime);
+    }
+
+    [Fact]
+    public void Recalculate_Festival_AllowOnStageOverlap_DowngradedWarning()
+    {
+        var sut = Create();
+        var first = new DateTime(2024, 6, 15, 20, 0, 0);
+        var template = new FestivalTimingTemplate { DefaultSetLengthMinutes = 60 };
+        var (show, ro) = MakeFestivalShow(first, template);
+        AddFestivalSlot(ro, 1, first, 90, pinned: true);
+        var s2 = AddFestivalSlot(ro, 1, first.AddMinutes(60), 60, pinned: true);
+        s2.OverrideFlags = UserOverrideFlags.AllowOnStageOverlap;
+
+        var result = sut.Recalculate(ro, show);
+
+        Assert.Contains(result.Warnings, w => w.Type == ScheduleWarningType.UserOverrideOverlap);
+        Assert.DoesNotContain(result.Warnings, w => w.Type == ScheduleWarningType.OnStageOverlap);
+    }
+
+    [Fact]
+    public void Recalculate_Festival_DuplicateEventTypes_Honoured()
+    {
+        var sut = Create();
+        var first = new DateTime(2024, 6, 15, 20, 0, 0);
+        var template = new FestivalTimingTemplate
+        {
+            PreShowEntries =
+            {
+                new TimingChainEntry { EventType = TimingEventType.SOUNDCHECK, DefaultDurationMinutes = 15 },
+                new TimingChainEntry { EventType = TimingEventType.SOUNDCHECK, DefaultDurationMinutes = 15 },
+            },
+            DefaultSetLengthMinutes = 60,
+        };
+        var (show, ro) = MakeFestivalShow(first, template);
+        AddFestivalSlot(ro, 1, first, 60, pinned: true);
+
+        sut.Recalculate(ro, show);
+
+        var soundchecks = ro.Slots[0].PreShowEvents.Where(e => e.EventType == TimingEventType.SOUNDCHECK).ToList();
+        Assert.Equal(2, soundchecks.Count);
+    }
+
+    [Fact]
+    public void Recalculate_Festival_EmptyTemplate_OnlyAnchorEvent()
+    {
+        var sut = Create();
+        var first = new DateTime(2024, 6, 15, 20, 0, 0);
+        var template = new FestivalTimingTemplate(); // empty
+        var (show, ro) = MakeFestivalShow(first, template);
+        AddFestivalSlot(ro, 1, first, 60, pinned: true);
+
+        var result = sut.Recalculate(ro, show);
+
+        Assert.Empty(result.Warnings);
+        Assert.Empty(ro.Slots[0].PreShowEvents);
+        Assert.Empty(ro.Slots[0].PostShowEvents);
+    }
+
+    [Fact]
+    public void Recalculate_Festival_CustomDisplayName_IgnoredByScheduler()
+    {
+        var sut = Create();
+        var first = new DateTime(2024, 6, 15, 20, 0, 0);
+        var templateA = new FestivalTimingTemplate
+        {
+            PreShowEntries =
+            {
+                new TimingChainEntry { EventType = TimingEventType.SOUNDCHECK, DefaultDurationMinutes = 30, CustomDisplayName = "Morning balance" },
+            },
+            DefaultSetLengthMinutes = 60,
+        };
+        var templateB = new FestivalTimingTemplate
+        {
+            PreShowEntries =
+            {
+                new TimingChainEntry { EventType = TimingEventType.SOUNDCHECK, DefaultDurationMinutes = 30 },
+            },
+            DefaultSetLengthMinutes = 60,
+        };
+
+        var (showA, roA) = MakeFestivalShow(first, templateA);
+        AddFestivalSlot(roA, 1, first, 60, pinned: true);
+        sut.Recalculate(roA, showA);
+
+        var (showB, roB) = MakeFestivalShow(first, templateB);
+        AddFestivalSlot(roB, 1, first, 60, pinned: true);
+        sut.Recalculate(roB, showB);
+
+        var scA = roA.Slots[0].PreShowEvents.First(e => e.EventType == TimingEventType.SOUNDCHECK);
+        var scB = roB.Slots[0].PreShowEvents.First(e => e.EventType == TimingEventType.SOUNDCHECK);
+        Assert.Equal(scA.StartTime, scB.StartTime);
+        Assert.Equal(scA.DurationMinutes, scB.DurationMinutes);
+    }
+
+    [Fact]
+    public void Recalculate_Festival_NoSoundcheckViaAbsence_SkipsSoundcheck()
+    {
+        var sut = Create();
+        var first = new DateTime(2024, 6, 15, 20, 0, 0);
+        var template = new FestivalTimingTemplate
+        {
+            PreShowEntries =
+            {
+                new TimingChainEntry { EventType = TimingEventType.PRESHOW_LINECHECK, DefaultDurationMinutes = 10 },
+                // No SOUNDCHECK entry
+            },
+            DefaultSetLengthMinutes = 60,
+        };
+        var (show, ro) = MakeFestivalShow(first, template);
+        AddFestivalSlot(ro, 1, first, 60, pinned: true);
+
+        sut.Recalculate(ro, show);
+
+        Assert.DoesNotContain(ro.Slots[0].PreShowEvents, e => e.EventType == TimingEventType.SOUNDCHECK);
+    }
 }

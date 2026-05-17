@@ -147,6 +147,90 @@ public static class LocalizationKeys
                 public const string WithDate = "page.runningOrder.dayTitle";
                 public const string NoDate = "page.runningOrder.dayTitle.noDate";
             }
+            public static class Toolbar
+            {
+                public const string ModeLabel = "page.runningOrder.toolbar.modeLabel";
+                public const string AnchorLabel = "page.runningOrder.toolbar.anchorLabel";
+                public const string VenueOpenLabel = "page.runningOrder.toolbar.venueOpenLabel";
+                public const string VenueCloseLabel = "page.runningOrder.toolbar.venueCloseLabel";
+                public const string TechnicalGetInLabel = "page.runningOrder.toolbar.technicalGetInLabel";
+                public const string DoorsLabel = "page.runningOrder.toolbar.doorsLabel";
+                public const string FirstShowLabel = "page.runningOrder.toolbar.firstShowLabel";
+                public const string SoundCurfewLabel = "page.runningOrder.toolbar.soundCurfewLabel";
+                public const string BackstageCurfewLabel = "page.runningOrder.toolbar.backstageCurfewLabel";
+                public const string BreakLabel = "page.runningOrder.toolbar.breakLabel";
+                public const string GapLabel = "page.runningOrder.toolbar.gapLabel";
+                public const string BreakfastLabel = "page.runningOrder.toolbar.breakfastLabel";
+                public const string LunchLabel = "page.runningOrder.toolbar.lunchLabel";
+                public const string DinnerLabel = "page.runningOrder.toolbar.dinnerLabel";
+            }
+            public static class Gantt
+            {
+                public const string Title = "page.runningOrder.gantt.title";
+                public const string DayBadge = "page.runningOrder.gantt.dayBadge";
+                public const string SelectSlotHint = "page.runningOrder.gantt.selectSlotHint";
+                public const string AllowOverlapBtn = "page.runningOrder.gantt.allowOverlapBtn";
+                public static class Legend
+                {
+                    public const string Soundcheck = "page.runningOrder.gantt.legend.soundcheck";
+                    public const string OnStage = "page.runningOrder.gantt.legend.onStage";
+                    public const string Early = "page.runningOrder.gantt.legend.early";
+                    public const string Post = "page.runningOrder.gantt.legend.post";
+                }
+            }
+            public static class Panel
+            {
+                public const string EarlyChainHeading = "page.runningOrder.panel.earlyChainHeading";
+                public const string PreShowHeading = "page.runningOrder.panel.preShowHeading";
+                public const string PostShowHeading = "page.runningOrder.panel.postShowHeading";
+                public const string BackstageRow = "page.runningOrder.panel.backstageRow";
+                public const string Changeover = "page.runningOrder.panel.changeover";
+                public const string Linecheck = "page.runningOrder.panel.linecheck";
+                public const string Catering = "page.runningOrder.panel.catering";
+                public const string BackstageCurfew = "page.runningOrder.panel.backstageCurfew";
+                public const string AddEventBtn = "page.runningOrder.panel.addEventBtn";
+                public const string AddEventPickerTitle = "page.runningOrder.panel.addEventPickerTitle";
+                public const string AddEventPlacementHint = "page.runningOrder.panel.addEventPlacementHint";
+                public static class Flag
+                {
+                    public const string HasPersonalBackstageCurfew = "page.runningOrder.panel.flag.hasPersonalBackstageCurfew";
+                }
+            }
+            public static class Template
+            {
+                public const string Title = "page.runningOrder.template.title";
+                public const string AddEntryBtn = "page.runningOrder.template.addEntryBtn";
+                public const string RemoveEntryBtn = "page.runningOrder.template.removeEntryBtn";
+                public const string OptionalLabel = "page.runningOrder.template.optionalLabel";
+                public const string CustomNameLabel = "page.runningOrder.template.customNameLabel";
+                public static class Preset
+                {
+                    public const string FestivalMainStage = "page.runningOrder.template.preset.festivalMainStage";
+                    public const string FestivalTent = "page.runningOrder.template.preset.festivalTent";
+                    public const string TraditionalVenue = "page.runningOrder.template.preset.traditionalVenue";
+                }
+            }
+            public static class VenueOptions
+            {
+                public const string Title = "page.runningOrder.venueOptions.title";
+                public const string IncludeGetIn = "page.runningOrder.venueOptions.includeGetIn";
+                public const string IncludeLoadInVenue = "page.runningOrder.venueOptions.includeLoadInVenue";
+                public const string IncludeStageLoadIn = "page.runningOrder.venueOptions.includeStageLoadIn";
+                public const string IncludeBackstageDrop = "page.runningOrder.venueOptions.includeBackstageDrop";
+                public const string IncludeSetupOnStage = "page.runningOrder.venueOptions.includeSetupOnStage";
+                public const string IncludeSoundcheck = "page.runningOrder.venueOptions.includeSoundcheck";
+                public const string IncludePreShowLinecheck = "page.runningOrder.venueOptions.includePreShowLinecheck";
+                public const string DefaultGetInMinutes = "page.runningOrder.venueOptions.defaultGetInMinutes";
+                public const string DefaultLoadInVenueMinutes = "page.runningOrder.venueOptions.defaultLoadInVenueMinutes";
+                public const string DefaultStageLoadInMinutes = "page.runningOrder.venueOptions.defaultStageLoadInMinutes";
+                public const string DefaultBackstageDropMinutes = "page.runningOrder.venueOptions.defaultBackstageDropMinutes";
+                public const string DefaultSetupOnStageMinutes = "page.runningOrder.venueOptions.defaultSetupOnStageMinutes";
+                public const string DefaultSoundcheckMinutes = "page.runningOrder.venueOptions.defaultSoundcheckMinutes";
+                public const string DefaultPreShowLinecheckMinutes = "page.runningOrder.venueOptions.defaultPreShowLinecheckMinutes";
+                public const string DefaultBackstageLeadMinutes = "page.runningOrder.venueOptions.defaultBackstageLeadMinutes";
+                public const string DefaultChangeoverMinutes = "page.runningOrder.venueOptions.defaultChangeoverMinutes";
+                public const string DefaultSetLengthMinutes = "page.runningOrder.venueOptions.defaultSetLengthMinutes";
+            }
         }
 
         public static class Shows
@@ -412,6 +496,17 @@ public static class LocalizationKeys
         {
             public const string BundleExported = "toast.shows.bundleExported";
             public const string MasterBundleExported = "toast.shows.masterBundleExported";
+        }
+        public static class Schedule
+        {
+            public const string Warning = "toast.schedule.warning";
+        }
+        public static class Bundle
+        {
+            public static class Import
+            {
+                public const string RoConfigReset = "toast.bundle.import.roConfigReset";
+            }
         }
         public static class Settings
         {

@@ -3,9 +3,6 @@ using Microsoft.Extensions.Logging;
 
 namespace FestivalRider.Services;
 
-// Wave-1 scope: Traditional pipeline only. Festival pipeline returns Success with no warnings and
-// leaves the graph unchanged so callers can plumb through until wave 3 wires up the festival
-// algorithm. Tests covering the festival branch live with that future work.
 public class RunningOrderScheduler : IRunningOrderScheduler
 {
     private readonly ILogger<RunningOrderScheduler> _logger;
@@ -24,6 +21,8 @@ public class RunningOrderScheduler : IRunningOrderScheduler
         var ctx = new Ctx(order, show);
         if (ctx.Mode == ScheduleMode.Traditional)
             ComputeTraditionalTimeline(ctx, result);
+        else
+            ComputeFestivalTimeline(ctx, result);
         return result;
     }
 
@@ -370,6 +369,402 @@ public class RunningOrderScheduler : IRunningOrderScheduler
         }
     }
 
+    // -------- festival pipeline --------
+
+    private void ComputeFestivalTimeline(Ctx ctx, ScheduleResult result)
+    {
+        var template = ctx.Order.FestivalTemplate ?? new FestivalTimingTemplate();
+        var options = ctx.EffectiveVenueOptions;
+
+        bool firstShowMissingEmitted = false;
+        DateTime EffectiveFirstShow()
+        {
+            if (ctx.EffectiveFirstShow is DateTime dt) return dt;
+            if (!firstShowMissingEmitted)
+            {
+                result.Warnings.Add(new ScheduleWarning
+                {
+                    Type = ScheduleWarningType.FirstShowTimeMissing,
+                    Message = "First show time missing; defaulting to base date + 20h.",
+                });
+                firstShowMissingEmitted = true;
+            }
+            return ctx.BaseDate.AddHours(20);
+        }
+
+        // Defensive stage handling.
+        foreach (var slot in ctx.Order.Slots)
+        {
+            if (ctx.Show.Stages.Count > 0 && ctx.Show.Stages.All(s => s.Id != slot.StageId))
+            {
+                result.Warnings.Add(new ScheduleWarning
+                {
+                    Type = ScheduleWarningType.ConstraintViolation,
+                    Message = $"Slot references unknown stage {slot.StageId}.",
+                    SlotId = slot.Id,
+                });
+            }
+        }
+
+        // Per-band chain growth from anchor.
+        foreach (var slot in ctx.Order.Slots)
+        {
+            var anchorType = ctx.AnchorEvent;
+            var setLen = slot.SetLengthMinutes ?? template.DefaultSetLengthMinutes;
+
+            // Determine anchor start time.
+            DateTime anchorStart;
+            if (anchorType == TimingEventType.ON_STAGE)
+            {
+                if (slot.IsOnStagePinned && slot.OnStageTime.HasValue)
+                {
+                    anchorStart = slot.OnStageTime.Value;
+                }
+                else
+                {
+                    anchorStart = EffectiveFirstShow();
+                    slot.OnStageTime = anchorStart;
+                }
+            }
+            else
+            {
+                var firstShow = EffectiveFirstShow();
+                anchorStart = firstShow;
+
+                var pinnedAnchor = slot.PreShowEvents.FirstOrDefault(e =>
+                    e.EventType == anchorType && e.IsPinned && e.StartTime is DateTime);
+                if (pinnedAnchor?.StartTime is DateTime past)
+                    anchorStart = past;
+            }
+
+            // Build PreShowEvents backward from anchor (preserve pinned).
+            var pinnedPreShow = slot.PreShowEvents.Where(e => e.IsPinned).ToList();
+            var newPreShow = new List<SlotTimingEvent>();
+            DateTime cursor = anchorStart;
+
+            foreach (var entry in template.PreShowEntries)
+            {
+                if (entry.EventType == anchorType) continue; // anchor added after loop
+
+                var pinned = pinnedPreShow.FirstOrDefault(e =>
+                    e.EventType == entry.EventType && !newPreShow.Contains(e));
+
+                if (pinned != null)
+                {
+                    newPreShow.Add(pinned);
+                    if (pinned.StartTime is DateTime pst)
+                        cursor = pst;
+                }
+                else
+                {
+                    var start = cursor.AddMinutes(-entry.DefaultDurationMinutes);
+                    newPreShow.Add(new SlotTimingEvent
+                    {
+                        EventType = entry.EventType,
+                        StartTime = start,
+                        DurationMinutes = entry.DefaultDurationMinutes,
+                        IsPinned = false,
+                    });
+                    cursor = start;
+                }
+            }
+
+            // Add anchor event when not ON_STAGE.
+            if (anchorType != TimingEventType.ON_STAGE)
+            {
+                var pinnedAnchor = pinnedPreShow.FirstOrDefault(e =>
+                    e.EventType == anchorType && !newPreShow.Contains(e));
+                if (pinnedAnchor != null)
+                {
+                    newPreShow.Add(pinnedAnchor);
+                }
+                else
+                {
+                    var entry = template.PreShowEntries.FirstOrDefault(e => e.EventType == anchorType);
+                    var dur = entry?.DefaultDurationMinutes ?? 30;
+                    newPreShow.Add(new SlotTimingEvent
+                    {
+                        EventType = anchorType,
+                        StartTime = anchorStart,
+                        DurationMinutes = dur,
+                        IsPinned = false,
+                    });
+                }
+            }
+
+            foreach (var pinned in pinnedPreShow)
+            {
+                if (!newPreShow.Contains(pinned))
+                    newPreShow.Add(pinned);
+            }
+
+            slot.PreShowEvents = newPreShow;
+
+            // Build PostShowEvents forward from anchor end (preserve pinned).
+            var pinnedPostShow = slot.PostShowEvents.Where(e => e.IsPinned).ToList();
+            var newPostShow = new List<SlotTimingEvent>();
+            if (anchorType == TimingEventType.ON_STAGE)
+            {
+                cursor = anchorStart.AddMinutes(setLen);
+            }
+            else
+            {
+                var anchorEvent = newPreShow.FirstOrDefault(e => e.EventType == anchorType);
+                var anchorDur = anchorEvent?.DurationMinutes ?? template.PreShowEntries.FirstOrDefault(e => e.EventType == anchorType)?.DefaultDurationMinutes ?? 30;
+                cursor = anchorStart.AddMinutes(anchorDur);
+            }
+
+            foreach (var entry in template.PostShowEntries)
+            {
+                var pinned = pinnedPostShow.FirstOrDefault(e =>
+                    e.EventType == entry.EventType && !newPostShow.Contains(e));
+
+                if (pinned != null)
+                {
+                    newPostShow.Add(pinned);
+                    if (pinned.StartTime is DateTime pst)
+                        cursor = pst.AddMinutes(pinned.DurationMinutes ?? entry.DefaultDurationMinutes);
+                }
+                else
+                {
+                    newPostShow.Add(new SlotTimingEvent
+                    {
+                        EventType = entry.EventType,
+                        StartTime = cursor,
+                        DurationMinutes = entry.DefaultDurationMinutes,
+                        IsPinned = false,
+                    });
+                    cursor = cursor.AddMinutes(entry.DefaultDurationMinutes);
+                }
+            }
+
+            foreach (var pinned in pinnedPostShow)
+            {
+                if (!newPostShow.Contains(pinned))
+                    newPostShow.Add(pinned);
+            }
+
+            slot.PostShowEvents = newPostShow;
+
+            // If anchor is not ON_STAGE, derive ON_STAGE from the chain.
+            if (anchorType != TimingEventType.ON_STAGE && !slot.IsOnStagePinned)
+            {
+                var lastPostShow = slot.PostShowEvents
+                    .Where(e => e.StartTime.HasValue)
+                    .OrderBy(e => e.StartTime)
+                    .LastOrDefault();
+
+                if (lastPostShow?.StartTime is DateTime lpst)
+                {
+                    var dur = lastPostShow.DurationMinutes ?? 0;
+                    slot.OnStageTime = lpst.AddMinutes(dur);
+                }
+                else
+                {
+                    var anchorEvent = slot.PreShowEvents.FirstOrDefault(e => e.EventType == anchorType);
+                    var anchorDur = anchorEvent?.DurationMinutes ?? 0;
+                    slot.OnStageTime = anchorStart.AddMinutes(anchorDur);
+                }
+            }
+
+            // Early-chain validation.
+            if (template.EarlyChain.Count > 0)
+            {
+                var pinnedEarly = slot.EarlyChain.Where(e => e.IsPinned).ToList();
+                var newEarly = new List<SlotTimingEvent>();
+
+                foreach (var entry in template.EarlyChain)
+                {
+                    var pinned = pinnedEarly.FirstOrDefault(e =>
+                        e.EventType == entry.EventType && !newEarly.Contains(e));
+
+                    if (pinned != null)
+                        newEarly.Add(pinned);
+                    else
+                        newEarly.Add(new SlotTimingEvent
+                        {
+                            EventType = entry.EventType,
+                            StartTime = null,
+                            DurationMinutes = entry.DefaultDurationMinutes,
+                            IsPinned = false,
+                        });
+                }
+
+                foreach (var pinned in pinnedEarly)
+                {
+                    if (!newEarly.Contains(pinned))
+                        newEarly.Add(pinned);
+                }
+
+                slot.EarlyChain = newEarly;
+
+                DateTime? earlyEnd = null;
+                foreach (var ev in slot.EarlyChain)
+                {
+                    if (ev.StartTime is DateTime est)
+                    {
+                        var dur = ev.DurationMinutes ?? 30;
+                        var end = est.AddMinutes(dur);
+                        if (!earlyEnd.HasValue || end > earlyEnd) earlyEnd = end;
+                    }
+                }
+
+                if (earlyEnd.HasValue && slot.OnStageTime.HasValue && earlyEnd.Value > slot.OnStageTime.Value)
+                {
+                    result.Warnings.Add(new ScheduleWarning
+                    {
+                        Type = ScheduleWarningType.EarlySoundcheckAfterOnStage,
+                        Message = "Early chain ends after on-stage time.",
+                        SlotId = slot.Id,
+                    });
+                }
+            }
+        }
+
+        // Same-stage on-stage overlap (multi-stage independence).
+        var stageGroups = ctx.Order.Slots
+            .Where(s => ctx.Show.Stages.Count == 0 || ctx.Show.Stages.Any(st => st.Id == s.StageId))
+            .GroupBy(s => s.StageId);
+
+        foreach (var stage in stageGroups)
+        {
+            var ordered = stage.OrderBy(s => s.OnStageTime ?? DateTime.MaxValue).ToList();
+            for (int i = 1; i < ordered.Count; i++)
+            {
+                var prev = ordered[i - 1];
+                var curr = ordered[i];
+                if (prev.OnStageTime is DateTime pt && curr.OnStageTime is DateTime ct)
+                {
+                    var prevEnd = pt.AddMinutes(prev.SetLengthMinutes ?? template.DefaultSetLengthMinutes);
+                    if (ct < prevEnd)
+                    {
+                        if (curr.OverrideFlags.HasFlag(UserOverrideFlags.AllowOnStageOverlap))
+                        {
+                            result.Warnings.Add(new ScheduleWarning
+                            {
+                                Type = ScheduleWarningType.UserOverrideOverlap,
+                                Message = $"On-stage overlap allowed by user on stage {curr.StageId}.",
+                                SlotId = curr.Id,
+                                RelatedSlotId = prev.Id,
+                            });
+                        }
+                        else
+                        {
+                            result.Warnings.Add(new ScheduleWarning
+                            {
+                                Type = ScheduleWarningType.OnStageOverlap,
+                                Message = $"On-stage overlap on stage {curr.StageId}.",
+                                SlotId = curr.Id,
+                                RelatedSlotId = prev.Id,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        // Derive BackstageTime when not pinned.
+        foreach (var slot in ctx.Order.Slots)
+        {
+            if (slot.IsBackstageTimePinned) continue;
+            var lead = slot.BackstageLeadMinutes ?? options.DefaultBackstageLeadMinutes;
+            var candidates = new List<DateTime>();
+            var changeover = slot.PreShowEvents.FirstOrDefault(e => e.EventType == TimingEventType.CHANGEOVER);
+            if (changeover?.StartTime is DateTime c) candidates.Add(c);
+            var linecheck = slot.PreShowEvents.FirstOrDefault(e => e.EventType == TimingEventType.PRESHOW_LINECHECK);
+            if (linecheck?.StartTime is DateTime l) candidates.Add(l);
+            if (slot.OnStageTime is DateTime o) candidates.Add(o);
+            if (candidates.Count == 0) continue;
+            slot.BackstageTime = candidates.Min().AddMinutes(-lead);
+        }
+
+        // Sound curfew + backstage curfew checks.
+        foreach (var slot in ctx.Order.Slots)
+        {
+            if (ctx.EffectiveSoundCurfew is DateTime sc && slot.OnStageTime is DateTime onStage)
+            {
+                var end = onStage.AddMinutes(slot.SetLengthMinutes ?? template.DefaultSetLengthMinutes);
+                if (end > sc)
+                {
+                    result.Warnings.Add(new ScheduleWarning
+                    {
+                        Type = ScheduleWarningType.CurfewViolation,
+                        Message = $"Set end {end:HH:mm} exceeds sound curfew {sc:HH:mm}.",
+                        SlotId = slot.Id,
+                    });
+                }
+            }
+            var effectiveBackstageCurfew = slot.Flags.HasFlag(BandScheduleFlags.HasPersonalBackstageCurfew)
+                ? slot.BackstageCurfewTime
+                : ctx.EffectiveBackstageCurfew;
+            if (effectiveBackstageCurfew is DateTime bc && slot.OnStageTime is DateTime os)
+            {
+                var setEnd = os.AddMinutes(slot.SetLengthMinutes ?? template.DefaultSetLengthMinutes);
+                if (setEnd > bc)
+                {
+                    result.Warnings.Add(new ScheduleWarning
+                    {
+                        Type = ScheduleWarningType.CurfewViolation,
+                        Message = $"Set end {setEnd:HH:mm} exceeds backstage curfew {bc:HH:mm}.",
+                        SlotId = slot.Id,
+                    });
+                }
+            }
+        }
+
+        // Catering window check.
+        foreach (var slot in ctx.Order.Slots)
+        {
+            if (slot.CateringSlot is null) continue;
+            var windows = new List<TimeSlot?>
+            {
+                ctx.EffectiveBreakfast,
+                ctx.EffectiveLunch,
+                ctx.EffectiveDinner,
+            }.Where(w => w is not null).Cast<TimeSlot>().ToList();
+            if (windows.Count == 0) continue;
+            var inside = windows.Any(w => Contains(w, slot.CateringSlot));
+            if (!inside)
+            {
+                result.Warnings.Add(new ScheduleWarning
+                {
+                    Type = ScheduleWarningType.CateringOutsideHours,
+                    Message = $"Catering for slot {slot.Id} falls outside every active meal window.",
+                    SlotId = slot.Id,
+                });
+            }
+        }
+
+        // Venue-open window validation for LOAD_IN_VENUE events.
+        foreach (var slot in ctx.Order.Slots)
+        {
+            foreach (var ev in slot.PreShowEvents.Where(e => e.EventType == TimingEventType.LOAD_IN_VENUE))
+            {
+                if (ev.StartTime is not DateTime evStart) continue;
+                var dur = ev.DurationMinutes ?? options.DefaultLoadInVenueMinutes;
+                var evEnd = evStart.AddMinutes(dur);
+                if (ctx.EffectiveVenueOpen is DateTime vo && evStart < vo)
+                {
+                    result.Warnings.Add(new ScheduleWarning
+                    {
+                        Type = ScheduleWarningType.VenueClosed,
+                        Message = $"Load-in starts {evStart:HH:mm} before venue open {vo:HH:mm}.",
+                        SlotId = slot.Id,
+                    });
+                }
+                if (ctx.EffectiveVenueClose is DateTime vc && evEnd > vc)
+                {
+                    result.Warnings.Add(new ScheduleWarning
+                    {
+                        Type = ScheduleWarningType.VenueClosed,
+                        Message = $"Load-in ends {evEnd:HH:mm} after venue close {vc:HH:mm}.",
+                        SlotId = slot.Id,
+                    });
+                }
+            }
+        }
+    }
+
     private static bool Contains(TimeSlot window, TimeSlot value)
     {
         if (window.End is null)
@@ -392,6 +787,14 @@ public class RunningOrderScheduler : IRunningOrderScheduler
 
     private static void SeedSlotEvents(RunningOrderSlot slot, Ctx ctx)
     {
+        if (ctx.Mode == ScheduleMode.Festival)
+            SeedFestivalSlotEvents(slot, ctx);
+        else
+            SeedTraditionalSlotEvents(slot, ctx);
+    }
+
+    private static void SeedTraditionalSlotEvents(RunningOrderSlot slot, Ctx ctx)
+    {
         var opts = ctx.EffectiveVenueOptions;
         if (slot.OnStageTime is not DateTime onStage) return;
         var cursor = onStage;
@@ -405,6 +808,47 @@ public class RunningOrderScheduler : IRunningOrderScheduler
             SeedBackward(slot, TimingEventType.LOAD_IN_STAGE, ref cursor, opts.DefaultStageLoadInMinutes);
         if (opts.IncludeGetIn)
             SeedBackward(slot, TimingEventType.GET_IN, ref cursor, opts.DefaultGetInMinutes);
+    }
+
+    private static void SeedFestivalSlotEvents(RunningOrderSlot slot, Ctx ctx)
+    {
+        var template = ctx.Order.FestivalTemplate ?? new FestivalTimingTemplate();
+
+        foreach (var entry in template.PreShowEntries)
+        {
+            if (slot.PreShowEvents.Any(e => e.EventType == entry.EventType)) continue;
+            slot.PreShowEvents.Add(new SlotTimingEvent
+            {
+                EventType = entry.EventType,
+                StartTime = null,
+                DurationMinutes = entry.DefaultDurationMinutes,
+                IsPinned = false,
+            });
+        }
+
+        foreach (var entry in template.PostShowEntries)
+        {
+            if (slot.PostShowEvents.Any(e => e.EventType == entry.EventType)) continue;
+            slot.PostShowEvents.Add(new SlotTimingEvent
+            {
+                EventType = entry.EventType,
+                StartTime = null,
+                DurationMinutes = entry.DefaultDurationMinutes,
+                IsPinned = false,
+            });
+        }
+
+        foreach (var entry in template.EarlyChain)
+        {
+            if (slot.EarlyChain.Any(e => e.EventType == entry.EventType)) continue;
+            slot.EarlyChain.Add(new SlotTimingEvent
+            {
+                EventType = entry.EventType,
+                StartTime = null,
+                DurationMinutes = entry.DefaultDurationMinutes,
+                IsPinned = false,
+            });
+        }
     }
 
     private static void SeedBackward(RunningOrderSlot slot, TimingEventType type, ref DateTime cursor, int duration)
