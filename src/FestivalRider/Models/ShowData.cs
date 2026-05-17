@@ -21,16 +21,16 @@ public class ShowData
 
     public ScheduleMode DefaultScheduleMode { get; set; } = ScheduleMode.Traditional;
     public TimingEventType DefaultAnchorEvent { get; set; } = TimingEventType.ON_STAGE;
-    public DateTime? VenueOpenTime { get; set; }
-    public DateTime? VenueCloseTime { get; set; }
-    public DateTime? TechnicalGetInTime { get; set; }
-    public DateTime? DoorsOpeningTime { get; set; }
-    public DateTime? FirstShowTime { get; set; }
-    public DateTime? SoundCurfewTime { get; set; }
-    public DateTime? BackstageCurfewTime { get; set; }
-    public TimeSlot? BreakfastHours { get; set; }
-    public TimeSlot? LunchHours { get; set; }
-    public TimeSlot? DinnerHours { get; set; }
+    public DateTime? VenueOpenTime { get; set; } = DateTime.Today.AddHours(14);
+    public DateTime? VenueCloseTime { get; set; } = DateTime.Today.AddHours(23).AddMinutes(45);
+    public DateTime? TechnicalGetInTime { get; set; } = DateTime.Today.AddHours(15);
+    public DateTime? DoorsOpeningTime { get; set; } = DateTime.Today.AddHours(19).AddMinutes(30);
+    public DateTime? FirstShowTime { get; set; } = DateTime.Today.AddHours(20);
+    public DateTime? SoundCurfewTime { get; set; } = DateTime.Today.AddHours(23);
+    public DateTime? BackstageCurfewTime { get; set; } = DateTime.Today.AddHours(23).AddMinutes(30);
+    public TimeSlot? BreakfastHours { get; set; } = new() { Start = DateTime.Today.AddHours(8), End = DateTime.Today.AddHours(10) };
+    public TimeSlot? LunchHours { get; set; } = new() { Start = DateTime.Today.AddHours(12), End = DateTime.Today.AddHours(14) };
+    public TimeSlot? DinnerHours { get; set; } = new() { Start = DateTime.Today.AddHours(18), End = DateTime.Today.AddHours(19) };
     public int BreakTimeMinutes { get; set; } = 120;
     public int SoundcheckGapMinutes { get; set; } = 0;
     public List<StageLinkGroup> StageLinkGroups { get; set; } = new();
