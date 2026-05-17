@@ -1,0 +1,252 @@
+@using FestivalRider.Models
+
+@if (Slot is null)
+{
+    <p class="text-muted small">@SelectSlotHint</p>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="m-0 fw-bold">@BandName</h6>
+    </div>
+
+    @if (Slot.EarlyChain.Count > 0)
+    {
+        <div class="mb-2">
+            <h6 class="small fw-bold">@EarlyChainHeading</h6>
+            @foreach (var ev in Slot.EarlyChain.OrderBy(e => e.StartTime ?? DateTime.MinValue))
+            {
+                <EventRow Event="ev" BaseDate="BaseDate" GetDefaultDuration="GetDefaultDuration" GetLabel="GetEventLabel" OnChange="NotifyChange" />
+            }
+        </div>
+    }
+
+    <div class="mb-2">
+        <h6 class="small fw-bold">@PreShowHeading</h6>
+        @if (Slot.BackstageTime.HasValue)
+        {
+            <div class="d-flex align-items-center gap-2 py-1 px-2 rounded" style="background:#e9ecef">
+                <span class="small fw-bold">@BackstageRowLabel</span>
+                <span class="small">@FormatTime(Slot.BackstageTime.Value)</span>
+                @if (Slot.IsBackstageTimePinned)
+                {
+                    <span class="badge bg-secondary">PIN</span>
+                }
+            </div>
+        }
+        @foreach (var ev in Slot.PreShowEvents.OrderByDescending(e => e.StartTime ?? DateTime.MaxValue))
+        {
+            <EventRow Event="ev" BaseDate="BaseDate" GetDefaultDuration="GetDefaultDuration" GetLabel="GetEventLabel" OnChange="NotifyChange" />
+        }
+    </div>
+
+    <div class="mb-2">
+        <h6 class="small fw-bold">@PostShowHeading</h6>
+        @foreach (var ev in Slot.PostShowEvents.OrderBy(e => e.StartTime ?? DateTime.MinValue))
+        {
+            <EventRow Event="ev" BaseDate="BaseDate" GetDefaultDuration="GetDefaultDuration" GetLabel="GetEventLabel" OnChange="NotifyChange" />
+        }
+    </div>
+
+    <div class="mb-2">
+        <h6 class="small fw-bold">@ConstraintsHeading</h6>
+        <div class="row g-1 mb-1">
+            <div class="col-6">
+                <label class="form-label small mb-0">@BackstageCurfewLabel</label>
+                <input type="time" class="form-control form-control-sm"
+                       value="@FormatTimeInput(Slot.BackstageCurfewTime)"
+                       @onchange="e => OnBackstageCurfewChanged(e.Value)" />
+            </div>
+            <div class="col-6 d-flex align-items-end">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="personal-curfew-@_id"
+                           checked="@_hasPersonalCurfew"
+                           @onchange="e => OnPersonalCurfewChanged(e.Value)" />
+                    <label class="form-check-label small" for="personal-curfew-@_id">@HasPersonalCurfewLabel</label>
+                </div>
+            </div>
+        </div>
+        <div class="row g-1 mb-1">
+            <div class="col-6">
+                <label class="form-label small mb-0">@CateringLabel @StartLabel</label>
+                <input type="time" class="form-control form-control-sm"
+                       value="@FormatTimeInput(Slot.CateringSlot?.Start)"
+                       @onchange="e => OnCateringStartChanged(e.Value)" />
+            </div>
+            <div class="col-6">
+                <label class="form-label small mb-0">@CateringLabel @EndLabel</label>
+                <input type="time" class="form-control form-control-sm"
+                       value="@FormatTimeInput(Slot.CateringSlot?.End)"
+                       @onchange="e => OnCateringEndChanged(e.Value)" />
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-2">
+        <h6 class="small fw-bold">@OverrideFlagsHeading</h6>
+        <div class="form-check">
+            <InputCheckbox class="form-check-input" @bind-Value="_allowSoundcheckOverlap" />
+            <label class="form-check-label small">@AllowSoundcheckOverlapLabel</label>
+        </div>
+        <div class="form-check">
+            <InputCheckbox class="form-check-input" @bind-Value="_allowOnStageOverlap" />
+            <label class="form-check-label small">@AllowOnStageOverlapLabel</label>
+        </div>
+    </div>
+
+    <div class="mb-2">
+        <h6 class="small fw-bold">@AddEventPickerTitle</h6>
+        <div class="d-flex gap-1">
+            <select class="form-select form-select-sm" @bind="_selectedEventType">
+                @foreach (var t in Enum.GetValues<TimingEventType>())
+                {
+                    <option value="@t">@GetEventLabel(t)</option>
+                }
+            </select>
+            <button class="btn btn-sm btn-outline-primary" @onclick="AddSelectedEvent">@AddEventBtn</button>
+        </div>
+        <p class="text-muted small mt-1 mb-0">@AddEventPlacementHint</p>
+    </div>
+}
+
+@code {
+    [Parameter] public RunningOrderSlot? Slot { get; set; }
+    [Parameter] public RunningOrder Order { get; set; } = new();
+    [Parameter] public ShowData Show { get; set; } = new();
+    [Parameter] public string BandName { get; set; } = "Band";
+    [Parameter] public string SelectSlotHint { get; set; } = "Select a slot.";
+    [Parameter] public string EarlyChainHeading { get; set; } = "Early chain";
+    [Parameter] public string PreShowHeading { get; set; } = "Pre-show";
+    [Parameter] public string PostShowHeading { get; set; } = "Post-show";
+    [Parameter] public string BackstageRowLabel { get; set; } = "Backstage";
+    [Parameter] public string ConstraintsHeading { get; set; } = "Constraints";
+    [Parameter] public string BackstageCurfewLabel { get; set; } = "Backstage curfew";
+    [Parameter] public string HasPersonalCurfewLabel { get; set; } = "Personal curfew";
+    [Parameter] public string CateringLabel { get; set; } = "Catering";
+    [Parameter] public string StartLabel { get; set; } = "Start";
+    [Parameter] public string EndLabel { get; set; } = "End";
+    [Parameter] public string OverrideFlagsHeading { get; set; } = "Overrides";
+    [Parameter] public string AllowSoundcheckOverlapLabel { get; set; } = "Allow soundcheck overlap";
+    [Parameter] public string AllowOnStageOverlapLabel { get; set; } = "Allow on-stage overlap";
+    [Parameter] public string AddEventBtn { get; set; } = "+ Add";
+    [Parameter] public string AddEventPickerTitle { get; set; } = "Add event";
+    [Parameter] public string AddEventPlacementHint { get; set; } = "Event will be placed automatically.";
+    [Parameter] public Func<TimingEventType, string> GetEventLabel { get; set; } = t => t.ToString();
+    [Parameter] public EventCallback OnChange { get; set; }
+    [Parameter] public EventCallback<TimingEventType> OnAddEvent { get; set; }
+
+    private static int _seq;
+    private readonly int _id = Interlocked.Increment(ref _seq);
+
+    private bool _hasPersonalCurfew => (Slot?.Flags & BandScheduleFlags.HasPersonalBackstageCurfew) != 0;
+
+    private TimingEventType _selectedEventType = TimingEventType.CATERING;
+    private bool _allowSoundcheckOverlap
+    {
+        get => (Slot?.OverrideFlags & UserOverrideFlags.AllowSoundcheckOverlap) != 0;
+        set
+        {
+            if (Slot is null) return;
+            if (value) Slot.OverrideFlags |= UserOverrideFlags.AllowSoundcheckOverlap;
+            else Slot.OverrideFlags &= ~UserOverrideFlags.AllowSoundcheckOverlap;
+            NotifyChange();
+        }
+    }
+    private bool _allowOnStageOverlap
+    {
+        get => (Slot?.OverrideFlags & UserOverrideFlags.AllowOnStageOverlap) != 0;
+        set
+        {
+            if (Slot is null) return;
+            if (value) Slot.OverrideFlags |= UserOverrideFlags.AllowOnStageOverlap;
+            else Slot.OverrideFlags &= ~UserOverrideFlags.AllowOnStageOverlap;
+            NotifyChange();
+        }
+    }
+
+    private DateTime BaseDate => Show.DateOfOpening == default
+        ? DateTime.Today
+        : Show.DateOfOpening.AddDays(Math.Max(0, Order.ShowDayNumber - 1)).ToDateTime(TimeOnly.MinValue);
+
+    private int GetDefaultDuration(TimingEventType type)
+    {
+        var template = Order.FestivalTemplate;
+        var opts = Order.VenueOptions ?? new VenueTimingOptions();
+        if (template is not null)
+        {
+            var entry = template.EarlyChain.Concat(template.PreShowEntries).Concat(template.PostShowEntries)
+                .FirstOrDefault(e => e.EventType == type);
+            if (entry is not null) return entry.DefaultDurationMinutes;
+        }
+        return type switch
+        {
+            TimingEventType.GET_IN => opts.DefaultGetInMinutes,
+            TimingEventType.LOAD_IN_VENUE => opts.DefaultLoadInVenueMinutes,
+            TimingEventType.LOAD_IN_STAGE => opts.DefaultStageLoadInMinutes,
+            TimingEventType.BACKSTAGE_DROP => opts.DefaultBackstageDropMinutes,
+            TimingEventType.SETUP_ON_STAGE => opts.DefaultSetupOnStageMinutes,
+            TimingEventType.SOUNDCHECK => opts.DefaultSoundcheckMinutes,
+            TimingEventType.CHANGEOVER => opts.DefaultChangeoverMinutes,
+            TimingEventType.PRESHOW_LINECHECK => opts.DefaultPreShowLinecheckMinutes,
+            TimingEventType.ON_STAGE => opts.DefaultSetLengthMinutes,
+            _ => 15,
+        };
+    }
+
+    private string FormatTime(DateTime dt)
+    {
+        var dayOffset = (int)(dt.Date - BaseDate.Date).TotalDays;
+        var badge = dayOffset > 0 ? $"+{dayOffset}d " : string.Empty;
+        return badge + dt.ToString("HH:mm");
+    }
+
+    private string? FormatTimeInput(DateTime? dt) => dt?.ToString("HH:mm");
+
+    private void OnBackstageCurfewChanged(object? value)
+    {
+        if (Slot is null) return;
+        if (value is string s && TimeOnly.TryParse(s, out var t))
+            Slot.BackstageCurfewTime = BaseDate.Date.Add(t.ToTimeSpan());
+        else
+            Slot.BackstageCurfewTime = null;
+        NotifyChange();
+    }
+
+    private void OnCateringStartChanged(object? value)
+    {
+        if (Slot is null) return;
+        Slot.CateringSlot ??= new TimeSlot { Start = BaseDate };
+        if (value is string s && TimeOnly.TryParse(s, out var t))
+            Slot.CateringSlot.Start = BaseDate.Date.Add(t.ToTimeSpan());
+        else
+            Slot.CateringSlot = null;
+        NotifyChange();
+    }
+
+    private void OnCateringEndChanged(object? value)
+    {
+        if (Slot is null || Slot.CateringSlot is null) return;
+        if (value is string s && TimeOnly.TryParse(s, out var t))
+            Slot.CateringSlot.End = BaseDate.Date.Add(t.ToTimeSpan());
+        else
+            Slot.CateringSlot.End = null;
+        NotifyChange();
+    }
+
+    private void AddSelectedEvent()
+    {
+        OnAddEvent.InvokeAsync(_selectedEventType);
+    }
+
+    private void OnPersonalCurfewChanged(object? value)
+    {
+        if (Slot is null) return;
+        if (value is bool b && b)
+            Slot.Flags |= BandScheduleFlags.HasPersonalBackstageCurfew;
+        else
+            Slot.Flags &= ~BandScheduleFlags.HasPersonalBackstageCurfew;
+        NotifyChange();
+    }
+
+    private void NotifyChange() => OnChange.InvokeAsync();
+}

@@ -1,0 +1,309 @@
+@using FestivalRider.Models
+@using FestivalRider.Services
+
+<div class="d-flex flex-wrap gap-2 align-items-end mb-2">
+    <div class="d-flex align-items-center gap-1">
+        <label class="small text-muted mb-0">@ModeLabel</label>
+        <select class="form-select form-select-sm" style="width: 130px;" value="@Order.ModeOverride" @onchange="OnModeChanged">
+            <option value="">@DefaultLabel (@Show.DefaultScheduleMode)</option>
+            <option value="@ScheduleMode.Traditional">@GetModeLabel(ScheduleMode.Traditional)</option>
+            <option value="@ScheduleMode.Festival">@GetModeLabel(ScheduleMode.Festival)</option>
+        </select>
+    </div>
+    <div class="d-flex align-items-center gap-1">
+        <label class="small text-muted mb-0">@AnchorLabel</label>
+        <select class="form-select form-select-sm" style="width: 130px;" value="@Order.AnchorEventOverride" @onchange="OnAnchorChanged">
+            <option value="">@DefaultLabel (@GetEventLabel(Show.DefaultAnchorEvent))</option>
+            @foreach (var t in Enum.GetValues<TimingEventType>())
+            {
+                <option value="@t">@GetEventLabel(t)</option>
+            }
+        </select>
+    </div>
+    <div class="d-flex align-items-center gap-1">
+        <label class="small text-muted mb-0">@BreakLabel</label>
+        <input type="number" class="form-control form-control-sm" style="width: 70px;" value="@Order.BreakTimeMinutesOverride" @onchange="e => OnOverrideInt(e, v => Order.BreakTimeMinutesOverride = v)" />
+    </div>
+    <div class="d-flex align-items-center gap-1">
+        <label class="small text-muted mb-0">@GapLabel</label>
+        <input type="number" class="form-control form-control-sm" style="width: 70px;" value="@Order.SoundcheckGapMinutesOverride" @onchange="e => OnOverrideInt(e, v => Order.SoundcheckGapMinutesOverride = v)" />
+    </div>
+    <div class="ms-auto d-flex gap-1">
+        <button class="btn btn-sm btn-outline-secondary" @onclick="() => _showTemplate = true">@TemplateBtnLabel</button>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="() => _showVenueOptions = true">@VenueOptionsBtnLabel</button>
+    </div>
+</div>
+
+<div class="d-flex flex-wrap gap-2 align-items-end mb-2">
+    <TimeInput Label="@VenueOpenLabel" Value="@Order.VenueOpenTimeOverride" BaseDate="BaseDate" OnChange="v => { Order.VenueOpenTimeOverride = v; Notify(); }" />
+    <TimeInput Label="@VenueCloseLabel" Value="@Order.VenueCloseTimeOverride" BaseDate="BaseDate" OnChange="v => { Order.VenueCloseTimeOverride = v; Notify(); }" />
+    <TimeInput Label="@TechnicalGetInLabel" Value="@Order.TechnicalGetInTimeOverride" BaseDate="BaseDate" OnChange="v => { Order.TechnicalGetInTimeOverride = v; Notify(); }" />
+    <TimeInput Label="@DoorsLabel" Value="@Order.DoorsOpeningTimeOverride" BaseDate="BaseDate" OnChange="v => { Order.DoorsOpeningTimeOverride = v; Notify(); }" />
+    <TimeInput Label="@FirstShowLabel" Value="@Order.FirstShowTimeOverride" BaseDate="BaseDate" OnChange="v => { Order.FirstShowTimeOverride = v; Notify(); }" />
+    <TimeInput Label="@SoundCurfewLabel" Value="@Order.SoundCurfewTimeOverride" BaseDate="BaseDate" OnChange="v => { Order.SoundCurfewTimeOverride = v; Notify(); }" />
+    <TimeInput Label="@BackstageCurfewLabel" Value="@Order.BackstageCurfewTimeOverride" BaseDate="BaseDate" OnChange="v => { Order.BackstageCurfewTimeOverride = v; Notify(); }" />
+</div>
+
+<div class="d-flex flex-wrap gap-2 align-items-end mb-2">
+    <TimeInput Label="@BreakfastLabel" Value="@Order.BreakfastHoursOverride?.Start" BaseDate="BaseDate" OnChange="v => { Order.BreakfastHoursOverride ??= new TimeSlot(); Order.BreakfastHoursOverride.Start = v ?? BaseDate; Notify(); }" />
+    <TimeInput Label="@LunchLabel" Value="@Order.LunchHoursOverride?.Start" BaseDate="BaseDate" OnChange="v => { Order.LunchHoursOverride ??= new TimeSlot(); Order.LunchHoursOverride.Start = v ?? BaseDate; Notify(); }" />
+    <TimeInput Label="@DinnerLabel" Value="@Order.DinnerHoursOverride?.Start" BaseDate="BaseDate" OnChange="v => { Order.DinnerHoursOverride ??= new TimeSlot(); Order.DinnerHoursOverride.Start = v ?? BaseDate; Notify(); }" />
+</div>
+
+<div class="row g-2">
+    <div class="col-lg-8">
+        <ScheduleGantt Order="Order" Show="Show" SelectedSlotId="_selectedSlotId" Bands="Bands"
+                       SelectSlotHint="@SelectSlotHint"
+                       UnknownBandLabel="@UnknownBandLabel"
+                       LegendSoundcheck="@LegendSoundcheck"
+                       LegendOnStage="@LegendOnStage"
+                       LegendEarly="@LegendEarly"
+                       LegendPost="@LegendPost"
+                       OnSelectSlot="OnSelectSlot" />
+
+        @if (CanAddSlot)
+        {
+            <div class="d-flex gap-2 align-items-end mt-2">
+                <select class="form-select form-select-sm" style="width: 200px;" @bind="_newSlotBandId">
+                    <option value="@Guid.Empty">@PickBandLabel</option>
+                    @foreach (var b in Bands)
+                    {
+                        <option value="@b.Id">@b.Name</option>
+                    }
+                </select>
+                <select class="form-select form-select-sm" style="width: 150px;" @bind="_newSlotStageId">
+                    <option value="0">@PickStageLabel</option>
+                    @foreach (var s in Stages)
+                    {
+                        <option value="@s.Id">@s.Name</option>
+                    }
+                </select>
+                <button class="btn btn-sm btn-outline-primary" @onclick="AddSlot">@AddSlotLabel</button>
+            </div>
+        }
+    </div>
+    <div class="col-lg-4">
+        <ScheduleBandPanel Slot="SelectedSlot" Order="Order" Show="Show" BandName="@SelectedBandName"
+                             GetEventLabel="GetEventLabel"
+                             EarlyChainHeading="@EarlyChainHeading"
+                             PreShowHeading="@PreShowHeading"
+                             PostShowHeading="@PostShowHeading"
+                             BackstageRowLabel="@BackstageRowLabel"
+                             ConstraintsHeading="@ConstraintsHeading"
+                             BackstageCurfewLabel="@BackstageCurfewLabel"
+                             HasPersonalCurfewLabel="@HasPersonalCurfewLabel"
+                             CateringLabel="@CateringLabel"
+                             StartLabel="@StartLabel"
+                             EndLabel="@EndLabel"
+                             OverrideFlagsHeading="@OverrideFlagsHeading"
+                             AllowSoundcheckOverlapLabel="@AllowSoundcheckOverlapLabel"
+                             AllowOnStageOverlapLabel="@AllowOnStageOverlapLabel"
+                             AddEventBtn="@AddEventBtn"
+                             AddEventPickerTitle="@AddEventPickerTitle"
+                             AddEventPlacementHint="@AddEventPlacementHint"
+                             OnChange="Notify"
+                             OnAddEvent="OnAddEvent" />
+    </div>
+</div>
+
+<TemplateEditor @bind-Visible="_showTemplate" Template="GetOrCreateTemplate()" OnChange="Notify"
+                Title="@TemplateTitle"
+                PresetFestivalMainStage="@PresetFestivalMainStage"
+                PresetFestivalTent="@PresetFestivalTent"
+                PresetTraditionalVenue="@PresetTraditionalVenue"
+                CloseLabel="@CloseLabel"
+                GetEventLabel="GetEventLabel" />
+
+<VenueOptionsEditor @bind-Visible="_showVenueOptions" Options="GetOrCreateVenueOptions()" OnChange="Notify"
+                  Title="@VenueOptionsTitle"
+                  CloseLabel="@CloseLabel"
+                  GetInLabel="@VenueGetInLabel"
+                  LoadInVenueLabel="@VenueLoadInVenueLabel"
+                  StageLoadInLabel="@VenueStageLoadInLabel"
+                  BackstageDropLabel="@VenueBackstageDropLabel"
+                  SetupOnStageLabel="@VenueSetupOnStageLabel"
+                  SoundcheckLabel="@VenueSoundcheckLabel"
+                  PreShowLinecheckLabel="@VenuePreShowLinecheckLabel"
+                  GetInDefaultLabel="@VenueGetInDefaultLabel"
+                  LoadInVenueDefaultLabel="@VenueLoadInVenueDefaultLabel"
+                  StageLoadInDefaultLabel="@VenueStageLoadInDefaultLabel"
+                  BackstageDropDefaultLabel="@VenueBackstageDropDefaultLabel"
+                  SetupOnStageDefaultLabel="@VenueSetupOnStageDefaultLabel"
+                  SoundcheckDefaultLabel="@VenueSoundcheckDefaultLabel"
+                  PreShowLinecheckDefaultLabel="@VenuePreShowLinecheckDefaultLabel"
+                  BackstageLeadDefaultLabel="@VenueBackstageLeadDefaultLabel"
+                  ChangeoverDefaultLabel="@VenueChangeoverDefaultLabel"
+                  SetLengthDefaultLabel="@VenueSetLengthDefaultLabel" />
+
+@code {
+    [Parameter] public RunningOrder Order { get; set; } = new();
+    [Parameter] public ShowData Show { get; set; } = new();
+    [Parameter] public IReadOnlyList<Band> Bands { get; set; } = new List<Band>();
+    [Parameter] public IReadOnlyList<Stage> Stages { get; set; } = new List<Stage>();
+    [Parameter] public Func<TimingEventType, string> GetEventLabel { get; set; } = t => t.ToString();
+    [Parameter] public Func<ScheduleMode, string> GetModeLabel { get; set; } = m => m.ToString();
+    [Parameter] public EventCallback OnChange { get; set; }
+
+    [Parameter] public string ModeLabel { get; set; } = "Mode";
+    [Parameter] public string AnchorLabel { get; set; } = "Anchor";
+    [Parameter] public string DefaultLabel { get; set; } = "Default";
+    [Parameter] public string BreakLabel { get; set; } = "Break";
+    [Parameter] public string GapLabel { get; set; } = "Gap";
+    [Parameter] public string VenueOpenLabel { get; set; } = "Venue open";
+    [Parameter] public string VenueCloseLabel { get; set; } = "Venue close";
+    [Parameter] public string TechnicalGetInLabel { get; set; } = "Tech get-in";
+    [Parameter] public string DoorsLabel { get; set; } = "Doors";
+    [Parameter] public string FirstShowLabel { get; set; } = "First show";
+    [Parameter] public string SoundCurfewLabel { get; set; } = "Sound curfew";
+    [Parameter] public string BackstageCurfewLabel { get; set; } = "Backstage curfew";
+    [Parameter] public string BreakfastLabel { get; set; } = "Breakfast";
+    [Parameter] public string LunchLabel { get; set; } = "Lunch";
+    [Parameter] public string DinnerLabel { get; set; } = "Dinner";
+    [Parameter] public string SelectSlotHint { get; set; } = "Click a band to view details.";
+    [Parameter] public string UnknownBandLabel { get; set; } = "Unknown";
+    [Parameter] public string LegendSoundcheck { get; set; } = "Soundcheck";
+    [Parameter] public string LegendOnStage { get; set; } = "On stage";
+    [Parameter] public string LegendEarly { get; set; } = "Early";
+    [Parameter] public string LegendPost { get; set; } = "Post-show";
+    [Parameter] public string PickBandLabel { get; set; } = "Pick band";
+    [Parameter] public string PickStageLabel { get; set; } = "Pick stage";
+    [Parameter] public string AddSlotLabel { get; set; } = "+ Add slot";
+    [Parameter] public string TemplateBtnLabel { get; set; } = "Template";
+    [Parameter] public string VenueOptionsBtnLabel { get; set; } = "Venue options";
+    [Parameter] public string EarlyChainHeading { get; set; } = "Early chain";
+    [Parameter] public string PreShowHeading { get; set; } = "Pre-show";
+    [Parameter] public string PostShowHeading { get; set; } = "Post-show";
+    [Parameter] public string BackstageRowLabel { get; set; } = "Backstage";
+    [Parameter] public string ConstraintsHeading { get; set; } = "Constraints";
+    [Parameter] public string HasPersonalCurfewLabel { get; set; } = "Personal curfew";
+    [Parameter] public string CateringLabel { get; set; } = "Catering";
+    [Parameter] public string StartLabel { get; set; } = "Start";
+    [Parameter] public string EndLabel { get; set; } = "End";
+    [Parameter] public string OverrideFlagsHeading { get; set; } = "Overrides";
+    [Parameter] public string AllowSoundcheckOverlapLabel { get; set; } = "Allow soundcheck overlap";
+    [Parameter] public string AllowOnStageOverlapLabel { get; set; } = "Allow on-stage overlap";
+    [Parameter] public string AddEventBtn { get; set; } = "+ Add";
+    [Parameter] public string AddEventPickerTitle { get; set; } = "Add event";
+    [Parameter] public string AddEventPlacementHint { get; set; } = "Event will be placed automatically.";
+    [Parameter] public string TemplateTitle { get; set; } = "Timing template";
+    [Parameter] public string PresetFestivalMainStage { get; set; } = "Festival main stage";
+    [Parameter] public string PresetFestivalTent { get; set; } = "Festival tent";
+    [Parameter] public string PresetTraditionalVenue { get; set; } = "Traditional venue";
+    [Parameter] public string VenueOptionsTitle { get; set; } = "Venue options";
+    [Parameter] public string CloseLabel { get; set; } = "Done";
+    [Parameter] public string VenueGetInLabel { get; set; } = "Get-in";
+    [Parameter] public string VenueLoadInVenueLabel { get; set; } = "Load-in (venue)";
+    [Parameter] public string VenueStageLoadInLabel { get; set; } = "Load-in (stage)";
+    [Parameter] public string VenueBackstageDropLabel { get; set; } = "Backstage drop";
+    [Parameter] public string VenueSetupOnStageLabel { get; set; } = "Setup on stage";
+    [Parameter] public string VenueSoundcheckLabel { get; set; } = "Soundcheck";
+    [Parameter] public string VenuePreShowLinecheckLabel { get; set; } = "Line check";
+    [Parameter] public string VenueGetInDefaultLabel { get; set; } = "Get-in";
+    [Parameter] public string VenueLoadInVenueDefaultLabel { get; set; } = "Load-in (venue)";
+    [Parameter] public string VenueStageLoadInDefaultLabel { get; set; } = "Load-in (stage)";
+    [Parameter] public string VenueBackstageDropDefaultLabel { get; set; } = "Backstage drop";
+    [Parameter] public string VenueSetupOnStageDefaultLabel { get; set; } = "Setup on stage";
+    [Parameter] public string VenueSoundcheckDefaultLabel { get; set; } = "Soundcheck";
+    [Parameter] public string VenuePreShowLinecheckDefaultLabel { get; set; } = "Line check";
+    [Parameter] public string VenueBackstageLeadDefaultLabel { get; set; } = "Backstage lead";
+    [Parameter] public string VenueChangeoverDefaultLabel { get; set; } = "Changeover";
+    [Parameter] public string VenueSetLengthDefaultLabel { get; set; } = "Set length";
+
+    private Guid _selectedSlotId = Guid.Empty;
+    private Guid _newSlotBandId = Guid.Empty;
+    private int _newSlotStageId = 0;
+    private bool _showTemplate = false;
+    private bool _showVenueOptions = false;
+
+    private DateTime BaseDate => Show.DateOfOpening == default
+        ? DateTime.Today
+        : Show.DateOfOpening.AddDays(Math.Max(0, Order.ShowDayNumber - 1)).ToDateTime(TimeOnly.MinValue);
+
+    private RunningOrderSlot? SelectedSlot => Order.Slots.FirstOrDefault(s => s.Id == _selectedSlotId);
+
+    private string SelectedBandName
+    {
+        get
+        {
+            var slot = SelectedSlot;
+            if (slot is null) return "Band";
+            var band = Bands.FirstOrDefault(b => b.Id == slot.BandId);
+            return band?.Name ?? UnknownBandLabel;
+        }
+    }
+
+    private bool CanAddSlot => Bands.Count > 0;
+
+    private FestivalTimingTemplate GetOrCreateTemplate()
+    {
+        Order.FestivalTemplate ??= new FestivalTimingTemplate();
+        return Order.FestivalTemplate;
+    }
+
+    private VenueTimingOptions GetOrCreateVenueOptions()
+    {
+        Order.VenueOptions ??= new VenueTimingOptions();
+        return Order.VenueOptions;
+    }
+
+    private void OnSelectSlot(Guid slotId) => _selectedSlotId = slotId;
+
+    private void OnModeChanged(ChangeEventArgs e)
+    {
+        if (e.Value is string s && Enum.TryParse<ScheduleMode>(s, out var m))
+            Order.ModeOverride = m;
+        else
+            Order.ModeOverride = null;
+        Notify();
+    }
+
+    private void OnAnchorChanged(ChangeEventArgs e)
+    {
+        if (e.Value is string s && Enum.TryParse<TimingEventType>(s, out var t))
+            Order.AnchorEventOverride = t;
+        else
+            Order.AnchorEventOverride = null;
+        Notify();
+    }
+
+    private void OnOverrideInt(ChangeEventArgs e, Action<int?> setter)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var v) && v > 0)
+            setter(v);
+        else
+            setter(null);
+        Notify();
+    }
+
+    private void AddSlot()
+    {
+        if (_newSlotBandId == Guid.Empty || Bands.All(b => b.Id != _newSlotBandId)) return;
+        var stageId = Stages.Count > 0 ? (_newSlotStageId != 0 ? _newSlotStageId : Stages.First().Id) : 0;
+        var placement = new BandPlacement { BandId = _newSlotBandId, StageId = stageId };
+        Order.Slots.Add(new RunningOrderSlot
+        {
+            Id = Guid.NewGuid(),
+            BandId = _newSlotBandId,
+            StageId = stageId,
+        });
+        _newSlotBandId = Guid.Empty;
+        _newSlotStageId = 0;
+        Notify();
+    }
+
+    private void OnAddEvent(TimingEventType type)
+    {
+        var slot = SelectedSlot;
+        if (slot is null) return;
+        var ev = new SlotTimingEvent { EventType = type };
+        if (type == TimingEventType.CATERING || type == TimingEventType.BACKSTAGE_WAIT)
+            slot.PreShowEvents.Add(ev);
+        else if (type == TimingEventType.LOAD_OUT_STAGING || type == TimingEventType.LOAD_OUT_VENUE)
+            slot.PostShowEvents.Add(ev);
+        else
+            slot.PreShowEvents.Add(ev);
+        Notify();
+    }
+
+    private void Notify() => OnChange.InvokeAsync();
+}

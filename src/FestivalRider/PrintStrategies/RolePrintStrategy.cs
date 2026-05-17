@@ -37,6 +37,9 @@ public class RolePrintStrategy : IPrintStrategy
     {
         var (order, role, slots) = Resolve(context);
         var show = _bands.FindShow(order.ShowId) ?? new ShowData();
+        var baseDate = show.DateOfOpening == default
+            ? DateTime.Today
+            : show.DateOfOpening.AddDays(order.ShowDayNumber - 1).ToDateTime(TimeOnly.MinValue);
         return builder =>
         {
             var seq = 0;
@@ -52,7 +55,7 @@ public class RolePrintStrategy : IPrintStrategy
             {
                 var band = _bands.FindBand(order.ShowId, s.BandId);
                 if (band is null) continue;
-                BuildBandBlock(builder, ref seq, band, s, role, order.ShowId);
+                BuildBandBlock(builder, ref seq, band, s, role, order.ShowId, baseDate);
             }
         };
     }
@@ -92,7 +95,7 @@ public class RolePrintStrategy : IPrintStrategy
         b.CloseElement();
     }
 
-    private void BuildBandBlock(RenderTreeBuilder b, ref int seq, Band band, RunningOrderSlot slot, ContactRole role, Guid showId)
+    private void BuildBandBlock(RenderTreeBuilder b, ref int seq, Band band, RunningOrderSlot slot, ContactRole role, Guid showId, DateTime baseDate)
     {
         var stage = _bands.FindStage(showId, slot.StageId);
         var stageLabel = stage?.Name ?? _loc.T("page.runningOrder.unknownStage", slot.StageId);
@@ -103,7 +106,7 @@ public class RolePrintStrategy : IPrintStrategy
 
         b.OpenElement(seq++, "h2");
         b.AddAttribute(seq++, "class", "h5");
-        var title = $"{band.Name} — {(slot.OnStageTime?.ToString("HH:mm") ?? string.Empty)}";
+        var title = $"{band.Name} — {FormatTime(slot.OnStageTime, baseDate)}";
         if (!string.IsNullOrEmpty(stageLabel))
             title += $" @ {stageLabel}";
         b.AddContent(seq++, title);
@@ -225,6 +228,14 @@ public class RolePrintStrategy : IPrintStrategy
             b.CloseElement();
         }
         b.CloseElement();
+    }
+
+    private static string FormatTime(DateTime? dt, DateTime baseDate)
+    {
+        if (!dt.HasValue) return string.Empty;
+        var dayOffset = (int)(dt.Value.Date - baseDate.Date).TotalDays;
+        var suffix = dayOffset > 0 ? $" +{dayOffset}d" : string.Empty;
+        return dt.Value.ToString("HH:mm") + suffix;
     }
 
     private static void AddIfSet(List<(string, string)> fields, string label, string? value)

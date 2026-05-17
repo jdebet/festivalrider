@@ -1,8 +1,10 @@
 {
   "nav.bands": "Bands",
   "nav.bandsV2": "Bands v2",
+  "nav.bandsV3": "Bands v3",
   "nav.runningOrder": "Running order",
   "nav.runningOrderV2": "RO v2",
+  "nav.runningOrderV3": "RO v3",
   "nav.settings": "Settings",
   "nav.shows": "Shows",
   "nav.show.label": "Show",

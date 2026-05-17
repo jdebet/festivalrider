@@ -1,0 +1,172 @@
+@page "/running-order-v3"
+@using RoModel = FestivalRider.Models.RunningOrder
+@using FestivalRider.Components
+@implements IDisposable
+@inject IBandService BandService
+@inject ILocalizationService Localization
+@inject IToastService Toasts
+@inject IRunningOrderScheduler Scheduler
+@inject NavigationManager Nav
+
+<PageTitle>@Localization.T("page.runningOrder.title")</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h1 class="h4 m-0">@Localization.T("page.runningOrder.heading") v3</h1>
+    <button class="btn btn-primary btn-sm" @onclick="AddRunningOrder">@Localization.T("page.runningOrder.addBtn")</button>
+</div>
+
+@if (BandService.Bands.Count == 0)
+{
+    <div class="alert alert-warning py-2 small">@Localization.T("page.runningOrder.noBands")</div>
+}
+
+@if (!BandService.RunningOrdersForActiveShow.Any())
+{
+    <div class="alert alert-info py-2 small">@Localization.T("page.runningOrder.empty", Localization.T("page.runningOrder.addBtn"))</div>
+}
+else
+{
+    @foreach (var order in BandService.RunningOrdersForActiveShow.OrderBy(o => o.ShowDayNumber))
+    {
+        <RiderSection Title="@TitleFor(order)">
+            @{ var ro = order; }
+            <div class="d-flex flex-wrap gap-2 align-items-end mb-2">
+                <div class="d-flex align-items-center gap-2">
+                    <label class="small text-muted mb-0">@Localization.T("page.runningOrder.dayLabel")</label>
+                    <input type="number" min="1" max="@_show.ShowDayCount" class="form-control form-control-sm" style="width: 70px;"
+                           value="@ro.ShowDayNumber"
+                           @onchange="e => OnDayChanged(ro, e)" />
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <label class="small text-muted mb-0">@Localization.T("page.runningOrder.dateLabel")</label>
+                    <input class="form-control form-control-sm" style="width: 130px;" readonly value="@FormatDate(ro)" />
+                </div>
+                <div class="ms-auto">
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => RequestDelete(ro.Id)">@Localization.T("page.runningOrder.deleteBtn")</button>
+                </div>
+            </div>
+            <RunningOrderEditor Order="ro" Show="_show" Bands="BandService.Bands" Stages="_show.Stages"
+                                GetEventLabel="GetEventLabel" GetModeLabel="GetModeLabel"
+                                OnChange="() => OnOrderChanged(ro)" />
+        </RiderSection>
+    }
+}
+
+<ConfirmDialog Show="_pendingDeleteId.HasValue"
+               Title="@Localization.T("confirm.deleteRunningOrder.title")"
+               Message="@_deleteMessage"
+               ConfirmLabel="@Localization.T("confirm.deleteRunningOrder.label")"
+               OnConfirm="ConfirmDelete"
+               OnCancel="() => _pendingDeleteId = null" />
+
+@code {
+    private ShowData _show = new();
+    private Guid? _pendingDeleteId;
+    private string _deleteMessage = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        BandService.OnChange += HandleChange;
+        Localization.OnLocaleChanged += HandleChange;
+        Reload();
+        foreach (var ro in BandService.RunningOrdersForActiveShow)
+        {
+            Scheduler.Recalculate(ro, _show);
+            BandService.UpdateRunningOrder(ro);
+        }
+    }
+
+    private void HandleChange()
+    {
+        Reload();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void Reload()
+    {
+        _show = BandService.FindShow(BandService.ActiveShowId) ?? new ShowData();
+    }
+
+    private string TitleFor(RoModel ro)
+    {
+        var date = FormatDate(ro);
+        return string.IsNullOrEmpty(date)
+            ? Localization.T("page.runningOrder.dayTitle.noDate", ro.ShowDayNumber, ro.Slots.Count)
+            : Localization.T("page.runningOrder.dayTitle", ro.ShowDayNumber, date, ro.Slots.Count);
+    }
+
+    private string FormatDate(RoModel ro)
+    {
+        if (_show.DateOfOpening == default) return string.Empty;
+        var date = _show.DateOfOpening.AddDays(ro.ShowDayNumber - 1);
+        return date.ToString("ddd dd MMM yyyy");
+    }
+
+    private void AddRunningOrder()
+    {
+        var scoped = BandService.RunningOrdersForActiveShow.ToList();
+        var nextDay = scoped.Count == 0
+            ? 1
+            : Math.Min(_show.ShowDayCount, scoped.Max(o => o.ShowDayNumber) + 1);
+        var ro = new RoModel
+        {
+            ShowId = BandService.ActiveShowId,
+            ShowDayNumber = Math.Max(1, nextDay),
+        };
+        BandService.AddRunningOrder(ro);
+    }
+
+    private void ConfirmDelete()
+    {
+        if (_pendingDeleteId is { } id)
+        {
+            BandService.DeleteRunningOrder(id);
+            Toasts.Show(Localization.T(LocalizationKeys.Toast.RunningOrder.Deleted), ToastLevel.Info);
+        }
+        _pendingDeleteId = null;
+    }
+
+    private void RequestDelete(Guid id)
+    {
+        var ro = BandService.FindRunningOrder(id);
+        _pendingDeleteId = id;
+        _deleteMessage = ro is null
+            ? Localization.T("confirm.deleteRunningOrder.messageFallback")
+            : Localization.T("confirm.deleteRunningOrder.message", ro.ShowDayNumber, ro.Slots.Count);
+    }
+
+    private void OnDayChanged(RunningOrder ro, ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var v))
+        {
+            if (v < 1) v = 1;
+            if (v > _show.ShowDayCount) v = _show.ShowDayCount;
+            ro.ShowDayNumber = v;
+            OnOrderChanged(ro);
+        }
+    }
+
+    private void OnOrderChanged(RunningOrder ro)
+    {
+        var result = Scheduler.Recalculate(ro, _show);
+        BandService.UpdateRunningOrder(ro);
+        foreach (var w in result.Warnings)
+        {
+            var bandName = w.SlotId is { } sid
+                ? (ro.Slots.FirstOrDefault(s => s.Id == sid) is { } slot
+                    ? (BandService.FindBand(slot.BandId)?.Name ?? "?")
+                    : "?")
+                : "?";
+            Toasts.Show(Localization.T("toast.schedule.warning", w.Message, bandName), ToastLevel.Warning);
+        }
+    }
+
+    private string GetEventLabel(TimingEventType t) => Localization.T($"enum.TimingEventType.{t}");
+    private string GetModeLabel(ScheduleMode m) => Localization.T($"enum.ScheduleMode.{m}");
+
+    public void Dispose()
+    {
+        BandService.OnChange -= HandleChange;
+        Localization.OnLocaleChanged -= HandleChange;
+    }
+}

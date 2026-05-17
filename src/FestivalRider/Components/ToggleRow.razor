@@ -1,0 +1,28 @@
+<div class="col-md-6">
+    <div class="form-check">
+        <input type="checkbox" class="form-check-input" id="toggle-@_id"
+               checked="@Value"
+               @onchange="OnChanged" />
+        <label class="form-check-label small" for="toggle-@_id">@Label</label>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public bool Value { get; set; }
+    [Parameter] public EventCallback<bool> ValueChanged { get; set; }
+    [Parameter] public EventCallback OnChange { get; set; }
+
+    private static int _seq;
+    private readonly int _id = Interlocked.Increment(ref _seq);
+
+    private async Task OnChanged(ChangeEventArgs e)
+    {
+        if (e.Value is bool b)
+        {
+            Value = b;
+            await ValueChanged.InvokeAsync(b);
+            await OnChange.InvokeAsync();
+        }
+    }
+}

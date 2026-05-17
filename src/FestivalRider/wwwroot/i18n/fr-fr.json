@@ -1,8 +1,10 @@
 {
   "nav.bands": "Groupes",
   "nav.bandsV2": "Groupes v2",
+  "nav.bandsV3": "Groupes v3",
   "nav.runningOrder": "Ordre de passage",
   "nav.runningOrderV2": "OP v2",
+  "nav.runningOrderV3": "OP v3",
   "nav.settings": "Paramètres",
   "nav.shows": "Spectacles",
   "nav.show.label": "Spectacle",

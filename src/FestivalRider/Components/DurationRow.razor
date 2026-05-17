@@ -1,0 +1,23 @@
+<div class="col-md-6 d-flex align-items-center gap-2">
+    <label class="form-label small mb-0" style="width: 140px;">@Label</label>
+    <input type="number" class="form-control form-control-sm" style="width: 80px;"
+           value="@Value"
+           @onchange="OnChanged" />
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public int Value { get; set; }
+    [Parameter] public EventCallback<int> ValueChanged { get; set; }
+    [Parameter] public EventCallback OnChange { get; set; }
+
+    private async Task OnChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var v))
+        {
+            Value = v;
+            await ValueChanged.InvokeAsync(v);
+            await OnChange.InvokeAsync();
+        }
+    }
+}

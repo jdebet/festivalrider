@@ -1,0 +1,254 @@
+@using FestivalRider.Models
+
+@if (Visible)
+{
+    <div class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@Title</h5>
+                    <button type="button" class="btn-close" @onclick="() => VisibleChanged.InvokeAsync(false)"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex gap-1 mb-2">
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="LoadFestivalMainStage">@PresetFestivalMainStage</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="LoadFestivalTent">@PresetFestivalTent</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="LoadTraditionalVenue">@PresetTraditionalVenue</button>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <h6 class="small fw-bold">Early chain</h6>
+                            @RenderList(Template.EarlyChain, "early")
+                        </div>
+                        <div class="col-md-4">
+                            <h6 class="small fw-bold">Pre-show (closest to anchor first)</h6>
+                            @RenderList(Template.PreShowEntries, "pre")
+                        </div>
+                        <div class="col-md-4">
+                            <h6 class="small fw-bold">Post-show</h6>
+                            @RenderList(Template.PostShowEntries, "post")
+                        </div>
+                    </div>
+
+                    <div class="mt-2">
+                        <label class="form-label small mb-0">@DefaultSetLengthLabel</label>
+                        <input type="number" class="form-control form-control-sm" style="width: 100px;"
+                               value="@Template.DefaultSetLengthMinutes"
+                               @onchange="e => { if (int.TryParse(e.Value?.ToString(), out var v)) Template.DefaultSetLengthMinutes = v; Notify(); }" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-primary" @onclick="() => VisibleChanged.InvokeAsync(false)">@CloseLabel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+    [Parameter] public FestivalTimingTemplate Template { get; set; } = new();
+    [Parameter] public EventCallback OnChange { get; set; }
+    [Parameter] public string Title { get; set; } = "Timing template";
+    [Parameter] public string PresetFestivalMainStage { get; set; } = "Festival main stage";
+    [Parameter] public string PresetFestivalTent { get; set; } = "Festival tent";
+    [Parameter] public string PresetTraditionalVenue { get; set; } = "Traditional venue";
+    [Parameter] public string DefaultSetLengthLabel { get; set; } = "Default set length (min)";
+    [Parameter] public string CloseLabel { get; set; } = "Done";
+    [Parameter] public string AddEntryBtn { get; set; } = "+ Add";
+    [Parameter] public string RemoveEntryBtn { get; set; } = "Remove";
+    [Parameter] public string OptionalLabel { get; set; } = "Optional";
+    [Parameter] public string CustomNameLabel { get; set; } = "Custom name";
+    [Parameter] public Func<TimingEventType, string> GetEventLabel { get; set; } = t => t.ToString();
+
+    private RenderFragment RenderList(List<TimingChainEntry> list, string keyPrefix)
+    {
+        return builder =>
+        {
+            foreach (var entry in list)
+            {
+                var idx = list.IndexOf(entry);
+                builder.OpenElement(0, "div");
+                builder.AddAttribute(1, "class", "border rounded p-1 mb-1 small");
+
+                builder.OpenElement(2, "div");
+                builder.AddAttribute(3, "class", "d-flex gap-1 mb-1");
+
+                builder.OpenElement(4, "select");
+                builder.AddAttribute(5, "class", "form-select form-select-sm");
+                builder.AddAttribute(6, "value", entry.EventType.ToString());
+                builder.AddAttribute(7, "onchange", EventCallback.Factory.Create<ChangeEventArgs>(this, e =>
+                {
+                    if (Enum.TryParse<TimingEventType>(e.Value?.ToString(), out var t)) entry.EventType = t;
+                    Notify();
+                }));
+                foreach (var ev in Enum.GetValues<TimingEventType>())
+                {
+                    builder.OpenElement(8, "option");
+                    builder.AddAttribute(9, "value", ev.ToString());
+                    builder.AddContent(10, GetEventLabel(ev));
+                    builder.CloseElement();
+                }
+                builder.CloseElement();
+
+                builder.OpenElement(11, "input");
+                builder.AddAttribute(12, "type", "number");
+                builder.AddAttribute(13, "class", "form-control form-control-sm");
+                builder.AddAttribute(14, "style", "width: 60px;");
+                builder.AddAttribute(15, "value", entry.DefaultDurationMinutes);
+                builder.AddAttribute(16, "onchange", EventCallback.Factory.Create<ChangeEventArgs>(this, e =>
+                {
+                    if (int.TryParse(e.Value?.ToString(), out var v)) entry.DefaultDurationMinutes = v;
+                    Notify();
+                }));
+                builder.CloseElement();
+
+                builder.OpenElement(17, "button");
+                builder.AddAttribute(18, "type", "button");
+                builder.AddAttribute(19, "class", "btn btn-sm btn-outline-danger");
+                builder.AddAttribute(20, "onclick", EventCallback.Factory.Create(this, () => { list.RemoveAt(idx); Notify(); }));
+                builder.AddContent(21, "×");
+                builder.CloseElement();
+
+                builder.CloseElement();
+
+                builder.OpenElement(22, "div");
+                builder.AddAttribute(23, "class", "d-flex gap-1 align-items-center");
+
+                builder.OpenElement(24, "input");
+                builder.AddAttribute(25, "type", "checkbox");
+                builder.AddAttribute(26, "class", "form-check-input");
+                builder.AddAttribute(27, "checked", entry.IsOptional);
+                builder.AddAttribute(28, "onchange", EventCallback.Factory.Create<ChangeEventArgs>(this, e =>
+                {
+                    entry.IsOptional = e.Value is bool b && b;
+                    Notify();
+                }));
+                builder.CloseElement();
+                builder.AddContent(29, $" {OptionalLabel}");
+
+                builder.CloseElement();
+
+                builder.OpenElement(30, "input");
+                builder.AddAttribute(31, "type", "text");
+                builder.AddAttribute(32, "class", "form-control form-control-sm mt-1");
+                builder.AddAttribute(33, "placeholder", CustomNameLabel);
+                builder.AddAttribute(34, "value", entry.CustomDisplayName);
+                builder.AddAttribute(35, "onchange", EventCallback.Factory.Create<ChangeEventArgs>(this, e =>
+                {
+                    entry.CustomDisplayName = e.Value?.ToString();
+                    Notify();
+                }));
+                builder.CloseElement();
+
+                builder.OpenElement(36, "div");
+                builder.AddAttribute(37, "class", "d-flex gap-1 mt-1");
+                builder.OpenElement(38, "button");
+                builder.AddAttribute(39, "type", "button");
+                builder.AddAttribute(40, "class", "btn btn-sm btn-outline-secondary");
+                builder.AddAttribute(41, "disabled", idx == 0);
+                builder.AddAttribute(42, "onclick", EventCallback.Factory.Create(this, () => MoveUp(list, idx)));
+                builder.AddContent(43, "↑");
+                builder.CloseElement();
+                builder.OpenElement(44, "button");
+                builder.AddAttribute(45, "type", "button");
+                builder.AddAttribute(46, "class", "btn btn-sm btn-outline-secondary");
+                builder.AddAttribute(47, "disabled", idx >= list.Count - 1);
+                builder.AddAttribute(48, "onclick", EventCallback.Factory.Create(this, () => MoveDown(list, idx)));
+                builder.AddContent(49, "↓");
+                builder.CloseElement();
+                builder.CloseElement();
+
+                builder.CloseElement();
+            }
+
+            builder.OpenElement(50, "button");
+            builder.AddAttribute(51, "type", "button");
+            builder.AddAttribute(52, "class", "btn btn-sm btn-outline-primary");
+            builder.AddAttribute(53, "onclick", EventCallback.Factory.Create(this, () =>
+            {
+                list.Add(new TimingChainEntry { EventType = TimingEventType.SOUNDCHECK, DefaultDurationMinutes = 30 });
+                Notify();
+            }));
+            builder.AddContent(54, AddEntryBtn);
+            builder.CloseElement();
+        };
+    }
+
+    private void MoveUp(List<TimingChainEntry> list, int index)
+    {
+        if (index <= 0) return;
+        (list[index - 1], list[index]) = (list[index], list[index - 1]);
+        Notify();
+    }
+
+    private void MoveDown(List<TimingChainEntry> list, int index)
+    {
+        if (index >= list.Count - 1) return;
+        (list[index], list[index + 1]) = (list[index + 1], list[index]);
+        Notify();
+    }
+
+    private void LoadFestivalMainStage()
+    {
+        Template.EarlyChain.Clear();
+        Template.PreShowEntries.Clear();
+        Template.PostShowEntries.Clear();
+        Template.DefaultSetLengthMinutes = 60;
+        Template.PreShowEntries.AddRange(new[]
+        {
+            new TimingChainEntry { EventType = TimingEventType.CHANGEOVER, DefaultDurationMinutes = 15 },
+            new TimingChainEntry { EventType = TimingEventType.PRESHOW_LINECHECK, DefaultDurationMinutes = 10 },
+            new TimingChainEntry { EventType = TimingEventType.SOUNDCHECK, DefaultDurationMinutes = 30 },
+            new TimingChainEntry { EventType = TimingEventType.SETUP_ON_STAGE, DefaultDurationMinutes = 15 },
+            new TimingChainEntry { EventType = TimingEventType.LOAD_IN_STAGE, DefaultDurationMinutes = 30 },
+        });
+        Template.PostShowEntries.AddRange(new[]
+        {
+            new TimingChainEntry { EventType = TimingEventType.LOAD_OUT_STAGING, DefaultDurationMinutes = 30 },
+            new TimingChainEntry { EventType = TimingEventType.LOAD_OUT_VENUE, DefaultDurationMinutes = 30 },
+        });
+        Notify();
+    }
+
+    private void LoadFestivalTent()
+    {
+        Template.EarlyChain.Clear();
+        Template.PreShowEntries.Clear();
+        Template.PostShowEntries.Clear();
+        Template.DefaultSetLengthMinutes = 45;
+        Template.PreShowEntries.AddRange(new[]
+        {
+            new TimingChainEntry { EventType = TimingEventType.CHANGEOVER, DefaultDurationMinutes = 10 },
+            new TimingChainEntry { EventType = TimingEventType.PRESHOW_LINECHECK, DefaultDurationMinutes = 5 },
+            new TimingChainEntry { EventType = TimingEventType.SOUNDCHECK, DefaultDurationMinutes = 20 },
+            new TimingChainEntry { EventType = TimingEventType.SETUP_ON_STAGE, DefaultDurationMinutes = 10 },
+            new TimingChainEntry { EventType = TimingEventType.LOAD_IN_STAGE, DefaultDurationMinutes = 20 },
+        });
+        Template.PostShowEntries.Add(new TimingChainEntry { EventType = TimingEventType.LOAD_OUT_VENUE, DefaultDurationMinutes = 20 });
+        Notify();
+    }
+
+    private void LoadTraditionalVenue()
+    {
+        Template.EarlyChain.Clear();
+        Template.PreShowEntries.Clear();
+        Template.PostShowEntries.Clear();
+        Template.DefaultSetLengthMinutes = 45;
+        Template.PreShowEntries.AddRange(new[]
+        {
+            new TimingChainEntry { EventType = TimingEventType.CHANGEOVER, DefaultDurationMinutes = 15 },
+            new TimingChainEntry { EventType = TimingEventType.PRESHOW_LINECHECK, DefaultDurationMinutes = 10 },
+            new TimingChainEntry { EventType = TimingEventType.SOUNDCHECK, DefaultDurationMinutes = 30 },
+            new TimingChainEntry { EventType = TimingEventType.SETUP_ON_STAGE, DefaultDurationMinutes = 15 },
+            new TimingChainEntry { EventType = TimingEventType.LOAD_IN_STAGE, DefaultDurationMinutes = 30 },
+            new TimingChainEntry { EventType = TimingEventType.GET_IN, DefaultDurationMinutes = 15 },
+        });
+        Template.PostShowEntries.Add(new TimingChainEntry { EventType = TimingEventType.LOAD_OUT_VENUE, DefaultDurationMinutes = 30 });
+        Notify();
+    }
+
+    private void Notify() => OnChange.InvokeAsync();
+}

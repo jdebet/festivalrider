@@ -36,12 +36,15 @@ public class StagePrintStrategy : IPrintStrategy
     {
         var (order, stage, slots) = Resolve(context);
         var show = _bands.FindShow(order.ShowId) ?? new ShowData();
+        var baseDate = show.DateOfOpening == default
+            ? DateTime.Today
+            : show.DateOfOpening.AddDays(order.ShowDayNumber - 1).ToDateTime(TimeOnly.MinValue);
         return builder =>
         {
             var seq = 0;
             BuildHeader(builder, ref seq, stage, order, show);
-            BuildScheduleTable(builder, ref seq, order.ShowId, slots);
-            BuildTechSummary(builder, ref seq, order.ShowId, slots);
+            BuildScheduleTable(builder, ref seq, order.ShowId, slots, baseDate);
+            BuildTechSummary(builder, ref seq, order.ShowId, slots, baseDate);
         };
     }
 
@@ -88,7 +91,7 @@ public class StagePrintStrategy : IPrintStrategy
         b.CloseElement();
     }
 
-    private void BuildScheduleTable(RenderTreeBuilder b, ref int seq, Guid showId, IReadOnlyList<RunningOrderSlot> slots)
+    private void BuildScheduleTable(RenderTreeBuilder b, ref int seq, Guid showId, IReadOnlyList<RunningOrderSlot> slots, DateTime baseDate)
     {
         b.OpenElement(seq++, "section");
         b.AddAttribute(seq++, "class", "print-section mb-3");
@@ -125,7 +128,7 @@ public class StagePrintStrategy : IPrintStrategy
             b.OpenElement(seq++, "tr");
             foreach (var v in new[]
             {
-                s.OnStageTime?.ToString("HH:mm") ?? string.Empty,
+                FormatTime(s.OnStageTime, baseDate),
                 _loc.T("print.stage.min", s.SetLengthMinutes ?? 0),
                 band?.Name ?? _loc.T("print.stage.unknownBand"),
                 s.Notes ?? string.Empty,
@@ -142,7 +145,7 @@ public class StagePrintStrategy : IPrintStrategy
         b.CloseElement();
     }
 
-    private void BuildTechSummary(RenderTreeBuilder b, ref int seq, Guid showId, IReadOnlyList<RunningOrderSlot> slots)
+    private void BuildTechSummary(RenderTreeBuilder b, ref int seq, Guid showId, IReadOnlyList<RunningOrderSlot> slots, DateTime baseDate)
     {
         if (slots.Count == 0) return;
         b.OpenElement(seq++, "section");
@@ -172,7 +175,7 @@ public class StagePrintStrategy : IPrintStrategy
             b.OpenElement(seq++, "tr");
             foreach (var v in new[]
             {
-                s.OnStageTime?.ToString("HH:mm") ?? string.Empty,
+                FormatTime(s.OnStageTime, baseDate),
                 band?.Name ?? _loc.T("print.stage.unknownBand"),
                 t is null ? string.Empty : $"{AmpLabel(t.Power.Amperage)} {PhaseLabel(t.Power.Phase)}",
                 t?.Foh.OwnConsoleModel ?? string.Empty,
@@ -191,6 +194,14 @@ public class StagePrintStrategy : IPrintStrategy
         b.CloseElement();
         b.CloseElement();
         b.CloseElement();
+    }
+
+    private static string FormatTime(DateTime? dt, DateTime baseDate)
+    {
+        if (!dt.HasValue) return string.Empty;
+        var dayOffset = (int)(dt.Value.Date - baseDate.Date).TotalDays;
+        var suffix = dayOffset > 0 ? $" +{dayOffset}d" : string.Empty;
+        return dt.Value.ToString("HH:mm") + suffix;
     }
 
     private string AmpLabel(PowerAmperage a) => _loc.T($"enum.PowerAmperage.{a}");

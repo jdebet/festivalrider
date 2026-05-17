@@ -6,8 +6,10 @@ public static class LocalizationKeys
     {
         public const string Bands = "nav.bands";
         public const string BandsV2 = "nav.bandsV2";
+        public const string BandsV3 = "nav.bandsV3";
         public const string RunningOrder = "nav.runningOrder";
         public const string RunningOrderV2 = "nav.runningOrderV2";
+        public const string RunningOrderV3 = "nav.runningOrderV3";
         public const string Settings = "nav.settings";
         public const string Shows = "nav.shows";
         public const string Export = "nav.export";

@@ -1,0 +1,155 @@
+@using FestivalRider.Models
+
+<div class="fr-gantt">
+    @if (Order.Slots.Count == 0)
+    {
+        <p class="text-muted small">@SelectSlotHint</p>
+    }
+    else
+    {
+        <div class="fr-gantt-legend d-flex flex-wrap gap-2 mb-1 small">
+            <span class="fr-gantt-legend-item"><span class="fr-gantt-dot" style="background:#fd7e14"></span> @LegendSoundcheck</span>
+            <span class="fr-gantt-legend-item"><span class="fr-gantt-dot" style="background:#28a745"></span> @LegendOnStage</span>
+            <span class="fr-gantt-legend-item"><span class="fr-gantt-dot" style="background:#dc3545"></span> @LegendEarly</span>
+            <span class="fr-gantt-legend-item"><span class="fr-gantt-dot" style="background:#007bff"></span> @LegendPost</span>
+        </div>
+
+        var minTime = MinTime;
+        var maxTime = MaxTime;
+        var totalMinutes = Math.Max((maxTime - minTime).TotalMinutes, 1);
+
+        <div class="fr-gantt-tracks border rounded p-1">
+            @foreach (var slot in Order.Slots.OrderBy(s => s.OnStageTime ?? DateTime.MaxValue))
+            {
+                var band = Bands.FirstOrDefault(b => b.Id == slot.BandId);
+                var bandName = band?.Name ?? UnknownBandLabel;
+                var isSelected = slot.Id == SelectedSlotId;
+
+                <div class="fr-gantt-row d-flex align-items-center gap-1 py-1 @(isSelected ? "fr-gantt-row-selected" : "")"
+                     @onclick="() => OnSelectSlot.InvokeAsync(slot.Id)">
+                    <div class="fr-gantt-label small text-truncate" style="width: 120px; flex-shrink: 0;">
+                        @bandName
+                    </div>
+                    <div class="fr-gantt-track position-relative flex-grow-1" style="height: 24px; background: #f8f9fa; border-radius: 4px;">
+                        @foreach (var ev in AllEvents(slot))
+                        {
+                            if (ev.StartTime is null) continue;
+                            var start = ev.StartTime.Value;
+                            var end = start.AddMinutes(ev.DurationMinutes ?? DefaultDuration(ev.EventType));
+                            var leftPct = Math.Clamp((start - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
+                            var widthPct = Math.Clamp((end - start).TotalMinutes / totalMinutes * 100, 0.5, 100 - leftPct);
+                            var color = EventColor(ev.EventType, slot);
+
+                            <div class="position-absolute top-0 h-100"
+                                 style="left: @(leftPct.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; width: @(widthPct.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; background: @color; border-radius: 3px; cursor: pointer;"
+                                 title="@ev.EventType @FormatTime(start, BaseDate)-@FormatTime(end, BaseDate)">
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public RunningOrder Order { get; set; } = new();
+    [Parameter] public ShowData Show { get; set; } = new();
+    [Parameter] public Guid? SelectedSlotId { get; set; }
+    [Parameter] public IReadOnlyList<Band> Bands { get; set; } = new List<Band>();
+    [Parameter] public string SelectSlotHint { get; set; } = "Click a band to view details.";
+    [Parameter] public string UnknownBandLabel { get; set; } = "Unknown";
+    [Parameter] public string LegendSoundcheck { get; set; } = "Soundcheck";
+    [Parameter] public string LegendOnStage { get; set; } = "On stage";
+    [Parameter] public string LegendEarly { get; set; } = "Early";
+    [Parameter] public string LegendPost { get; set; } = "Post-show";
+    [Parameter] public EventCallback<Guid> OnSelectSlot { get; set; }
+    [Parameter] public EventCallback<SlotEditRequest> OnEditRequest { get; set; }
+
+    private DateTime BaseDate => Show.DateOfOpening == default
+        ? DateTime.Today
+        : Show.DateOfOpening.AddDays(Math.Max(0, Order.ShowDayNumber - 1)).ToDateTime(TimeOnly.MinValue);
+
+    private DateTime MinTime
+    {
+        get
+        {
+            var allStarts = Order.Slots
+                .SelectMany(AllEvents)
+                .Where(e => e.StartTime.HasValue)
+                .Select(e => e.StartTime!.Value)
+                .ToList();
+            if (allStarts.Count == 0) return BaseDate.AddHours(8);
+            return allStarts.Min().AddMinutes(-30);
+        }
+    }
+
+    private DateTime MaxTime
+    {
+        get
+        {
+            var allEnds = Order.Slots
+                .SelectMany(s => AllEvents(s).Select(e =>
+                {
+                    if (e.StartTime is null) return (DateTime?)null;
+                    var dur = e.DurationMinutes ?? DefaultDuration(e.EventType);
+                    return e.StartTime.Value.AddMinutes(dur);
+                }))
+                .OfType<DateTime>()
+                .ToList();
+            if (allEnds.Count == 0) return BaseDate.AddHours(24);
+            return allEnds.Max().AddMinutes(30);
+        }
+    }
+
+    private static IEnumerable<SlotTimingEvent> AllEvents(RunningOrderSlot slot)
+    {
+        foreach (var e in slot.EarlyChain) yield return e;
+        foreach (var e in slot.PreShowEvents) yield return e;
+        foreach (var e in slot.PostShowEvents) yield return e;
+    }
+
+    private int DefaultDuration(TimingEventType type)
+    {
+        var opts = Order.VenueOptions ?? new VenueTimingOptions();
+        return type switch
+        {
+            TimingEventType.GET_IN => opts.DefaultGetInMinutes,
+            TimingEventType.LOAD_IN_VENUE => opts.DefaultLoadInVenueMinutes,
+            TimingEventType.LOAD_IN_STAGE => opts.DefaultStageLoadInMinutes,
+            TimingEventType.BACKSTAGE_DROP => opts.DefaultBackstageDropMinutes,
+            TimingEventType.SETUP_ON_STAGE => opts.DefaultSetupOnStageMinutes,
+            TimingEventType.SOUNDCHECK => opts.DefaultSoundcheckMinutes,
+            TimingEventType.CHANGEOVER => opts.DefaultChangeoverMinutes,
+            TimingEventType.PRESHOW_LINECHECK => opts.DefaultPreShowLinecheckMinutes,
+            TimingEventType.ON_STAGE => opts.DefaultSetLengthMinutes,
+            TimingEventType.LOAD_OUT_STAGING => opts.DefaultLoadInVenueMinutes,
+            TimingEventType.LOAD_OUT_VENUE => opts.DefaultLoadInVenueMinutes,
+            TimingEventType.CATERING => 30,
+            TimingEventType.BACKSTAGE_WAIT => 15,
+            _ => 15,
+        };
+    }
+
+    private string EventColor(TimingEventType type, RunningOrderSlot slot)
+    {
+        var inEarly = slot.EarlyChain.Any(e => e.EventType == type);
+        if (inEarly) return "#dc3545";
+        var inPost = slot.PostShowEvents.Any(e => e.EventType == type);
+        if (inPost) return "#007bff";
+
+        return type switch
+        {
+            TimingEventType.SOUNDCHECK => "#fd7e14",
+            TimingEventType.ON_STAGE => "#28a745",
+            _ => "#ffc107",
+        };
+    }
+
+    private string FormatTime(DateTime dt, DateTime baseDate)
+    {
+        var dayOffset = (int)(dt.Date - baseDate.Date).TotalDays;
+        var badge = dayOffset > 0 ? $"+{dayOffset}d " : string.Empty;
+        return badge + dt.ToString("HH:mm");
+    }
+}

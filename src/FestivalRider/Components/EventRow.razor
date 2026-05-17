@@ -1,0 +1,56 @@
+@using FestivalRider.Models
+
+<div class="d-flex align-items-center gap-2 py-1 px-2 rounded mb-1" style="background:#f8f9fa">
+    <span class="small fw-bold" style="width: 110px;">@GetLabel(Event.EventType)</span>
+    <span class="small text-muted" style="width: 70px;">@FormatTime(Event.StartTime)</span>
+    <div class="d-flex align-items-center gap-1 flex-grow-1">
+        <input type="number" class="form-control form-control-sm" style="width: 60px;"
+               placeholder="@GetDefaultDuration(Event.EventType)"
+               value="@Event.DurationMinutes"
+               @onchange="OnDurationChanged" />
+        <span class="small text-muted">min</span>
+    </div>
+    <div class="form-check m-0">
+        <input type="checkbox" class="form-check-input" id="pin-@Event.EventType-@_id"
+               checked="@Event.IsPinned"
+               @onchange="e => OnPinnedChanged(e.Value)" />
+        <label class="form-check-label small" for="pin-@Event.EventType-@_id">PIN</label>
+    </div>
+</div>
+
+@code {
+    [Parameter] public SlotTimingEvent Event { get; set; } = new();
+    [Parameter] public DateTime BaseDate { get; set; }
+    [Parameter] public Func<TimingEventType, int> GetDefaultDuration { get; set; } = _ => 15;
+    [Parameter] public Func<TimingEventType, string> GetLabel { get; set; } = t => t.ToString();
+    [Parameter] public EventCallback OnChange { get; set; }
+
+    private static int _seq;
+    private readonly int _id = Interlocked.Increment(ref _seq);
+
+    private string FormatTime(DateTime? dt)
+    {
+        if (dt is null) return "--:--";
+        var dayOffset = (int)(dt.Value.Date - BaseDate.Date).TotalDays;
+        var badge = dayOffset > 0 ? $"+{dayOffset}d " : string.Empty;
+        return badge + dt.Value.ToString("HH:mm");
+    }
+
+    private void OnDurationChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var v) && v > 0)
+            Event.DurationMinutes = v;
+        else
+            Event.DurationMinutes = null;
+        OnChange.InvokeAsync();
+    }
+
+    private void OnPinnedChanged(object? value)
+    {
+        if (value is bool b)
+            Event.IsPinned = b;
+        else if (bool.TryParse(value?.ToString(), out var parsed))
+            Event.IsPinned = parsed;
+        OnChange.InvokeAsync();
+    }
+}

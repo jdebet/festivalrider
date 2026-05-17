@@ -1,0 +1,74 @@
+@using FestivalRider.Models
+
+@if (Visible)
+{
+    <div class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@Title</h5>
+                    <button type="button" class="btn-close" @onclick="() => VisibleChanged.InvokeAsync(false)"></button>
+                </div>
+                <div class="modal-body">
+                    <h6 class="small fw-bold">@TogglesHeading</h6>
+                    <div class="row g-1 mb-2">
+                        <ToggleRow Label="@GetInLabel" @bind-Value="Options.IncludeGetIn" OnChange="Notify" />
+                        <ToggleRow Label="@LoadInVenueLabel" @bind-Value="Options.IncludeLoadInVenue" OnChange="Notify" />
+                        <ToggleRow Label="@StageLoadInLabel" @bind-Value="Options.IncludeStageLoadIn" OnChange="Notify" />
+                        <ToggleRow Label="@BackstageDropLabel" @bind-Value="Options.IncludeBackstageDrop" OnChange="Notify" />
+                        <ToggleRow Label="@SetupOnStageLabel" @bind-Value="Options.IncludeSetupOnStage" OnChange="Notify" />
+                        <ToggleRow Label="@SoundcheckLabel" @bind-Value="Options.IncludeSoundcheck" OnChange="Notify" />
+                        <ToggleRow Label="@PreShowLinecheckLabel" @bind-Value="Options.IncludePreShowLinecheck" OnChange="Notify" />
+                    </div>
+
+                    <h6 class="small fw-bold">@DefaultsHeading</h6>
+                    <div class="row g-1">
+                        <DurationRow Label="@GetInDefaultLabel" @bind-Value="Options.DefaultGetInMinutes" OnChange="Notify" />
+                        <DurationRow Label="@LoadInVenueDefaultLabel" @bind-Value="Options.DefaultLoadInVenueMinutes" OnChange="Notify" />
+                        <DurationRow Label="@StageLoadInDefaultLabel" @bind-Value="Options.DefaultStageLoadInMinutes" OnChange="Notify" />
+                        <DurationRow Label="@BackstageDropDefaultLabel" @bind-Value="Options.DefaultBackstageDropMinutes" OnChange="Notify" />
+                        <DurationRow Label="@SetupOnStageDefaultLabel" @bind-Value="Options.DefaultSetupOnStageMinutes" OnChange="Notify" />
+                        <DurationRow Label="@SoundcheckDefaultLabel" @bind-Value="Options.DefaultSoundcheckMinutes" OnChange="Notify" />
+                        <DurationRow Label="@PreShowLinecheckDefaultLabel" @bind-Value="Options.DefaultPreShowLinecheckMinutes" OnChange="Notify" />
+                        <DurationRow Label="@BackstageLeadDefaultLabel" @bind-Value="Options.DefaultBackstageLeadMinutes" OnChange="Notify" />
+                        <DurationRow Label="@ChangeoverDefaultLabel" @bind-Value="Options.DefaultChangeoverMinutes" OnChange="Notify" />
+                        <DurationRow Label="@SetLengthDefaultLabel" @bind-Value="Options.DefaultSetLengthMinutes" OnChange="Notify" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-primary" @onclick="() => VisibleChanged.InvokeAsync(false)">@CloseLabel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+    [Parameter] public VenueTimingOptions Options { get; set; } = new();
+    [Parameter] public EventCallback OnChange { get; set; }
+    [Parameter] public string Title { get; set; } = "Venue options";
+    [Parameter] public string TogglesHeading { get; set; } = "Inclusion toggles";
+    [Parameter] public string DefaultsHeading { get; set; } = "Default durations (min)";
+    [Parameter] public string CloseLabel { get; set; } = "Done";
+    [Parameter] public string GetInLabel { get; set; } = "Get-in";
+    [Parameter] public string LoadInVenueLabel { get; set; } = "Load-in (venue)";
+    [Parameter] public string StageLoadInLabel { get; set; } = "Load-in (stage)";
+    [Parameter] public string BackstageDropLabel { get; set; } = "Backstage drop";
+    [Parameter] public string SetupOnStageLabel { get; set; } = "Setup on stage";
+    [Parameter] public string SoundcheckLabel { get; set; } = "Soundcheck";
+    [Parameter] public string PreShowLinecheckLabel { get; set; } = "Pre-show line check";
+    [Parameter] public string GetInDefaultLabel { get; set; } = "Get-in";
+    [Parameter] public string LoadInVenueDefaultLabel { get; set; } = "Load-in (venue)";
+    [Parameter] public string StageLoadInDefaultLabel { get; set; } = "Load-in (stage)";
+    [Parameter] public string BackstageDropDefaultLabel { get; set; } = "Backstage drop";
+    [Parameter] public string SetupOnStageDefaultLabel { get; set; } = "Setup on stage";
+    [Parameter] public string SoundcheckDefaultLabel { get; set; } = "Soundcheck";
+    [Parameter] public string PreShowLinecheckDefaultLabel { get; set; } = "Line check";
+    [Parameter] public string BackstageLeadDefaultLabel { get; set; } = "Backstage lead";
+    [Parameter] public string ChangeoverDefaultLabel { get; set; } = "Changeover";
+    [Parameter] public string SetLengthDefaultLabel { get; set; } = "Set length";
+
+    private void Notify() => OnChange.InvokeAsync();
+}

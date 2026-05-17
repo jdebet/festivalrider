@@ -1,0 +1,726 @@
+@page "/band-v3/{Id:guid}"
+@implements IDisposable
+@inject IBandService BandService
+@inject ILocalizationService Localization
+@inject IExportService Export
+@inject IToastService Toasts
+@inject NavigationManager Nav
+
+<PageTitle>@(_band?.Name ?? "Band") · FestivalRider</PageTitle>
+
+@if (_band is null)
+{
+    <div class="alert alert-warning py-2 small">
+        @Localization.T("page.editor.bandNotFound") <a href="/bands-v3">@Localization.T("page.editor.backToBands")</a>
+    </div>
+}
+else
+{
+    <div class="mb-2">
+        <a href="/bands-v3" class="text-decoration-none small">@Localization.T("page.editor.backToBands")</a>
+    </div>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <InputText class="form-control form-control-sm fw-bold" style="font-size: 1.5rem; max-width: 400px;" @bind-Value="_band.Name" />
+        <div class="d-flex flex-wrap gap-1">
+            <button class="btn btn-sm btn-primary" @onclick="Save">@Localization.T("page.editor.save")</button>
+            <label class="btn btn-sm btn-outline-secondary mb-0">
+                @Localization.T("page.editor.importCsv")
+                <InputFile OnChange="ImportCsv" accept=".csv" class="d-none" />
+            </label>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="GoBack">@Localization.T("page.editor.back")</button>
+        </div>
+    </div>
+
+    <EditForm Model="_band" OnValidSubmit="Save">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <RiderSection Title="@Localization.T("section.band.title")" InitiallyExpanded="true">
+            <h6 class="mb-1 fw-bold">@Localization.T("section.contacts.title")</h6>
+            <table class="table table-sm fr-table-dense align-middle mb-2">
+                <thead>
+                    <tr>
+                        <th>@Localization.T("field.role")</th>
+                        <th>@Localization.T("field.name")</th>
+                        <th>@Localization.T("field.email")</th>
+                        <th>@Localization.T("field.phone")</th>
+                        <th style="width: 40px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var i = 0; i < _band.Contacts.Count; i++)
+                    {
+                        var idx = i;
+                        var contact = _band.Contacts[idx];
+                        <tr @key="idx">
+                            <td>
+                                <InputSelect class="form-select form-select-sm fr-form-ultra-sm" @bind-Value="contact.Role">
+                                    @foreach (var r in Enum.GetValues<ContactRole>())
+                                    {
+                                        <option value="@r">@Localization.T($"enum.ContactRole.{r}")</option>
+                                    }
+                                </InputSelect>
+                            </td>
+                            <td><InputText class="form-control form-control-sm fr-form-ultra-sm" @bind-Value="contact.Name" /></td>
+                            <td><InputText class="form-control form-control-sm fr-form-ultra-sm" @bind-Value="contact.Email" /></td>
+                            <td><InputText class="form-control form-control-sm fr-form-ultra-sm" @bind-Value="contact.Phone" /></td>
+                            <td><button type="button" class="btn btn-sm btn-outline-danger fr-form-ultra-sm" @onclick="() => _band.Contacts.RemoveAt(idx)">&#10005;</button></td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="4" class="border-0"></td>
+                        <td class="border-0"><button type="button" class="btn btn-sm btn-outline-primary fr-form-ultra-sm" @onclick="() => _band.Contacts.Add(new Contact())">+</button></td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <h6 class="mb-1 fw-bold">@Localization.T("section.travelParty.title")</h6>
+            <table class="table table-sm fr-table-dense align-middle mb-1">
+                <thead>
+                    <tr>
+                        <th>@Localization.T("field.type")</th>
+                        <th>@Localization.T("field.role")</th>
+                        <th>@Localization.T("field.name")</th>
+                        <th style="width: 40px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var i = 0; i < _band.TravelParty.Members.Count; i++)
+                    {
+                        var idx = i;
+                        var party = _band.TravelParty.Members[idx];
+                        <tr @key="idx">
+                            <td>
+                                <InputSelect class="form-select form-select-sm fr-form-ultra-sm" @bind-Value="party.Type">
+                                    @foreach (var t in Enum.GetValues<PartyType>())
+                                    {
+                                        <option value="@t">@Localization.T($"enum.PartyType.{t}")</option>
+                                    }
+                                </InputSelect>
+                            </td>
+                            <td><InputText class="form-control form-control-sm fr-form-ultra-sm" @bind-Value="party.Role" /></td>
+                            <td><InputText class="form-control form-control-sm fr-form-ultra-sm" @bind-Value="party.Name" /></td>
+                            <td><button type="button" class="btn btn-sm btn-outline-danger fr-form-ultra-sm" @onclick="() => _band.TravelParty.Members.RemoveAt(idx)">&#10005;</button></td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="3" class="border-0"></td>
+                        <td class="border-0"><button type="button" class="btn btn-sm btn-outline-primary fr-form-ultra-sm" @onclick="() => _band.TravelParty.Members.Add(new Party())">+</button></td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <div class="row g-1 mb-1">
+                <div class="col-12">
+                    <label class="form-label small mb-0">@Localization.T("field.notes")</label>
+                    <InputTextArea class="form-control form-control-sm" rows="2" @bind-Value="_band.Notes" />
+                </div>
+            </div>
+        </RiderSection>
+
+        <h2 class="h5 mt-3 mb-1">@Localization.T("page.editor.tech.heading")</h2>
+
+        <RiderSection Title="@Localization.T("section.cabling.title")" InitiallyExpanded="true">
+            <div class="table-responsive">
+                <table class="table table-sm fr-table-dense align-middle mb-1">
+                    <thead>
+                        <tr>
+                            <th style="width: 110px;">@Localization.T("field.cable.source")</th>
+                            <th style="width: 110px;">@Localization.T("field.cable.target")</th>
+                            <th style="width: 100px;">@Localization.T("field.cable.type")</th>
+                            <th style="width: 100px;">@Localization.T("field.spec")</th>
+                            <th style="width: 90px;">@Localization.T("field.cable.minLength")</th>
+                            <th style="width: 90px;">@Localization.T("field.cable.maxLength")</th>
+                            <th style="width: 100px;">@Localization.T("field.provider")</th>
+                            <th style="width: 40px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (var i = 0; i < _band.Rider.Tech.Cables.Count; i++)
+                        {
+                            var idx = i;
+                            var cable = _band.Rider.Tech.Cables[idx];
+                            <tr @key="idx">
+                                <td>
+                                    <InputSelect class="form-select form-select-sm fr-form-ultra-sm" @bind-Value="cable.Source">
+                                        @foreach (var p in Enum.GetValues<CablePoint>())
+                                        {
+                                            <option value="@p">@Localization.T($"enum.CablePoint.{p}")</option>
+                                        }
+                                    </InputSelect>
+                                    @if (cable.Source == CablePoint.Other)
+                                    {
+                                        <InputText class="form-control form-control-sm fr-form-ultra-sm mt-1" placeholder="@Localization.T("field.cable.sourceOther")" @bind-Value="cable.SourceOther" />
+                                    }
+                                </td>
+                                <td>
+                                    <InputSelect class="form-select form-select-sm fr-form-ultra-sm" @bind-Value="cable.Target">
+                                        @foreach (var p in Enum.GetValues<CablePoint>())
+                                        {
+                                            <option value="@p">@Localization.T($"enum.CablePoint.{p}")</option>
+                                        }
+                                    </InputSelect>
+                                    @if (cable.Target == CablePoint.Other)
+                                    {
+                                        <InputText class="form-control form-control-sm fr-form-ultra-sm mt-1" placeholder="@Localization.T("field.cable.targetOther")" @bind-Value="cable.TargetOther" />
+                                    }
+                                </td>
+                                <td>
+                                    <InputSelect class="form-select form-select-sm fr-form-ultra-sm" @bind-Value="cable.Type">
+                                        @foreach (var t in Enum.GetValues<CableType>())
+                                        {
+                                            <option value="@t">@Localization.T($"enum.CableType.{t}")</option>
+                                        }
+                                    </InputSelect>
+                                    @if (cable.Type == CableType.Other)
+                                    {
+                                        <InputText class="form-control form-control-sm fr-form-ultra-sm mt-1" placeholder="@Localization.T("field.cable.typeOther")" @bind-Value="cable.TypeOther" />
+                                    }
+                                </td>
+                                <td><InputText class="form-control form-control-sm fr-form-ultra-sm" @bind-Value="cable.CategoryOrSpec" /></td>
+                                <td><InputNumber class="form-control form-control-sm fr-form-ultra-sm" step="5" @bind-Value="cable.MinLengthMeters" /></td>
+                                <td><InputNumber class="form-control form-control-sm fr-form-ultra-sm" step="5" @bind-Value="cable.MaxLengthMeters" /></td>
+                                <td>
+                                    <InputSelect class="form-select form-select-sm fr-form-ultra-sm" @bind-Value="cable.Provider">
+                                        @foreach (var p in Enum.GetValues<CableProvider>())
+                                        {
+                                            <option value="@p">@Localization.T($"enum.CableProvider.{p}")</option>
+                                        }
+                                    </InputSelect>
+                                </td>
+                                <td><button type="button" class="btn btn-sm btn-outline-danger fr-form-ultra-sm" @onclick="() => _band.Rider.Tech.Cables.RemoveAt(idx)">&#10005;</button></td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="7" class="border-0"></td>
+                            <td class="border-0"><button type="button" class="btn btn-sm btn-outline-primary fr-form-ultra-sm" @onclick="() => _band.Rider.Tech.Cables.Add(new Cable())">+</button></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </RiderSection>
+
+        <RiderSection Title="@Localization.T("section.lighting.title")" InitiallyExpanded="true">
+            <div class="row g-1 mb-1">
+                <div class="col-md-8">
+                    <label class="form-label small mb-0">@Localization.T("field.lighting.ownConsole")</label>
+                    <InputText class="form-control form-control-sm" @bind-Value="_band.Rider.Tech.Lighting.OwnConsoleModel" />
+                </div>
+            </div>
+            <div class="row g-1 mb-2">
+                <div class="col-auto">
+                    <label class="form-label small mb-0">@Localization.T("field.lighting.backdropWidth")</label>
+                    <InputNumber class="form-control form-control-sm" style="width: 80px;" @bind-Value="_band.Rider.Tech.Lighting.BackdropWidthMeters" />
+                </div>
+                <div class="col-auto">
+                    <label class="form-label small mb-0">@Localization.T("field.lighting.backdropHeight")</label>
+                    <InputNumber class="form-control form-control-sm" style="width: 80px;" @bind-Value="_band.Rider.Tech.Lighting.BackdropHeightMeters" />
+                </div>
+            </div>
+
+            <h6 class="mb-1 fw-bold">@Localization.T("field.lighting.floorMachines")</h6>
+            <table class="table table-sm fr-table-dense align-middle mb-1">
+                <thead>
+                    <tr>
+                        <th>@Localization.T("field.lighting.modelOrType")</th>
+                        <th>@Localization.T("field.lighting.location")</th>
+                        <th style="width: 90px;">@Localization.T("field.count")</th>
+                        <th style="width: 40px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var i = 0; i < _band.Rider.Tech.Lighting.FloorMachines.Count; i++)
+                    {
+                        var idx = i;
+                        var m = _band.Rider.Tech.Lighting.FloorMachines[idx];
+                        <tr @key="idx">
+                            <td><InputText class="form-control form-control-sm fr-form-ultra-sm" @bind-Value="m.Name" /></td>
+                            <td><InputText class="form-control form-control-sm fr-form-ultra-sm" @bind-Value="m.Location" /></td>
+                            <td><InputNumber class="form-control form-control-sm fr-form-ultra-sm" @bind-Value="m.Count" /></td>
+                            <td><button type="button" class="btn btn-sm btn-outline-danger fr-form-ultra-sm" @onclick="() => _band.Rider.Tech.Lighting.FloorMachines.RemoveAt(idx)">&#10005;</button></td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="3" class="border-0"></td>
+                        <td class="border-0"><button type="button" class="btn btn-sm btn-outline-primary fr-form-ultra-sm" @onclick="() => _band.Rider.Tech.Lighting.FloorMachines.Add(new LightingMachine())">+</button></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </RiderSection>
+
+        <RiderSection Title="@Localization.T("section.power.title")" InitiallyExpanded="true">
+            <div class="row g-1">
+                <div class="col-md-3">
+                    <label class="form-label small mb-0">@Localization.T("field.power.amperage")</label>
+                    <InputSelect class="form-select form-select-sm" @bind-Value="_band.Rider.Tech.Power.Amperage">
+                        @foreach (var a in Enum.GetValues<PowerAmperage>())
+                        {
+                            <option value="@a">@Localization.T($"enum.PowerAmperage.{a}")</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-0">@Localization.T("field.power.phase")</label>
+                    <InputSelect class="form-select form-select-sm" @bind-Value="_band.Rider.Tech.Power.Phase">
+                        @foreach (var p in Enum.GetValues<PowerPhase>())
+                        {
+                            <option value="@p">@Localization.T($"enum.PowerPhase.{p}")</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small mb-0">@Localization.T("field.power.adapterNotes")</label>
+                    <InputText class="form-control form-control-sm" @bind-Value="_band.Rider.Tech.Power.AdapterNotes" />
+                </div>
+            </div>
+        </RiderSection>
+
+        <RiderSection Title="@Localization.T("section.foh.title")" InitiallyExpanded="true">
+            <div class="row g-1 mb-1">
+                <div class="col-12">
+                    <label class="form-label small mb-0">@Localization.T("field.foh.ownConsole")</label>
+                    <InputText class="form-control form-control-sm" @bind-Value="_band.Rider.Tech.Foh.OwnConsoleModel" />
+                </div>
+            </div>
+            <div class="row g-1 mb-1">
+                <div class="col-md-3">
+                    <label class="form-label small mb-0">@Localization.T("field.foh.outputProtocol")</label>
+                    <InputSelect class="form-select form-select-sm" @bind-Value="_band.Rider.Tech.Foh.OutputProtocol">
+                        @foreach (var p in Enum.GetValues<OutputProtocol>())
+                        {
+                            <option value="@p">@Localization.T($"enum.OutputProtocol.{p}")</option>
+                        }
+                    </InputSelect>
+                    @if (_band.Rider.Tech.Foh.OutputProtocol == OutputProtocol.Other)
+                    {
+                        <InputText class="form-control form-control-sm mt-1" placeholder="@Localization.T("field.foh.outputProtocolOther")" @bind-Value="_band.Rider.Tech.Foh.OutputProtocolOther" />
+                    }
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-0">@Localization.T("field.foh.outputLocation")</label>
+                    <InputSelect class="form-select form-select-sm" @bind-Value="_band.Rider.Tech.Foh.OutputLocation">
+                        @foreach (var l in Enum.GetValues<OutputLocation>())
+                        {
+                            <option value="@l">@Localization.T($"enum.OutputLocation.{l}")</option>
+                        }
+                    </InputSelect>
+                    @if (_band.Rider.Tech.Foh.OutputLocation == OutputLocation.Other)
+                    {
+                        <InputText class="form-control form-control-sm mt-1" placeholder="@Localization.T("field.foh.outputLocationOther")" @bind-Value="_band.Rider.Tech.Foh.OutputLocationOther" />
+                    }
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small mb-0">@Localization.T("field.foh.outputNotes")</label>
+                    <InputText class="form-control form-control-sm" @bind-Value="_band.Rider.Tech.Foh.OutputNotes" />
+                </div>
+            </div>
+            <div class="row g-1 mb-1">
+                <div class="col-md-3">
+                    <label class="form-label small mb-0">@Localization.T("field.foh.stageToFohSends")</label>
+                    <InputNumber class="form-control form-control-sm" @bind-Value="_band.Rider.Tech.Foh.StageToFohSendCount" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-0">@Localization.T("field.foh.roundTripCount")</label>
+                    <InputNumber class="form-control form-control-sm" @bind-Value="_band.Rider.Tech.Foh.StageToFohRoundTripCount" />
+                </div>
+            </div>
+            <div class="row g-1 mb-1">
+                <div class="col-md-3">
+                    <label class="form-label small mb-0">@Localization.T("field.foh.footprintWidth")</label>
+                    <InputNumber class="form-control form-control-sm" @bind-Value="_band.Rider.Tech.Foh.FootprintWidthMeters" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-0">@Localization.T("field.foh.footprintLength")</label>
+                    <InputNumber class="form-control form-control-sm" @bind-Value="_band.Rider.Tech.Foh.FootprintLengthMeters" />
+                </div>
+            </div>
+            <div class="row g-1 mb-1">
+                <div class="col-12">
+                    <label class="form-label small mb-0">@Localization.T("field.foh.additionalHardware")</label>
+                    <InputText class="form-control form-control-sm" @bind-Value="_band.Rider.Tech.Foh.AdditionalHardware" />
+                </div>
+            </div>
+            <div class="row g-1 mb-1">
+                <div class="col-12">
+                    <label class="form-label small mb-0">@Localization.T("field.notes")</label>
+                    <InputTextArea class="form-control form-control-sm" rows="2" @bind-Value="_band.Rider.Tech.Foh.Notes" />
+                </div>
+            </div>
+        </RiderSection>
+
+        <RiderSection Title="@Localization.T("section.monitors.title")" InitiallyExpanded="true">
+            <div class="row g-1 mb-1">
+                <div class="col-md-3">
+                    <label class="form-label small mb-0">@Localization.T("field.monitors.sourceMode")</label>
+                    <InputSelect class="form-select form-select-sm" @bind-Value="_band.Rider.Tech.Monitors.SourceMode">
+                        @foreach (var m in Enum.GetValues<MonitorSourceMode>())
+                        {
+                            <option value="@m">@Localization.T($"enum.MonitorSourceMode.{m}")</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+            @if (_band.Rider.Tech.Monitors.SourceMode == MonitorSourceMode.OwnConsole)
+            {
+                <div class="row g-1 mb-1">
+                    <div class="col-md-5">
+                        <label class="form-label small mb-0">@Localization.T("field.monitors.ownConsole")</label>
+                        <InputText class="form-control form-control-sm" @bind-Value="_band.Rider.Tech.Monitors.OwnConsoleModel" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small mb-0">@Localization.T("field.monitors.consoleLocation")</label>
+                        <InputSelect class="form-select form-select-sm" @bind-Value="_band.Rider.Tech.Monitors.OwnConsoleLocation">
+                            @foreach (var l in Enum.GetValues<MonitorTechLocation>())
+                            {
+                                <option value="@l">@Localization.T($"enum.MonitorTechLocation.{l}")</option>
+                            }
+                        </InputSelect>
+                    </div>
+                </div>
+            }
+
+            <h6 class="mb-1 fw-bold">@Localization.T("field.monitors.wedges")</h6>
+            <table class="table table-sm fr-table-dense align-middle mb-2">
+                <thead>
+                    <tr>
+                        <th>@Localization.T("field.where")</th>
+                        <th style="width: 70px;">@Localization.T("field.monitors.dual")</th>
+                        <th style="width: 70px;">@Localization.T("field.monitors.stereo")</th>
+                        <th style="width: 70px;">@Localization.T("field.monitors.drumfill")</th>
+                        <th style="width: 40px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var i = 0; i < _band.Rider.Tech.Monitors.Wedges.Count; i++)
+                    {
+                        var idx = i;
+                        var w = _band.Rider.Tech.Monitors.Wedges[idx];
+                        <tr @key="idx">
+                            <td><InputText class="form-control form-control-sm fr-form-ultra-sm" @bind-Value="w.Where" /></td>
+                            <td class="text-center"><InputCheckbox class="form-check-input" @bind-Value="w.DualLinked" /></td>
+                            <td class="text-center"><InputCheckbox class="form-check-input" @bind-Value="w.Stereo" /></td>
+                            <td class="text-center"><InputCheckbox class="form-check-input" @bind-Value="w.DrumFill" /></td>
+                            <td><button type="button" class="btn btn-sm btn-outline-danger fr-form-ultra-sm" @onclick="() => _band.Rider.Tech.Monitors.Wedges.RemoveAt(idx)">&#10005;</button></td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="4" class="border-0"></td>
+                        <td class="border-0"><button type="button" class="btn btn-sm btn-outline-primary fr-form-ultra-sm" @onclick="() => _band.Rider.Tech.Monitors.Wedges.Add(new MonitorWedge())">+</button></td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <h6 class="mb-1 fw-bold">@Localization.T("field.monitors.inEars")</h6>
+            <table class="table table-sm fr-table-dense align-middle mb-1">
+                <thead>
+                    <tr>
+                        <th>@Localization.T("field.where")</th>
+                        <th style="width: 70px;">@Localization.T("field.monitors.wireless")</th>
+                        <th style="width: 110px;">@Localization.T("field.provider")</th>
+                        <th>@Localization.T("field.description")</th>
+                        <th style="width: 40px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var i = 0; i < _band.Rider.Tech.Monitors.InEars.Count; i++)
+                    {
+                        var idx = i;
+                        var iem = _band.Rider.Tech.Monitors.InEars[idx];
+                        <tr @key="idx">
+                            <td><InputText class="form-control form-control-sm fr-form-ultra-sm" @bind-Value="iem.Where" /></td>
+                            <td class="text-center"><InputCheckbox class="form-check-input" @bind-Value="iem.IsWireless" /></td>
+                            <td>
+                                <InputSelect class="form-select form-select-sm fr-form-ultra-sm" @bind-Value="iem.Provider">
+                                    @foreach (var p in Enum.GetValues<CableProvider>())
+                                    {
+                                        <option value="@p">@Localization.T($"enum.CableProvider.{p}")</option>
+                                    }
+                                </InputSelect>
+                            </td>
+                            <td>
+                                @if (iem.IsWireless && iem.Provider == CableProvider.Brought)
+                                {
+                                    <InputText class="form-control form-control-sm fr-form-ultra-sm" placeholder="@Localization.T("field.model")" @bind-Value="iem.Model" />
+                                    <InputText class="form-control form-control-sm fr-form-ultra-sm mt-1" placeholder="@Localization.T("field.frequency")" @bind-Value="iem.Frequency" />
+                                }
+                            </td>
+                            <td><button type="button" class="btn btn-sm btn-outline-danger fr-form-ultra-sm" @onclick="() => _band.Rider.Tech.Monitors.InEars.RemoveAt(idx)">&#10005;</button></td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="4" class="border-0"></td>
+                        <td class="border-0"><button type="button" class="btn btn-sm btn-outline-primary fr-form-ultra-sm" @onclick="() => _band.Rider.Tech.Monitors.InEars.Add(new InEarMonitor())">+</button></td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <div class="mt-1">
+                <label class="form-label small mb-0">@Localization.T("field.notes")</label>
+                <InputTextArea class="form-control form-control-sm" rows="2" @bind-Value="_band.Rider.Tech.Monitors.Notes" />
+            </div>
+        </RiderSection>
+
+        <RiderSection Title="@Localization.T("section.stage.title")" InitiallyExpanded="true">
+            <h6 class="mb-1 fw-bold">@Localization.T("field.stage.risers")</h6>
+            <table class="table table-sm fr-table-dense align-middle mb-2">
+                <thead>
+                    <tr>
+                        <th>@Localization.T("field.where")</th>
+                        <th style="width: 90px;">@Localization.T("field.stage.riserWidth")</th>
+                        <th style="width: 90px;">@Localization.T("field.stage.riserLength")</th>
+                        <th style="width: 90px;">@Localization.T("field.stage.riserHeight")</th>
+                        <th style="width: 40px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var i = 0; i < _band.Rider.Tech.Stage.Risers.Count; i++)
+                    {
+                        var idx = i;
+                        var r = _band.Rider.Tech.Stage.Risers[idx];
+                        <tr @key="idx">
+                            <td><InputText class="form-control form-control-sm fr-form-ultra-sm" @bind-Value="r.Where" /></td>
+                            <td><InputNumber class="form-control form-control-sm fr-form-ultra-sm" step="0.5" @bind-Value="r.WidthMeters" /></td>
+                            <td><InputNumber class="form-control form-control-sm fr-form-ultra-sm" step="0.5" @bind-Value="r.LengthMeters" /></td>
+                            <td><InputNumber class="form-control form-control-sm fr-form-ultra-sm" step="20" @bind-Value="r.HeightCm" /></td>
+                            <td><button type="button" class="btn btn-sm btn-outline-danger fr-form-ultra-sm" @onclick="() => _band.Rider.Tech.Stage.Risers.RemoveAt(idx)">&#10005;</button></td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="4" class="border-0"></td>
+                        <td class="border-0"><button type="button" class="btn btn-sm btn-outline-primary fr-form-ultra-sm" @onclick="() => _band.Rider.Tech.Stage.Risers.Add(new Riser())">+</button></td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <h6 class="mb-1 fw-bold">@Localization.T("field.stage.otherRisers")</h6>
+            <table class="table table-sm fr-table-dense align-middle mb-2">
+                <thead>
+                    <tr>
+                        <th>@Localization.T("field.where")</th>
+                        <th style="width: 130px;">@Localization.T("field.type")</th>
+                        <th>@Localization.T("field.description")</th>
+                        <th style="width: 40px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var i = 0; i < _band.Rider.Tech.Stage.OtherRisers.Count; i++)
+                    {
+                        var idx = i;
+                        var o = _band.Rider.Tech.Stage.OtherRisers[idx];
+                        <tr @key="idx">
+                            <td><InputText class="form-control form-control-sm fr-form-ultra-sm" @bind-Value="o.Where" /></td>
+                            <td>
+                                <InputSelect class="form-select form-select-sm fr-form-ultra-sm" @bind-Value="o.Type">
+                                    @foreach (var t in Enum.GetValues<OtherRiserType>())
+                                    {
+                                        <option value="@t">@Localization.T($"enum.OtherRiserType.{t}")</option>
+                                    }
+                                </InputSelect>
+                            </td>
+                            <td><InputText class="form-control form-control-sm fr-form-ultra-sm" @bind-Value="o.Description" /></td>
+                            <td><button type="button" class="btn btn-sm btn-outline-danger fr-form-ultra-sm" @onclick="() => _band.Rider.Tech.Stage.OtherRisers.RemoveAt(idx)">&#10005;</button></td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="3" class="border-0"></td>
+                        <td class="border-0"><button type="button" class="btn btn-sm btn-outline-primary fr-form-ultra-sm" @onclick="() => _band.Rider.Tech.Stage.OtherRisers.Add(new OtherRiser())">+</button></td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <h6 class="mb-1 fw-bold">@Localization.T("field.stage.wirelessMics")</h6>
+            <table class="table table-sm fr-table-dense align-middle mb-1">
+                <thead>
+                    <tr>
+                        <th>@Localization.T("field.where")</th>
+                        <th style="width: 70px;">@Localization.T("field.count")</th>
+                        <th style="width: 110px;">@Localization.T("field.provider")</th>
+                        <th>@Localization.T("field.description")</th>
+                        <th style="width: 40px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var i = 0; i < _band.Rider.Tech.Stage.WirelessMics.Count; i++)
+                    {
+                        var idx = i;
+                        var w = _band.Rider.Tech.Stage.WirelessMics[idx];
+                        <tr @key="idx">
+                            <td><InputText class="form-control form-control-sm fr-form-ultra-sm" @bind-Value="w.Where" /></td>
+                            <td><InputNumber class="form-control form-control-sm fr-form-ultra-sm" @bind-Value="w.Count" /></td>
+                            <td>
+                                <InputSelect class="form-select form-select-sm fr-form-ultra-sm" @bind-Value="w.Provider">
+                                    @foreach (var p in Enum.GetValues<CableProvider>())
+                                    {
+                                        <option value="@p">@Localization.T($"enum.CableProvider.{p}")</option>
+                                    }
+                                </InputSelect>
+                            </td>
+                            <td>
+                                @if (w.Provider == CableProvider.Brought)
+                                {
+                                    <InputText class="form-control form-control-sm fr-form-ultra-sm" placeholder="@Localization.T("field.model")" @bind-Value="w.Model" />
+                                    <InputText class="form-control form-control-sm fr-form-ultra-sm mt-1" placeholder="@Localization.T("field.frequency")" @bind-Value="w.Frequency" />
+                                }
+                            </td>
+                            <td><button type="button" class="btn btn-sm btn-outline-danger fr-form-ultra-sm" @onclick="() => _band.Rider.Tech.Stage.WirelessMics.RemoveAt(idx)">&#10005;</button></td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="4" class="border-0"></td>
+                        <td class="border-0"><button type="button" class="btn btn-sm btn-outline-primary fr-form-ultra-sm" @onclick="() => _band.Rider.Tech.Stage.WirelessMics.Add(new WirelessMic())">+</button></td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <div class="form-check mt-2">
+                <InputCheckbox class="form-check-input" @bind-Value="_band.Rider.Tech.Stage.BringsOwnMics" />
+                <label class="form-check-label small">@Localization.T("field.stage.bringsOwnMics")</label>
+            </div>
+            <div class="mt-1">
+                <label class="form-label small mb-0">@Localization.T("field.notes")</label>
+                <InputTextArea class="form-control form-control-sm" rows="2" @bind-Value="_band.Rider.Tech.Stage.Notes" />
+            </div>
+        </RiderSection>
+
+        <RiderSection Title="@Localization.T("section.techNotes.title")" InitiallyExpanded="true">
+            <InputTextArea class="form-control form-control-sm" rows="3" @bind-Value="_band.Rider.Tech.Notes" />
+        </RiderSection>
+
+        <h2 class="h5 mt-3 mb-1">@Localization.T("page.editor.hospitality.heading")</h2>
+        <RiderSection Title="@Localization.T("section.hospitality.title")" InitiallyExpanded="true">
+            <div class="row g-1 mb-1">
+                <div class="col-md-6">
+                    <label class="form-label small mb-0">@Localization.T("field.hospitality.dressingRoom")</label>
+                    <InputTextArea class="form-control form-control-sm" rows="2" @bind-Value="_band.Rider.Hospitality.DressingRoomNotes" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small mb-0">@Localization.T("field.hospitality.catering")</label>
+                    <InputTextArea class="form-control form-control-sm" rows="2" @bind-Value="_band.Rider.Hospitality.CateringNotes" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small mb-0">@Localization.T("field.hospitality.dietaryRestrictions")</label>
+                    <InputText class="form-control form-control-sm" @bind-Value="_band.Rider.Hospitality.DietaryRestrictions" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-0">@Localization.T("field.hospitality.towelCount")</label>
+                    <InputNumber class="form-control form-control-sm" @bind-Value="_band.Rider.Hospitality.TowelCount" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-0">@Localization.T("field.hospitality.parkingSpaces")</label>
+                    <InputNumber class="form-control form-control-sm" @bind-Value="_band.Rider.Hospitality.ParkingSpaces" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label small mb-0">@Localization.T("field.hospitality.accommodations")</label>
+                    <InputTextArea class="form-control form-control-sm" rows="2" @bind-Value="_band.Rider.Hospitality.Accommodations" />
+                </div>
+            </div>
+            <h6 class="mb-1 fw-bold">@Localization.T("field.hospitality.drinks")</h6>
+            <table class="table table-sm fr-table-dense align-middle mb-1">
+                <thead>
+                    <tr>
+                        <th>@Localization.T("field.description")</th>
+                        <th style="width: 40px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var i = 0; i < _band.Rider.Hospitality.DrinksRequests.Count; i++)
+                    {
+                        var idx = i;
+                        <tr @key="idx">
+                            <td>
+                                <input class="form-control form-control-sm fr-form-ultra-sm" value="@_band.Rider.Hospitality.DrinksRequests[idx]"
+                                       @oninput="e => _band.Rider.Hospitality.DrinksRequests[idx] = e.Value?.ToString() ?? string.Empty" />
+                            </td>
+                            <td><button type="button" class="btn btn-sm btn-outline-danger fr-form-ultra-sm" @onclick="() => _band.Rider.Hospitality.DrinksRequests.RemoveAt(idx)">&#10005;</button></td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td class="border-0"></td>
+                        <td class="border-0"><button type="button" class="btn btn-sm btn-outline-primary fr-form-ultra-sm" @onclick="() => _band.Rider.Hospitality.DrinksRequests.Add(string.Empty)">+</button></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </RiderSection>
+
+        <div class="d-flex justify-content-end gap-2 my-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="GoBack">@Localization.T("page.editor.back")</button>
+            <button type="submit" class="btn btn-sm btn-primary">@Localization.T("page.editor.save")</button>
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private Band? _band;
+
+    protected override void OnInitialized()
+    {
+        BandService.OnChange += HandleChange;
+        Localization.OnLocaleChanged += HandleChange;
+        Load();
+    }
+
+    protected override void OnParametersSet() => Load();
+
+    private void Load() => _band = BandService.FindBand(Id);
+
+    private void HandleChange() => InvokeAsync(StateHasChanged);
+
+    private void Save()
+    {
+        if (_band is null) return;
+        BandService.UpdateBand(_band);
+        Toasts.Show(Localization.T(LocalizationKeys.Toast.Bands.Updated, _band.Name), ToastLevel.Success);
+        Nav.NavigateTo("/bands-v3");
+    }
+
+    private async Task ImportCsv(InputFileChangeEventArgs e)
+    {
+        if (_band is null) return;
+        try
+        {
+            await using var s = e.File.OpenReadStream(5 * 1024 * 1024);
+            using var reader = new StreamReader(s);
+            var csv = await reader.ReadToEndAsync();
+            var imported = Export.ImportBandCsv(csv);
+            imported.Id = _band.Id;
+            imported.UpdatedAt = DateTimeOffset.UtcNow;
+            BandService.UpdateBand(imported);
+            _band = BandService.FindBand(_band.Id);
+            Toasts.Show(Localization.T("toast.editor.imported", imported.Name), ToastLevel.Success);
+        }
+        catch (Exception ex)
+        {
+            Toasts.Show(Localization.T("toast.editor.importFailed", ex.Message), ToastLevel.Error);
+        }
+    }
+
+    private void GoBack() => Nav.NavigateTo("/bands-v3");
+
+    public void Dispose()
+    {
+        BandService.OnChange -= HandleChange;
+        Localization.OnLocaleChanged -= HandleChange;
+    }
+}
