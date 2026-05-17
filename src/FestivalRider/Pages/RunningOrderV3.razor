@@ -69,7 +69,7 @@ else
         BandService.OnChange += HandleChange;
         Localization.OnLocaleChanged += HandleChange;
         Reload();
-        foreach (var ro in BandService.RunningOrdersForActiveShow)
+        foreach (var ro in BandService.RunningOrdersForActiveShow.ToList())
         {
             Scheduler.Recalculate(ro, _show);
             BandService.UpdateRunningOrder(ro);
