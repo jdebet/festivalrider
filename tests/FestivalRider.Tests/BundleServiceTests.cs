@@ -21,7 +21,7 @@ public sealed class BundleServiceTests
 
     private static BundleService CreateWithV2Migrator()
     {
-        var (svc, _, _) = Create(new IBundleMigrator[] { new V2ToV3BundleMigrator(), new V3ToV4BundleMigrator(), new V4ToV5BundleMigrator() });
+        var (svc, _, _) = Create(new IBundleMigrator[] { new V2ToV3BundleMigrator(), new V3ToV4BundleMigrator(), new V4ToV5BundleMigrator(), new V5ToV6BundleMigrator() });
         return svc;
     }
 
@@ -552,7 +552,7 @@ public sealed class BundleServiceTests
 
         Assert.Null(result.Error);
         Assert.NotNull(result.State);
-        Assert.Equal(5, result.State!.SchemaVersion);
+        Assert.Equal(6, result.State!.SchemaVersion);
         Assert.Single(result.State.Shows);
         Assert.Equal("V2 Festival", result.State.Shows[0].Name);
         Assert.Equal(result.State.Shows[0].Id, result.State.ActiveShowId);
@@ -621,7 +621,7 @@ public sealed class BundleServiceTests
     [Fact]
     public void Import_Throwing_Migrator_Fails()
     {
-        var (svc, _, _) = Create(new IBundleMigrator[] { new ThrowingBundleMigrator(), new V3ToV4BundleMigrator(), new V4ToV5BundleMigrator() });
+        var (svc, _, _) = Create(new IBundleMigrator[] { new ThrowingBundleMigrator(), new V3ToV4BundleMigrator(), new V4ToV5BundleMigrator(), new V5ToV6BundleMigrator() });
         var zip = TestDataFactory.BuildV2BundleZip();
         var result = svc.ImportBundle(new MemoryStream(zip), Guid.NewGuid());
 

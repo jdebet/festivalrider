@@ -144,25 +144,25 @@ public sealed class StorageServiceTests
     }
 
     [Fact]
-    public async Task Migration_v1_to_v5_Succeeds_PersistsAndToasts()
+    public async Task Migration_v1_to_v6_Succeeds_PersistsAndToasts()
     {
-        var migrators = new IStateMigrator[] { new V1ToV2Migrator(), new V2ToV3Migrator(), new V3ToV4Migrator(), new V4ToV5Migrator() };
+        var migrators = new IStateMigrator[] { new V1ToV2Migrator(), new V2ToV3Migrator(), new V3ToV4Migrator(), new V4ToV5Migrator(), new V5ToV6Migrator() };
         var (svc, js, toasts, _, bands) = Create(migrators);
         js.ReturnValues["festivalRiderStorage.getItem"] = TestDataFactory.BuildV1JsonPayload();
         js.ReturnValues["festivalRiderStorage.setItem"] = true;
 
         await svc.EnsureLoadedAsync();
 
-        Assert.Contains(toasts.Messages, t => t.Text.Contains("Migrated data v1") && t.Text.Contains("v5"));
+        Assert.Contains(toasts.Messages, t => t.Text.Contains("Migrated data v1") && t.Text.Contains("v6"));
         // Migration warnings surfaced (genre + inputs + backline).
         Assert.Contains(toasts.Messages, t => t.Text.Contains("Genre"));
         Assert.Contains(toasts.Messages, t => t.Text.Contains("Inputs"));
 
-        // Migrated payload was persisted with schemaVersion=5.
+        // Migrated payload was persisted with schemaVersion=6.
         var persisted = LastStateWrite(js);
         Assert.NotNull(persisted);
         using var doc = JsonDocument.Parse(persisted!);
-        Assert.Equal(5, doc.RootElement.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal(6, doc.RootElement.GetProperty("schemaVersion").GetInt32());
 
         // Bands survive the migration.
         Assert.Single(bands.Bands);

@@ -12,7 +12,7 @@ public class StorageService : IStorageService, IAsyncDisposable
     private const string StateKey = "festivalrider.state";
     private const string LockKey = "festivalrider.tab-lock";
     private const string BackupKeyPrefix = "festivalrider.backup.v";
-    private const int CurrentSchemaVersion = 5;
+    private const int CurrentSchemaVersion = 6;
     private const int DebounceMs = 1000;
     private const int HeartbeatMs = 2000;
 

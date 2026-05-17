@@ -25,10 +25,12 @@ builder.Services.AddScoped<IStateMigrator, V1ToV2Migrator>();
 builder.Services.AddScoped<IStateMigrator, V2ToV3Migrator>();
 builder.Services.AddScoped<IStateMigrator, V3ToV4Migrator>();
 builder.Services.AddScoped<IStateMigrator, V4ToV5Migrator>();
+builder.Services.AddScoped<IStateMigrator, V5ToV6Migrator>();
 
 builder.Services.AddScoped<IBundleMigrator, V2ToV3BundleMigrator>();
 builder.Services.AddScoped<IBundleMigrator, V3ToV4BundleMigrator>();
 builder.Services.AddScoped<IBundleMigrator, V4ToV5BundleMigrator>();
+builder.Services.AddScoped<IBundleMigrator, V5ToV6BundleMigrator>();
 
 builder.Services.AddScoped<IPrintStrategy, BandRiderPrintStrategy>();
 builder.Services.AddScoped<IPrintStrategy, StagePrintStrategy>();
