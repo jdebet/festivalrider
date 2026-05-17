@@ -59,6 +59,7 @@ public sealed class RunningOrderSchedulerTests
         var sut = Create();
         var first = new DateTime(2024, 6, 15, 20, 0, 0);
         var (show, ro) = MakeShow(first, breakMinutes: 120);
+        show.TechnicalGetInTime = first.AddHours(-4); // 16:00 on show date, before soundchecks
 
         var a = AddSlot(ro, 1, first, 60, pinned: true, sortIndex: 1);
         var b = AddSlot(ro, 1, first.AddMinutes(75), 60, pinned: true, sortIndex: 0);
@@ -127,6 +128,7 @@ public sealed class RunningOrderSchedulerTests
         var sut = Create();
         var date = new DateOnly(2024, 6, 15);
         var show = new ShowData { Name = "x", DateOfOpening = date, ShowDayCount = 1 };
+        show.FirstShowTime = null; // clear default so scheduler emits missing warning
         show.Stages.Add(new Stage { Id = 1, Name = "Main" });
         var ro = new RunningOrder { ShowId = show.Id, ShowDayNumber = 1, VenueOptions = new VenueTimingOptions() };
         AddSlot(ro, 1, null, 60, pinned: false, sortIndex: 0);
