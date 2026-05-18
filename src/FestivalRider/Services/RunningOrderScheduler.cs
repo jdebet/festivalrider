@@ -297,9 +297,11 @@ public class RunningOrderScheduler : IRunningOrderScheduler
             foreach (var stage in scStageGroups)
             {
                 var ordered = stage.OrderBy(s => ctx.Order.Slots.IndexOf(s)).ToList();
-                for (int i = 1; i < ordered.Count; i++)
+                // Soundchecks are packed in show order backward from break, so chronologically
+                // they run from last show → first show. Iterate in reverse show order.
+                for (int i = ordered.Count - 2; i >= 0; i--)
                 {
-                    var prev = ordered[i - 1];
+                    var prev = ordered[i + 1];
                     var curr = ordered[i];
                     var prevSc = prev.PreShowEvents.FirstOrDefault(e => e.EventType == TimingEventType.SOUNDCHECK);
                     var currSc = curr.PreShowEvents.FirstOrDefault(e => e.EventType == TimingEventType.SOUNDCHECK);
