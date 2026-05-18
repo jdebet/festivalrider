@@ -15,10 +15,10 @@
             <div class="fr-gantt-row d-flex align-items-center gap-1 mb-1">
                 <div class="fr-gantt-label" style="width: 120px; flex-shrink: 0;"></div>
                 <div class="d-flex flex-wrap gap-2 small">
-                    <span class="fr-gantt-legend-item"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#fd7e14;vertical-align:middle;margin-right:4px;"></span>@LegendSoundcheck</span>
-                    <span class="fr-gantt-legend-item"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#28a745;vertical-align:middle;margin-right:4px;"></span>@LegendOnStage</span>
-                    <span class="fr-gantt-legend-item"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dc3545;vertical-align:middle;margin-right:4px;"></span>@LegendEarly</span>
-                    <span class="fr-gantt-legend-item"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#007bff;vertical-align:middle;margin-right:4px;"></span>@LegendPost</span>
+                    @foreach (var item in LegendItems())
+                    {
+                        <span class="fr-gantt-legend-item"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:@EventColor(item.Type);vertical-align:middle;margin-right:4px;"></span>@item.Label</span>
+                    }
                 </div>
             </div>
 
@@ -147,10 +147,7 @@
     [Parameter] public IReadOnlyList<Band> Bands { get; set; } = new List<Band>();
     [Parameter] public string SelectSlotHint { get; set; } = "Click a band to view details.";
     [Parameter] public string UnknownBandLabel { get; set; } = "Unknown";
-    [Parameter] public string LegendSoundcheck { get; set; } = "Soundcheck";
-    [Parameter] public string LegendOnStage { get; set; } = "On stage";
-    [Parameter] public string LegendEarly { get; set; } = "Early";
-    [Parameter] public string LegendPost { get; set; } = "Post-show";
+    [Parameter] public Func<TimingEventType, string> GetEventLabel { get; set; } = t => t.ToString();
     [Parameter] public EventCallback<Guid> OnSelectSlot { get; set; }
     [Parameter] public EventCallback<SlotEditRequest> OnEditRequest { get; set; }
     [Parameter] public EventCallback<Guid> OnMoveSlotUp { get; set; }
@@ -241,6 +238,8 @@
         };
     }
 
+    private string EventColor(TimingEventType type) => EventColor(type, new RunningOrderSlot());
+
     private string EventColor(TimingEventType type, RunningOrderSlot slot)
     {
         var inPost = slot.PostShowEvents.Any(e => e.EventType == type);
@@ -248,13 +247,14 @@
         return type switch
         {
             TimingEventType.GET_IN => "#17a2b8",
-            TimingEventType.LOAD_IN_VENUE or TimingEventType.LOAD_IN_STAGE => "#007bff",
-            TimingEventType.BACKSTAGE_DROP => "#dc3545",
+            TimingEventType.LOAD_IN_VENUE => "#4dabf7",
+            TimingEventType.LOAD_IN_STAGE => "#007bff",
+            TimingEventType.BACKSTAGE_DROP => "#8fbc8f",
             TimingEventType.SETUP_ON_STAGE => "#ffc107",
             TimingEventType.SOUNDCHECK => "#fd7e14",
             TimingEventType.CHANGEOVER => "#ffc107",
-            TimingEventType.PRESHOW_LINECHECK => "#8fbc8f",
-            TimingEventType.ON_STAGE => "#28a745",
+            TimingEventType.PRESHOW_LINECHECK => "#ffb347",
+            TimingEventType.ON_STAGE => "#dc3545",
             TimingEventType.LOAD_OUT_STAGING or TimingEventType.LOAD_OUT_VENUE => "#007bff",
             TimingEventType.CATERING => "#6f42c1",
             TimingEventType.BACKSTAGE_WAIT => "#6c757d",
@@ -267,6 +267,20 @@
         var dayOffset = (int)(dt.Date - baseDate.Date).TotalDays;
         var badge = dayOffset > 0 ? $"+{dayOffset}d " : string.Empty;
         return badge + dt.ToString("HH:mm");
+    }
+
+    private IEnumerable<(TimingEventType Type, string Label)> LegendItems()
+    {
+        var opts = Order.VenueOptions ?? new VenueTimingOptions();
+        if (opts.IncludeGetIn) yield return (TimingEventType.GET_IN, GetEventLabel(TimingEventType.GET_IN));
+        if (opts.IncludeLoadInVenue) yield return (TimingEventType.LOAD_IN_VENUE, GetEventLabel(TimingEventType.LOAD_IN_VENUE));
+        if (opts.IncludeBackstageDrop) yield return (TimingEventType.BACKSTAGE_DROP, GetEventLabel(TimingEventType.BACKSTAGE_DROP));
+        if (opts.IncludeStageLoadIn) yield return (TimingEventType.LOAD_IN_STAGE, GetEventLabel(TimingEventType.LOAD_IN_STAGE));
+        if (opts.IncludeSetupOnStage) yield return (TimingEventType.SETUP_ON_STAGE, GetEventLabel(TimingEventType.SETUP_ON_STAGE));
+        if (opts.IncludeSoundcheck) yield return (TimingEventType.SOUNDCHECK, GetEventLabel(TimingEventType.SOUNDCHECK));
+        yield return (TimingEventType.CHANGEOVER, GetEventLabel(TimingEventType.CHANGEOVER));
+        if (opts.IncludePreShowLinecheck) yield return (TimingEventType.PRESHOW_LINECHECK, GetEventLabel(TimingEventType.PRESHOW_LINECHECK));
+        yield return (TimingEventType.ON_STAGE, GetEventLabel(TimingEventType.ON_STAGE));
     }
 
     private int SlotIndex(Guid slotId) => Order.Slots.FindIndex(s => s.Id == slotId);

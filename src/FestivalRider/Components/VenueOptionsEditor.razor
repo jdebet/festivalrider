@@ -10,30 +10,67 @@
                     <button type="button" class="btn-close" @onclick="() => VisibleChanged.InvokeAsync(false)"></button>
                 </div>
                 <div class="modal-body">
-                    <h6 class="small fw-bold">@TogglesHeading</h6>
-                    <div class="row g-1 mb-2">
-                        <ToggleRow Label="@GetInLabel" @bind-Value="Options.IncludeGetIn" OnChange="Notify" />
-                        <ToggleRow Label="@LoadInVenueLabel" @bind-Value="Options.IncludeLoadInVenue" OnChange="Notify" />
-                        <ToggleRow Label="@StageLoadInLabel" @bind-Value="Options.IncludeStageLoadIn" OnChange="Notify" />
-                        <ToggleRow Label="@BackstageDropLabel" @bind-Value="Options.IncludeBackstageDrop" OnChange="Notify" />
-                        <ToggleRow Label="@SetupOnStageLabel" @bind-Value="Options.IncludeSetupOnStage" OnChange="Notify" />
-                        <ToggleRow Label="@SoundcheckLabel" @bind-Value="Options.IncludeSoundcheck" OnChange="Notify" />
-                        <ToggleRow Label="@PreShowLinecheckLabel" @bind-Value="Options.IncludePreShowLinecheck" OnChange="Notify" />
-                    </div>
-
-                    <h6 class="small fw-bold">@DefaultsHeading</h6>
-                    <div class="row g-1">
-                        <DurationRow Label="@GetInDefaultLabel" @bind-Value="Options.DefaultGetInMinutes" OnChange="Notify" />
-                        <DurationRow Label="@LoadInVenueDefaultLabel" @bind-Value="Options.DefaultLoadInVenueMinutes" OnChange="Notify" />
-                        <DurationRow Label="@StageLoadInDefaultLabel" @bind-Value="Options.DefaultStageLoadInMinutes" OnChange="Notify" />
-                        <DurationRow Label="@BackstageDropDefaultLabel" @bind-Value="Options.DefaultBackstageDropMinutes" OnChange="Notify" />
-                        <DurationRow Label="@SetupOnStageDefaultLabel" @bind-Value="Options.DefaultSetupOnStageMinutes" OnChange="Notify" />
-                        <DurationRow Label="@SoundcheckDefaultLabel" @bind-Value="Options.DefaultSoundcheckMinutes" OnChange="Notify" />
-                        <DurationRow Label="@PreShowLinecheckDefaultLabel" @bind-Value="Options.DefaultPreShowLinecheckMinutes" OnChange="Notify" />
-                        <DurationRow Label="@BackstageLeadDefaultLabel" @bind-Value="Options.DefaultBackstageLeadMinutes" OnChange="Notify" />
-                        <DurationRow Label="@ChangeoverDefaultLabel" @bind-Value="Options.DefaultChangeoverMinutes" OnChange="Notify" />
-                        <DurationRow Label="@SetLengthDefaultLabel" @bind-Value="Options.DefaultSetLengthMinutes" OnChange="Notify" />
-                    </div>
+                    <table class="table table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th>@OptionNameHeading</th>
+                                <th style="width: 80px;">@ToggleHeading</th>
+                                <th style="width: 140px;">@DurationHeading</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>@GetInLabel</td>
+                                <td><input type="checkbox" class="form-check-input" checked="@Options.IncludeGetIn" @onchange="e => SetToggle(v => Options.IncludeGetIn = v, e.Value)" /></td>
+                                <td><input type="number" class="form-control form-control-sm" style="width: 80px;" step="5" value="@Options.DefaultGetInMinutes" @onchange="e => SetDuration(v => Options.DefaultGetInMinutes = v, e.Value)" /></td>
+                            </tr>
+                            <tr>
+                                <td>@LoadInVenueLabel</td>
+                                <td><input type="checkbox" class="form-check-input" checked="@Options.IncludeLoadInVenue" @onchange="e => SetToggle(v => Options.IncludeLoadInVenue = v, e.Value)" /></td>
+                                <td><input type="number" class="form-control form-control-sm" style="width: 80px;" step="5" value="@Options.DefaultLoadInVenueMinutes" @onchange="e => SetDuration(v => Options.DefaultLoadInVenueMinutes = v, e.Value)" /></td>
+                            </tr>
+                            <tr>
+                                <td>@BackstageDropLabel</td>
+                                <td><input type="checkbox" class="form-check-input" checked="@Options.IncludeBackstageDrop" @onchange="e => SetToggle(v => Options.IncludeBackstageDrop = v, e.Value)" /></td>
+                                <td><input type="number" class="form-control form-control-sm" style="width: 80px;" step="5" value="@Options.DefaultBackstageDropMinutes" @onchange="e => SetDuration(v => Options.DefaultBackstageDropMinutes = v, e.Value)" /></td>
+                            </tr>
+                            <tr>
+                                <td>@StageLoadInLabel</td>
+                                <td><input type="checkbox" class="form-check-input" checked="@Options.IncludeStageLoadIn" @onchange="e => SetToggle(v => Options.IncludeStageLoadIn = v, e.Value)" /></td>
+                                <td><input type="number" class="form-control form-control-sm" style="width: 80px;" step="5" value="@Options.DefaultStageLoadInMinutes" @onchange="e => SetDuration(v => Options.DefaultStageLoadInMinutes = v, e.Value)" /></td>
+                            </tr>
+                            <tr>
+                                <td>@SetupOnStageLabel</td>
+                                <td><input type="checkbox" class="form-check-input" checked="@Options.IncludeSetupOnStage" @onchange="e => SetToggle(v => Options.IncludeSetupOnStage = v, e.Value)" /></td>
+                                <td><input type="number" class="form-control form-control-sm" style="width: 80px;" step="5" value="@Options.DefaultSetupOnStageMinutes" @onchange="e => SetDuration(v => Options.DefaultSetupOnStageMinutes = v, e.Value)" /></td>
+                            </tr>
+                            <tr>
+                                <td>@SoundcheckLabel</td>
+                                <td><input type="checkbox" class="form-check-input" checked="@Options.IncludeSoundcheck" @onchange="e => SetToggle(v => Options.IncludeSoundcheck = v, e.Value)" /></td>
+                                <td><input type="number" class="form-control form-control-sm" style="width: 80px;" step="5" value="@Options.DefaultSoundcheckMinutes" @onchange="e => SetDuration(v => Options.DefaultSoundcheckMinutes = v, e.Value)" /></td>
+                            </tr>
+                            <tr>
+                                <td>@BackstageLeadLabel</td>
+                                <td></td>
+                                <td><input type="number" class="form-control form-control-sm" style="width: 80px;" step="5" value="@Options.DefaultBackstageLeadMinutes" @onchange="e => SetDuration(v => Options.DefaultBackstageLeadMinutes = v, e.Value)" /></td>
+                            </tr>
+                            <tr>
+                                <td>@ChangeoverLabel</td>
+                                <td></td>
+                                <td><input type="number" class="form-control form-control-sm" style="width: 80px;" step="5" value="@Options.DefaultChangeoverMinutes" @onchange="e => SetDuration(v => Options.DefaultChangeoverMinutes = v, e.Value)" /></td>
+                            </tr>
+                            <tr>
+                                <td>@PreShowLinecheckLabel</td>
+                                <td><input type="checkbox" class="form-check-input" checked="@Options.IncludePreShowLinecheck" @onchange="e => SetToggle(v => Options.IncludePreShowLinecheck = v, e.Value)" /></td>
+                                <td><input type="number" class="form-control form-control-sm" style="width: 80px;" step="5" value="@Options.DefaultPreShowLinecheckMinutes" @onchange="e => SetDuration(v => Options.DefaultPreShowLinecheckMinutes = v, e.Value)" /></td>
+                            </tr>
+                            <tr>
+                                <td>@SetLengthLabel</td>
+                                <td></td>
+                                <td><input type="number" class="form-control form-control-sm" style="width: 80px;" step="5" value="@Options.DefaultSetLengthMinutes" @onchange="e => SetDuration(v => Options.DefaultSetLengthMinutes = v, e.Value)" /></td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-sm btn-primary" @onclick="() => VisibleChanged.InvokeAsync(false)">@CloseLabel</button>
@@ -49,8 +86,9 @@
     [Parameter] public VenueTimingOptions Options { get; set; } = new();
     [Parameter] public EventCallback OnChange { get; set; }
     [Parameter] public string Title { get; set; } = "Venue options";
-    [Parameter] public string TogglesHeading { get; set; } = "Inclusion toggles";
-    [Parameter] public string DefaultsHeading { get; set; } = "Default durations (min)";
+    [Parameter] public string OptionNameHeading { get; set; } = "Venue option";
+    [Parameter] public string ToggleHeading { get; set; } = "Include";
+    [Parameter] public string DurationHeading { get; set; } = "Duration (min)";
     [Parameter] public string CloseLabel { get; set; } = "Done";
     [Parameter] public string GetInLabel { get; set; } = "Get-in";
     [Parameter] public string LoadInVenueLabel { get; set; } = "Load-in (venue)";
@@ -59,16 +97,22 @@
     [Parameter] public string SetupOnStageLabel { get; set; } = "Setup on stage";
     [Parameter] public string SoundcheckLabel { get; set; } = "Soundcheck";
     [Parameter] public string PreShowLinecheckLabel { get; set; } = "Pre-show line check";
-    [Parameter] public string GetInDefaultLabel { get; set; } = "Get-in";
-    [Parameter] public string LoadInVenueDefaultLabel { get; set; } = "Load-in (venue)";
-    [Parameter] public string StageLoadInDefaultLabel { get; set; } = "Load-in (stage)";
-    [Parameter] public string BackstageDropDefaultLabel { get; set; } = "Backstage drop";
-    [Parameter] public string SetupOnStageDefaultLabel { get; set; } = "Setup on stage";
-    [Parameter] public string SoundcheckDefaultLabel { get; set; } = "Soundcheck";
-    [Parameter] public string PreShowLinecheckDefaultLabel { get; set; } = "Line check";
-    [Parameter] public string BackstageLeadDefaultLabel { get; set; } = "Backstage lead";
-    [Parameter] public string ChangeoverDefaultLabel { get; set; } = "Changeover";
-    [Parameter] public string SetLengthDefaultLabel { get; set; } = "Set length";
+    [Parameter] public string BackstageLeadLabel { get; set; } = "Backstage lead";
+    [Parameter] public string ChangeoverLabel { get; set; } = "Changeover";
+    [Parameter] public string SetLengthLabel { get; set; } = "Set length";
+
+    private void SetToggle(Action<bool> setter, object? value)
+    {
+        if (value is bool b) setter(b);
+        else if (bool.TryParse(value?.ToString(), out var parsed)) setter(parsed);
+        Notify();
+    }
+
+    private void SetDuration(Action<int> setter, object? value)
+    {
+        if (int.TryParse(value?.ToString(), out var v)) setter(v);
+        Notify();
+    }
 
     private void Notify() => OnChange.InvokeAsync();
 }

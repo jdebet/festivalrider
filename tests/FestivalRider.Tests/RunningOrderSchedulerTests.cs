@@ -70,10 +70,10 @@ public sealed class RunningOrderSchedulerTests
         var soundcheckA = a.PreShowEvents.Single(e => e.EventType == TimingEventType.SOUNDCHECK);
         var soundcheckB = b.PreShowEvents.Single(e => e.EventType == TimingEventType.SOUNDCHECK);
         // breakAnchor = doors? null -> firstShow 20:00 - 120 = 18:00. Default soundcheck = 30 min.
-        // Reverse-order packing: B packs first (ends at 18:00, starts at 17:30).
-        // scCursor after B = setupStart(17:15). A packs next (ends at 17:15, starts at 16:45).
-        Assert.Equal(new DateTime(2024, 6, 15, 17, 30, 0), soundcheckB.StartTime);
-        Assert.Equal(new DateTime(2024, 6, 15, 16, 45, 0), soundcheckA.StartTime);
+        // Show-order packing: A packs first (ends at 18:00, starts at 17:30).
+        // scCursor after A = setupStart(17:15). B packs next (ends at 17:15, starts at 16:45).
+        Assert.Equal(new DateTime(2024, 6, 15, 17, 30, 0), soundcheckA.StartTime);
+        Assert.Equal(new DateTime(2024, 6, 15, 16, 45, 0), soundcheckB.StartTime);
     }
 
     [Fact]

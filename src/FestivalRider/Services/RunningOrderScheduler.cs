@@ -239,15 +239,14 @@ public class RunningOrderScheduler : IRunningOrderScheduler
             SeedTraditionalSlotEvents(slot, ctx);
         }
 
-        // Soundcheck phase: coordinate soundcheck blocks in reverse show order per stage.
+        // Soundcheck phase: coordinate soundcheck blocks backward from break in show order per stage.
         var scStageGroups = ctx.Order.Slots.GroupBy(s => s.StageId).ToList();
         foreach (var stage in scStageGroups)
         {
             var ordered = stage.OrderBy(s => ctx.Order.Slots.IndexOf(s)).ToList();
-            var reverseOrdered = ordered.AsEnumerable().Reverse().ToList();
             var scPhaseEnd = EffectiveFirstShow().AddMinutes(-ctx.EffectiveBreakTime);
             DateTime? scCursor = scPhaseEnd;
-            foreach (var slot in reverseOrdered)
+            foreach (var slot in ordered)
             {
                 var setup = slot.PreShowEvents.FirstOrDefault(e => e.EventType == TimingEventType.SETUP_ON_STAGE);
                 var soundcheck = slot.PreShowEvents.FirstOrDefault(e => e.EventType == TimingEventType.SOUNDCHECK);

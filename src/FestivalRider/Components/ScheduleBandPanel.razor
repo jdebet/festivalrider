@@ -20,13 +20,13 @@ else
 
     <div class="mb-2">
         <h6 class="small fw-bold">@GetEventLabel(TimingEventType.ON_STAGE)</h6>
-        <div class="d-flex align-items-center gap-2 py-1 px-2 rounded mb-1" style="background:rgba(40,167,69,0.10)">
+        <div class="d-flex align-items-center gap-2 py-1 px-2 rounded mb-1" style="background:rgba(220,53,69,0.10)">
             <span class="small fw-bold" style="width: 110px;">@GetEventLabel(TimingEventType.ON_STAGE)</span>
             <span class="small text-muted" style="width: 70px;">@(Slot.OnStageTime is DateTime os ? FormatTime(os) : "--:--")</span>
             <div class="d-flex align-items-center gap-1 flex-grow-1">
-                <input type="number" class="form-control form-control-sm" style="width: 60px;"
+                <input type="number" class="form-control form-control-sm" style="width: 60px;" step="5"
                        placeholder="@GetDefaultDuration(TimingEventType.ON_STAGE)"
-                       value="@Slot.SetLengthMinutes"
+                       value="@(Slot.SetLengthMinutes ?? GetDefaultDuration(TimingEventType.ON_STAGE))"
                        @onchange="OnSetLengthChanged" />
                 <span class="small text-muted">min</span>
             </div>
@@ -59,7 +59,7 @@ else
         <h6 class="small fw-bold">@BackstageRowLabel</h6>
         @if (Slot.BackstageTime.HasValue)
         {
-            <div class="d-flex align-items-center gap-2 py-1 px-2 rounded mb-1" style="background:rgba(0,0,0,0.04)">
+            <div class="d-flex align-items-center gap-2 py-1 px-2 rounded mb-1" style="background:rgba(143,188,143,0.20)">
                 <span class="small fw-bold" style="width: 110px;">@BackstageRowLabel</span>
                 <span class="small text-muted" style="width: 70px;">@FormatTime(Slot.BackstageTime.Value)</span>
                 <div class="flex-grow-1"></div>

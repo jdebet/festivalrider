@@ -56,10 +56,7 @@
         <ScheduleGantt Order="Order" Show="Show" SelectedSlotId="_selectedSlotId" Bands="Bands"
                        SelectSlotHint="@SelectSlotHint"
                        UnknownBandLabel="@UnknownBandLabel"
-                       LegendSoundcheck="@LegendSoundcheck"
-                       LegendOnStage="@LegendOnStage"
-                       LegendEarly="@LegendEarly"
-                       LegendPost="@LegendPost"
+                       GetEventLabel="GetEventLabel"
                        OnSelectSlot="OnSelectSlot"
                        OnMoveSlotUp="MoveSlotUp"
                        OnMoveSlotDown="MoveSlotDown"
@@ -128,16 +125,9 @@
                   SetupOnStageLabel="@VenueSetupOnStageLabel"
                   SoundcheckLabel="@VenueSoundcheckLabel"
                   PreShowLinecheckLabel="@VenuePreShowLinecheckLabel"
-                  GetInDefaultLabel="@VenueGetInDefaultLabel"
-                  LoadInVenueDefaultLabel="@VenueLoadInVenueDefaultLabel"
-                  StageLoadInDefaultLabel="@VenueStageLoadInDefaultLabel"
-                  BackstageDropDefaultLabel="@VenueBackstageDropDefaultLabel"
-                  SetupOnStageDefaultLabel="@VenueSetupOnStageDefaultLabel"
-                  SoundcheckDefaultLabel="@VenueSoundcheckDefaultLabel"
-                  PreShowLinecheckDefaultLabel="@VenuePreShowLinecheckDefaultLabel"
-                  BackstageLeadDefaultLabel="@VenueBackstageLeadDefaultLabel"
-                  ChangeoverDefaultLabel="@VenueChangeoverDefaultLabel"
-                  SetLengthDefaultLabel="@VenueSetLengthDefaultLabel" />
+                  BackstageLeadLabel="@VenueBackstageLeadLabel"
+                  ChangeoverLabel="@VenueChangeoverLabel"
+                  SetLengthLabel="@VenueSetLengthLabel" />
 
 @code {
     [Parameter] public RunningOrder Order { get; set; } = new();
@@ -165,10 +155,6 @@
     [Parameter] public string DinnerLabel { get; set; } = "Dinner";
     [Parameter] public string SelectSlotHint { get; set; } = "Click a band to view details.";
     [Parameter] public string UnknownBandLabel { get; set; } = "Unknown";
-    [Parameter] public string LegendSoundcheck { get; set; } = "Soundcheck";
-    [Parameter] public string LegendOnStage { get; set; } = "On stage";
-    [Parameter] public string LegendEarly { get; set; } = "Early";
-    [Parameter] public string LegendPost { get; set; } = "Post-show";
     [Parameter] public string PickBandLabel { get; set; } = "Pick band";
     [Parameter] public string PickStageLabel { get; set; } = "Pick stage";
     [Parameter] public string AddSlotLabel { get; set; } = "+ Add slot";
@@ -203,16 +189,9 @@
     [Parameter] public string VenueSetupOnStageLabel { get; set; } = "Setup on stage";
     [Parameter] public string VenueSoundcheckLabel { get; set; } = "Soundcheck";
     [Parameter] public string VenuePreShowLinecheckLabel { get; set; } = "Line check";
-    [Parameter] public string VenueGetInDefaultLabel { get; set; } = "Get-in";
-    [Parameter] public string VenueLoadInVenueDefaultLabel { get; set; } = "Load-in (venue)";
-    [Parameter] public string VenueStageLoadInDefaultLabel { get; set; } = "Load-in (stage)";
-    [Parameter] public string VenueBackstageDropDefaultLabel { get; set; } = "Backstage drop";
-    [Parameter] public string VenueSetupOnStageDefaultLabel { get; set; } = "Setup on stage";
-    [Parameter] public string VenueSoundcheckDefaultLabel { get; set; } = "Soundcheck";
-    [Parameter] public string VenuePreShowLinecheckDefaultLabel { get; set; } = "Line check";
-    [Parameter] public string VenueBackstageLeadDefaultLabel { get; set; } = "Backstage lead";
-    [Parameter] public string VenueChangeoverDefaultLabel { get; set; } = "Changeover";
-    [Parameter] public string VenueSetLengthDefaultLabel { get; set; } = "Set length";
+    [Parameter] public string VenueBackstageLeadLabel { get; set; } = "Backstage lead";
+    [Parameter] public string VenueChangeoverLabel { get; set; } = "Changeover";
+    [Parameter] public string VenueSetLengthLabel { get; set; } = "Set length";
 
     private Guid _selectedSlotId = Guid.Empty;
     private Guid _newSlotBandId = Guid.Empty;

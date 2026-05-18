@@ -4,9 +4,9 @@
     <span class="small fw-bold" style="width: 110px;">@GetLabel(Event.EventType)</span>
     <span class="small text-muted" style="width: 70px;">@FormatTime(Event.StartTime)</span>
     <div class="d-flex align-items-center gap-1 flex-grow-1">
-        <input type="number" class="form-control form-control-sm" style="width: 60px;"
+        <input type="number" class="form-control form-control-sm" style="width: 60px;" step="5"
                placeholder="@GetDefaultDuration(Event.EventType)"
-               value="@Event.DurationMinutes"
+               value="@(Event.DurationMinutes ?? GetDefaultDuration(Event.EventType))"
                @onchange="OnDurationChanged" />
         <span class="small text-muted">min</span>
     </div>
@@ -59,13 +59,14 @@
         return type switch
         {
             TimingEventType.SOUNDCHECK => "rgba(253,126,20,0.10)",
-            TimingEventType.ON_STAGE => "rgba(40,167,69,0.10)",
+            TimingEventType.ON_STAGE => "rgba(220,53,69,0.10)",
             TimingEventType.GET_IN => "rgba(23,162,184,0.10)",
-            TimingEventType.LOAD_IN_VENUE or TimingEventType.LOAD_IN_STAGE => "rgba(0,123,255,0.10)",
-            TimingEventType.BACKSTAGE_DROP => "rgba(220,53,69,0.10)",
+            TimingEventType.LOAD_IN_VENUE => "rgba(77,171,247,0.10)",
+            TimingEventType.LOAD_IN_STAGE => "rgba(0,123,255,0.10)",
+            TimingEventType.BACKSTAGE_DROP => "rgba(143,188,143,0.20)",
             TimingEventType.LOAD_OUT_STAGING or TimingEventType.LOAD_OUT_VENUE => "rgba(0,123,255,0.10)",
             TimingEventType.CHANGEOVER => "rgba(255,193,7,0.10)",
-            TimingEventType.PRESHOW_LINECHECK => "rgba(143,188,143,0.20)",
+            TimingEventType.PRESHOW_LINECHECK => "rgba(255,179,71,0.10)",
             TimingEventType.SETUP_ON_STAGE => "rgba(255,193,7,0.10)",
             TimingEventType.CATERING => "rgba(111,66,193,0.08)",
             TimingEventType.BACKSTAGE_WAIT => "rgba(108,117,125,0.08)",
