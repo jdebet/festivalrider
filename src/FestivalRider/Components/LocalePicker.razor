@@ -4,11 +4,10 @@
 {
     <div class="input-group input-group-sm">
         <select class="form-select form-select-sm"
-                value="@CurrentTag"
                 @onchange="OnSelect">
             @foreach (var locale in Locales)
             {
-                <option value="@locale.Tag">@locale.DisplayName</option>
+                <option value="@locale.Tag" selected="@(locale.Tag == CurrentTag)">@locale.DisplayName</option>
             }
         </select>
     </div>

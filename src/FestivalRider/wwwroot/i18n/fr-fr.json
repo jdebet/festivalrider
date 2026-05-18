@@ -587,5 +587,6 @@
   "page.runningOrder.venueOptions.defaultSetLengthMinutes": "Durée set par défaut (min)",
 
   "toast.schedule.warning": "{0} : {1}",
+  "toast.schedule.updated": "Planning mis à jour.",
   "toast.bundle.import.roConfigReset": "La configuration du running order a été réinitialisée aux valeurs par défaut lors de l'importation."
 }

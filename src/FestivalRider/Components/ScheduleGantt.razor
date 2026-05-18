@@ -7,18 +7,77 @@
     }
     else
     {
-        <div class="fr-gantt-legend d-flex flex-wrap gap-2 mb-1 small">
-            <span class="fr-gantt-legend-item"><span class="fr-gantt-dot" style="background:#fd7e14"></span> @LegendSoundcheck</span>
-            <span class="fr-gantt-legend-item"><span class="fr-gantt-dot" style="background:#28a745"></span> @LegendOnStage</span>
-            <span class="fr-gantt-legend-item"><span class="fr-gantt-dot" style="background:#dc3545"></span> @LegendEarly</span>
-            <span class="fr-gantt-legend-item"><span class="fr-gantt-dot" style="background:#007bff"></span> @LegendPost</span>
-        </div>
-
         var minTime = MinTime;
         var maxTime = MaxTime;
         var totalMinutes = Math.Max((maxTime - minTime).TotalMinutes, 1);
 
         <div class="fr-gantt-tracks border rounded p-1">
+            <div class="fr-gantt-row d-flex align-items-center gap-1 mb-1">
+                <div class="fr-gantt-label" style="width: 120px; flex-shrink: 0;"></div>
+                <div class="d-flex flex-wrap gap-2 small">
+                    <span class="fr-gantt-legend-item"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#fd7e14;vertical-align:middle;margin-right:4px;"></span>@LegendSoundcheck</span>
+                    <span class="fr-gantt-legend-item"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#28a745;vertical-align:middle;margin-right:4px;"></span>@LegendOnStage</span>
+                    <span class="fr-gantt-legend-item"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dc3545;vertical-align:middle;margin-right:4px;"></span>@LegendEarly</span>
+                    <span class="fr-gantt-legend-item"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#007bff;vertical-align:middle;margin-right:4px;"></span>@LegendPost</span>
+                </div>
+            </div>
+
+            @* Time ruler *@
+            <div class="fr-gantt-row d-flex align-items-center gap-1 mb-1">
+                <div class="fr-gantt-label" style="width: 120px; flex-shrink: 0;"></div>
+                <div class="fr-gantt-track position-relative flex-grow-1" style="height: 28px; background: #f8f9fa; border-radius: 4px;">
+                    @if (VenueOpenTime is DateTime vo)
+                    {
+                        var openLeft = Math.Clamp((vo - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
+                        <div class="position-absolute" style="left: 0; top: 0; width: @(openLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; height: 100%; background: rgba(0,0,0,0.08); border-radius: 4px 0 0 4px;"></div>
+                    }
+                    @if (VenueCloseTime is DateTime vc)
+                    {
+                        var closeLeft = Math.Clamp((vc - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
+                        <div class="position-absolute" style="left: @(closeLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 0; width: @((100 - closeLeft).ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; height: 100%; background: rgba(0,0,0,0.08); border-radius: 0 4px 4px 0;"></div>
+                    }
+                    @if (EffectiveSoundCurfew is DateTime sc && VenueCloseTime is DateTime vc2)
+                    {
+                        var scLeft = Math.Clamp((sc - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
+                        var scWidth = Math.Clamp((vc2 - sc).TotalMinutes / totalMinutes * 100, 0, 100 - scLeft);
+                        <div class="position-absolute" style="left: @(scLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 0; width: @(scWidth.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; height: 100%; background: rgba(139, 0, 0, 0.12);"></div>
+                    }
+                    @if (EffectiveBackstageCurfew is DateTime bsc && VenueCloseTime is DateTime vc3)
+                    {
+                        var bscLeft = Math.Clamp((bsc - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
+                        var bscWidth = Math.Clamp((vc3 - bsc).TotalMinutes / totalMinutes * 100, 0, 100 - bscLeft);
+                        <div class="position-absolute" style="left: @(bscLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 0; width: @(bscWidth.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; height: 100%; background: repeating-linear-gradient(45deg, rgba(0,0,0,0.05), rgba(0,0,0,0.05) 8px, rgba(0,0,0,0.12) 8px, rgba(0,0,0,0.12) 16px);"></div>
+                    }
+                    @if (EffectiveTechnicalGetIn is DateTime tgi)
+                    {
+                        var tgiLeft = Math.Clamp((tgi - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
+                        <div class="position-absolute" style="left: @(tgiLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 0; width: 2px; height: 100%; background: #000;"></div>
+                        <span class="position-absolute small" style="left: @(tgiLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 2px; transform: translateX(-50%); font-size: 8px; color: #000; white-space: nowrap; font-weight: bold;">Tech</span>
+                    }
+                    @foreach (var h in RulerHours(minTime, maxTime))
+                    {
+                        var hLeft = Math.Clamp((h - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
+                        <div class="position-absolute" style="left: @(hLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 0; width: 1px; height: 100%; background: #adb5bd;"></div>
+                        <span class="position-absolute small" style="left: @(hLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 2px; transform: translateX(-50%); font-size: 9px; color: #6c757d; white-space: nowrap;">@h.ToString("HH:mm")</span>
+                    }
+                    @foreach (var q in RulerQuarters(minTime, maxTime))
+                    {
+                        var qLeft = Math.Clamp((q - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
+                        <div class="position-absolute" style="left: @(qLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 60%; width: 1px; height: 40%; background: #dee2e6;"></div>
+                    }
+                    @if (minTime.Date != maxTime.Date)
+                    {
+                        var midnight = minTime.Date.AddDays(1);
+                        if (midnight > minTime && midnight < maxTime)
+                        {
+                            var mLeft = ((midnight - minTime).TotalMinutes / totalMinutes * 100);
+                            <div class="position-absolute" style="left: @(mLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 0; width: 2px; height: 100%; background: #dc3545;"></div>
+                            <span class="position-absolute small fw-bold" style="left: @(mLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 14px; transform: translateX(-50%); font-size: 8px; color: #dc3545; white-space: nowrap;">+1d</span>
+                        }
+                    }
+                </div>
+            </div>
+
             @foreach (var slot in Order.Slots.OrderBy(s => s.OnStageTime ?? DateTime.MaxValue))
             {
                 var band = Bands.FirstOrDefault(b => b.Id == slot.BandId);
@@ -27,10 +86,35 @@
 
                 <div class="fr-gantt-row d-flex align-items-center gap-1 py-1 @(isSelected ? "fr-gantt-row-selected" : "")"
                      @onclick="() => OnSelectSlot.InvokeAsync(slot.Id)">
-                    <div class="fr-gantt-label small text-truncate" style="width: 120px; flex-shrink: 0;">
-                        @bandName
+                    <div class="fr-gantt-label small d-flex align-items-center gap-1" style="width: 150px; flex-shrink: 0;">
+                        <span class="text-truncate flex-grow-1">@bandName</span>
+                        <button class="btn btn-sm btn-outline-secondary p-0" style="width:20px;height:20px;font-size:9px;line-height:1;flex-shrink:0;" @onclick="() => OnMoveSlotUp.InvokeAsync(slot.Id)" @onclick:stopPropagation disabled="@(!CanMoveUp(slot.Id))">&#9650;</button>
+                        <button class="btn btn-sm btn-outline-secondary p-0" style="width:20px;height:20px;font-size:9px;line-height:1;flex-shrink:0;" @onclick="() => OnMoveSlotDown.InvokeAsync(slot.Id)" @onclick:stopPropagation disabled="@(!CanMoveDown(slot.Id))">&#9660;</button>
+                        <button class="btn btn-sm btn-outline-danger p-0" style="width:20px;height:20px;font-size:9px;line-height:1;flex-shrink:0;" @onclick="() => OnRemoveSlot.InvokeAsync(slot.Id)" @onclick:stopPropagation>&#215;</button>
                     </div>
                     <div class="fr-gantt-track position-relative flex-grow-1" style="height: 24px; background: #f8f9fa; border-radius: 4px;">
+                        @if (VenueOpenTime is DateTime voRow)
+                        {
+                            var openLeftRow = Math.Clamp((voRow - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
+                            <div class="position-absolute" style="left: 0; top: 0; width: @(openLeftRow.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; height: 100%; background: rgba(0,0,0,0.08); border-radius: 4px 0 0 4px;"></div>
+                        }
+                        @if (VenueCloseTime is DateTime vcRow)
+                        {
+                            var closeLeftRow = Math.Clamp((vcRow - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
+                            <div class="position-absolute" style="left: @(closeLeftRow.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 0; width: @((100 - closeLeftRow).ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; height: 100%; background: rgba(0,0,0,0.08); border-radius: 0 4px 4px 0;"></div>
+                        }
+                        @if (EffectiveSoundCurfew is DateTime scRow && VenueCloseTime is DateTime vcScRow)
+                        {
+                            var scLeftRow = Math.Clamp((scRow - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
+                            var scWidthRow = Math.Clamp((vcScRow - scRow).TotalMinutes / totalMinutes * 100, 0, 100 - scLeftRow);
+                            <div class="position-absolute" style="left: @(scLeftRow.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 0; width: @(scWidthRow.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; height: 100%; background: rgba(139, 0, 0, 0.12);"></div>
+                        }
+                        @if (EffectiveBackstageCurfew is DateTime bscRow && VenueCloseTime is DateTime vcBcRow)
+                        {
+                            var bscLeftRow = Math.Clamp((bscRow - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
+                            var bscWidthRow = Math.Clamp((vcBcRow - bscRow).TotalMinutes / totalMinutes * 100, 0, 100 - bscLeftRow);
+                            <div class="position-absolute" style="left: @(bscLeftRow.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 0; width: @(bscWidthRow.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; height: 100%; background: repeating-linear-gradient(45deg, rgba(0,0,0,0.05), rgba(0,0,0,0.05) 8px, rgba(0,0,0,0.12) 8px, rgba(0,0,0,0.12) 16px);"></div>
+                        }
                         @foreach (var ev in AllEvents(slot))
                         {
                             if (ev.StartTime is null) continue;
@@ -40,9 +124,13 @@
                             var widthPct = Math.Clamp((end - start).TotalMinutes / totalMinutes * 100, 0.5, 100 - leftPct);
                             var color = EventColor(ev.EventType, slot);
 
-                            <div class="position-absolute top-0 h-100"
-                                 style="left: @(leftPct.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; width: @(widthPct.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; background: @color; border-radius: 3px; cursor: pointer;"
+                            <div class="position-absolute top-0 h-100 d-flex align-items-center justify-content-center"
+                                 style="left: @(leftPct.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; width: @(widthPct.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; background: @color; border-radius: 3px; cursor: pointer; font-size: 10px; color: white; overflow: hidden; white-space: nowrap; text-shadow: 0 0 2px rgba(0,0,0,0.7);"
                                  title="@ev.EventType @FormatTime(start, BaseDate)-@FormatTime(end, BaseDate)">
+                                @if (widthPct > 8)
+                                {
+                                    <span>@FormatTime(start, BaseDate)</span>
+                                }
                             </div>
                         }
                     </div>
@@ -65,12 +153,15 @@
     [Parameter] public string LegendPost { get; set; } = "Post-show";
     [Parameter] public EventCallback<Guid> OnSelectSlot { get; set; }
     [Parameter] public EventCallback<SlotEditRequest> OnEditRequest { get; set; }
+    [Parameter] public EventCallback<Guid> OnMoveSlotUp { get; set; }
+    [Parameter] public EventCallback<Guid> OnMoveSlotDown { get; set; }
+    [Parameter] public EventCallback<Guid> OnRemoveSlot { get; set; }
 
     private DateTime BaseDate => Show.DateOfOpening == default
         ? DateTime.Today
         : Show.DateOfOpening.AddDays(Math.Max(0, Order.ShowDayNumber - 1)).ToDateTime(TimeOnly.MinValue);
 
-    private DateTime MinTime
+    private DateTime EventMinTime
     {
         get
         {
@@ -84,7 +175,7 @@
         }
     }
 
-    private DateTime MaxTime
+    private DateTime EventMaxTime
     {
         get
         {
@@ -102,10 +193,29 @@
         }
     }
 
+    private DateTime? VenueOpenTime => Order.VenueOpenTimeOverride ?? Show.VenueOpenTime;
+    private DateTime? VenueCloseTime => Order.VenueCloseTimeOverride ?? Show.VenueCloseTime;
+    private DateTime? EffectiveTechnicalGetIn => Order.TechnicalGetInTimeOverride ?? Show.TechnicalGetInTime;
+    private DateTime? EffectiveSoundCurfew => Order.SoundCurfewTimeOverride ?? Show.SoundCurfewTime;
+    private DateTime? EffectiveBackstageCurfew => Order.BackstageCurfewTimeOverride ?? Show.BackstageCurfewTime;
+
+    private DateTime MinTime => EventMinTime;
+    private DateTime MaxTime => EventMaxTime;
+
     private static IEnumerable<SlotTimingEvent> AllEvents(RunningOrderSlot slot)
     {
         foreach (var e in slot.EarlyChain) yield return e;
         foreach (var e in slot.PreShowEvents) yield return e;
+        if (slot.OnStageTime is DateTime onStage)
+        {
+            yield return new SlotTimingEvent
+            {
+                EventType = TimingEventType.ON_STAGE,
+                StartTime = onStage,
+                DurationMinutes = slot.SetLengthMinutes,
+                IsPinned = slot.IsOnStagePinned,
+            };
+        }
         foreach (var e in slot.PostShowEvents) yield return e;
     }
 
@@ -133,16 +243,22 @@
 
     private string EventColor(TimingEventType type, RunningOrderSlot slot)
     {
-        var inEarly = slot.EarlyChain.Any(e => e.EventType == type);
-        if (inEarly) return "#dc3545";
         var inPost = slot.PostShowEvents.Any(e => e.EventType == type);
-        if (inPost) return "#007bff";
 
         return type switch
         {
+            TimingEventType.GET_IN => "#17a2b8",
+            TimingEventType.LOAD_IN_VENUE or TimingEventType.LOAD_IN_STAGE => "#007bff",
+            TimingEventType.BACKSTAGE_DROP => "#dc3545",
+            TimingEventType.SETUP_ON_STAGE => "#ffc107",
             TimingEventType.SOUNDCHECK => "#fd7e14",
+            TimingEventType.CHANGEOVER => "#ffc107",
+            TimingEventType.PRESHOW_LINECHECK => "#8fbc8f",
             TimingEventType.ON_STAGE => "#28a745",
-            _ => "#ffc107",
+            TimingEventType.LOAD_OUT_STAGING or TimingEventType.LOAD_OUT_VENUE => "#007bff",
+            TimingEventType.CATERING => "#6f42c1",
+            TimingEventType.BACKSTAGE_WAIT => "#6c757d",
+            _ => inPost ? "#007bff" : "#ffc107",
         };
     }
 
@@ -151,5 +267,40 @@
         var dayOffset = (int)(dt.Date - baseDate.Date).TotalDays;
         var badge = dayOffset > 0 ? $"+{dayOffset}d " : string.Empty;
         return badge + dt.ToString("HH:mm");
+    }
+
+    private int SlotIndex(Guid slotId) => Order.Slots.FindIndex(s => s.Id == slotId);
+    private bool CanMoveUp(Guid slotId) => SlotIndex(slotId) > 0;
+    private bool CanMoveDown(Guid slotId)
+    {
+        var idx = SlotIndex(slotId);
+        return idx >= 0 && idx < Order.Slots.Count - 1;
+    }
+
+    private static IEnumerable<DateTime> RulerHours(DateTime min, DateTime max)
+    {
+        var start = new DateTime(min.Year, min.Month, min.Day, min.Hour, 0, 0, min.Kind);
+        if (start < min) start = start.AddHours(1);
+        var end = new DateTime(max.Year, max.Month, max.Day, max.Hour, 0, 0, max.Kind);
+        while (start <= end)
+        {
+            yield return start;
+            start = start.AddHours(1);
+        }
+    }
+
+    private static IEnumerable<DateTime> RulerQuarters(DateTime min, DateTime max)
+    {
+        var start = new DateTime(min.Year, min.Month, min.Day, min.Hour, (min.Minute / 15 + 1) * 15 % 60, 0, min.Kind);
+        if (start < min) start = start.AddMinutes(15);
+        if (start.Minute == 0) start = start.AddMinutes(15);
+        var end = max;
+        while (start <= end)
+        {
+            if (start.Minute % 60 != 0)
+                yield return start;
+            start = start.AddMinutes(15);
+            if (start.Minute == 0) start = start.AddMinutes(15);
+        }
     }
 }

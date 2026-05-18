@@ -10,6 +10,77 @@ else
         <h6 class="m-0 fw-bold">@BandName</h6>
     </div>
 
+    <div class="mb-2">
+        <h6 class="small fw-bold">@PostShowHeading</h6>
+        @foreach (var ev in Slot.PostShowEvents.OrderBy(e => e.StartTime ?? DateTime.MinValue))
+        {
+            <EventRow Event="ev" BaseDate="BaseDate" GetDefaultDuration="GetDefaultDuration" GetLabel="GetEventLabel" OnChange="NotifyChange" />
+        }
+    </div>
+
+    <div class="mb-2">
+        <h6 class="small fw-bold">@GetEventLabel(TimingEventType.ON_STAGE)</h6>
+        <div class="d-flex align-items-center gap-2 py-1 px-2 rounded mb-1" style="background:rgba(40,167,69,0.10)">
+            <span class="small fw-bold" style="width: 110px;">@GetEventLabel(TimingEventType.ON_STAGE)</span>
+            <span class="small text-muted" style="width: 70px;">@(Slot.OnStageTime is DateTime os ? FormatTime(os) : "--:--")</span>
+            <div class="d-flex align-items-center gap-1 flex-grow-1">
+                <input type="number" class="form-control form-control-sm" style="width: 60px;"
+                       placeholder="@GetDefaultDuration(TimingEventType.ON_STAGE)"
+                       value="@Slot.SetLengthMinutes"
+                       @onchange="OnSetLengthChanged" />
+                <span class="small text-muted">min</span>
+            </div>
+            <div class="form-check m-0">
+                <input type="checkbox" class="form-check-input" id="pin-onstage-@_id"
+                       checked="@Slot.IsOnStagePinned"
+                       @onchange="e => OnOnStagePinnedChanged(e.Value)" />
+                <label class="form-check-label small" for="pin-onstage-@_id">PIN</label>
+            </div>
+        </div>
+    </div>
+
+    @if (PreShowLinecheckEvent is not null)
+    {
+        <div class="mb-2">
+            <h6 class="small fw-bold">@GetEventLabel(TimingEventType.PRESHOW_LINECHECK)</h6>
+            <EventRow Event="PreShowLinecheckEvent" BaseDate="BaseDate" GetDefaultDuration="GetDefaultDuration" GetLabel="GetEventLabel" OnChange="NotifyChange" />
+        </div>
+    }
+
+    @if (ChangeoverEvent is not null)
+    {
+        <div class="mb-2">
+            <h6 class="small fw-bold">@GetEventLabel(TimingEventType.CHANGEOVER)</h6>
+            <EventRow Event="ChangeoverEvent" BaseDate="BaseDate" GetDefaultDuration="GetDefaultDuration" GetLabel="GetEventLabel" OnChange="NotifyChange" />
+        </div>
+    }
+
+    <div class="mb-2">
+        <h6 class="small fw-bold">@BackstageRowLabel</h6>
+        @if (Slot.BackstageTime.HasValue)
+        {
+            <div class="d-flex align-items-center gap-2 py-1 px-2 rounded mb-1" style="background:rgba(0,0,0,0.04)">
+                <span class="small fw-bold" style="width: 110px;">@BackstageRowLabel</span>
+                <span class="small text-muted" style="width: 70px;">@FormatTime(Slot.BackstageTime.Value)</span>
+                <div class="flex-grow-1"></div>
+                <div class="form-check m-0">
+                    <input type="checkbox" class="form-check-input" id="pin-backstage-@_id"
+                           checked="@Slot.IsBackstageTimePinned"
+                           @onchange="e => OnBackstagePinnedChanged(e.Value)" />
+                    <label class="form-check-label small" for="pin-backstage-@_id">PIN</label>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="mb-2">
+        <h6 class="small fw-bold">@PreShowHeading</h6>
+        @foreach (var ev in Slot.PreShowEvents.Where(e => e.EventType is not TimingEventType.CHANGEOVER and not TimingEventType.PRESHOW_LINECHECK).OrderByDescending(e => e.StartTime ?? DateTime.MinValue))
+        {
+            <EventRow Event="ev" BaseDate="BaseDate" GetDefaultDuration="GetDefaultDuration" GetLabel="GetEventLabel" OnChange="NotifyChange" />
+        }
+    </div>
+
     @if (Slot.EarlyChain.Count > 0)
     {
         <div class="mb-2">
@@ -20,33 +91,6 @@ else
             }
         </div>
     }
-
-    <div class="mb-2">
-        <h6 class="small fw-bold">@PreShowHeading</h6>
-        @if (Slot.BackstageTime.HasValue)
-        {
-            <div class="d-flex align-items-center gap-2 py-1 px-2 rounded" style="background:#e9ecef">
-                <span class="small fw-bold">@BackstageRowLabel</span>
-                <span class="small">@FormatTime(Slot.BackstageTime.Value)</span>
-                @if (Slot.IsBackstageTimePinned)
-                {
-                    <span class="badge bg-secondary">PIN</span>
-                }
-            </div>
-        }
-        @foreach (var ev in Slot.PreShowEvents.OrderByDescending(e => e.StartTime ?? DateTime.MaxValue))
-        {
-            <EventRow Event="ev" BaseDate="BaseDate" GetDefaultDuration="GetDefaultDuration" GetLabel="GetEventLabel" OnChange="NotifyChange" />
-        }
-    </div>
-
-    <div class="mb-2">
-        <h6 class="small fw-bold">@PostShowHeading</h6>
-        @foreach (var ev in Slot.PostShowEvents.OrderBy(e => e.StartTime ?? DateTime.MinValue))
-        {
-            <EventRow Event="ev" BaseDate="BaseDate" GetDefaultDuration="GetDefaultDuration" GetLabel="GetEventLabel" OnChange="NotifyChange" />
-        }
-    </div>
 
     <div class="mb-2">
         <h6 class="small fw-bold">@ConstraintsHeading</h6>
@@ -139,6 +183,9 @@ else
     private readonly int _id = Interlocked.Increment(ref _seq);
 
     private bool _hasPersonalCurfew => (Slot?.Flags & BandScheduleFlags.HasPersonalBackstageCurfew) != 0;
+
+    private SlotTimingEvent? ChangeoverEvent => Slot?.PreShowEvents.FirstOrDefault(e => e.EventType == TimingEventType.CHANGEOVER);
+    private SlotTimingEvent? PreShowLinecheckEvent => Slot?.PreShowEvents.FirstOrDefault(e => e.EventType == TimingEventType.PRESHOW_LINECHECK);
 
     private TimingEventType _selectedEventType = TimingEventType.CATERING;
     private bool _allowSoundcheckOverlap
@@ -245,6 +292,36 @@ else
             Slot.Flags |= BandScheduleFlags.HasPersonalBackstageCurfew;
         else
             Slot.Flags &= ~BandScheduleFlags.HasPersonalBackstageCurfew;
+        NotifyChange();
+    }
+
+    private void OnSetLengthChanged(ChangeEventArgs e)
+    {
+        if (Slot is null) return;
+        if (int.TryParse(e.Value?.ToString(), out var v) && v > 0)
+            Slot.SetLengthMinutes = v;
+        else
+            Slot.SetLengthMinutes = null;
+        NotifyChange();
+    }
+
+    private void OnOnStagePinnedChanged(object? value)
+    {
+        if (Slot is null) return;
+        if (value is bool b)
+            Slot.IsOnStagePinned = b;
+        else if (bool.TryParse(value?.ToString(), out var parsed))
+            Slot.IsOnStagePinned = parsed;
+        NotifyChange();
+    }
+
+    private void OnBackstagePinnedChanged(object? value)
+    {
+        if (Slot is null) return;
+        if (value is bool b)
+            Slot.IsBackstageTimePinned = b;
+        else if (bool.TryParse(value?.ToString(), out var parsed))
+            Slot.IsBackstageTimePinned = parsed;
         NotifyChange();
     }
 

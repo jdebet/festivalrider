@@ -150,6 +150,7 @@ else
     {
         var result = Scheduler.Recalculate(ro, _show);
         BandService.UpdateRunningOrder(ro);
+        Toasts.Show(Localization.T(LocalizationKeys.Toast.Schedule.Updated), ToastLevel.Info);
         foreach (var w in result.Warnings)
         {
             var bandName = w.SlotId is { } sid

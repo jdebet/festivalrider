@@ -70,10 +70,10 @@ public sealed class RunningOrderSchedulerTests
         var soundcheckA = a.PreShowEvents.Single(e => e.EventType == TimingEventType.SOUNDCHECK);
         var soundcheckB = b.PreShowEvents.Single(e => e.EventType == TimingEventType.SOUNDCHECK);
         // breakAnchor = doors? null -> firstShow 20:00 - 120 = 18:00. Default soundcheck = 30 min.
-        // SoundcheckOrderIndex pack order: 0 (b) first, 1 (a) second. With gap 0, both end at 18:00.
-        // SoundcheckOrderIndex 0 (b) packs first (ends at 18:00), index 1 (a) packs after it.
+        // Reverse-order packing: B packs first (ends at 18:00, starts at 17:30).
+        // scCursor after B = setupStart(17:15). A packs next (ends at 17:15, starts at 16:45).
         Assert.Equal(new DateTime(2024, 6, 15, 17, 30, 0), soundcheckB.StartTime);
-        Assert.Equal(new DateTime(2024, 6, 15, 17, 0, 0), soundcheckA.StartTime);
+        Assert.Equal(new DateTime(2024, 6, 15, 16, 45, 0), soundcheckA.StartTime);
     }
 
     [Fact]
@@ -164,7 +164,9 @@ public sealed class RunningOrderSchedulerTests
 
         sut.Recalculate(ro, show);
 
-        Assert.Equal(first.AddMinutes(-15), slot.BackstageTime);
+        // BackstageTime anchors to the earliest of PRESHOW_LINECHECK and ON_STAGE, minus lead.
+        // PRESHOW_LINECHECK is seeded 10 min before ON_STAGE at 20:00 → 19:50.
+        Assert.Equal(first.AddMinutes(-10 - 15), slot.BackstageTime);
     }
 
     [Fact]
@@ -583,5 +585,64 @@ public sealed class RunningOrderSchedulerTests
         sut.Recalculate(ro, show);
 
         Assert.DoesNotContain(ro.Slots[0].PreShowEvents, e => e.EventType == TimingEventType.SOUNDCHECK);
+    }
+
+    [Fact]
+    public void Recalculate_Traditional_BackstageDrop_Before_LoadInStage()
+    {
+        var sut = Create();
+        var first = new DateTime(2024, 6, 15, 20, 0, 0);
+        var (show, ro) = MakeShow(first);
+        ro.VenueOptions = new VenueTimingOptions
+        {
+            IncludeGetIn = true,
+            IncludeLoadInVenue = true,
+            IncludeStageLoadIn = true,
+            IncludeBackstageDrop = true,
+            IncludeSetupOnStage = true,
+            IncludeSoundcheck = true,
+            IncludePreShowLinecheck = true,
+        };
+        AddSlot(ro, 1, first, 60, pinned: true, sortIndex: 0);
+
+        sut.Recalculate(ro, show);
+
+        var slot = ro.Slots[0];
+        var bd = slot.PreShowEvents.First(e => e.EventType == TimingEventType.BACKSTAGE_DROP);
+        var li = slot.PreShowEvents.First(e => e.EventType == TimingEventType.LOAD_IN_STAGE);
+        Assert.True(bd.StartTime < li.StartTime, $"BACKSTAGE_DROP ({bd.StartTime}) must start before LOAD_IN_STAGE ({li.StartTime})");
+    }
+
+    [Fact]
+    public void Recalculate_Traditional_ToggleSetupOff_Cleans_PreShow_And_EarlyChain()
+    {
+        var sut = Create();
+        var first = new DateTime(2024, 6, 15, 20, 0, 0);
+        var (show, ro) = MakeShow(first);
+        var slot = new RunningOrderSlot
+        {
+            BandId = Guid.NewGuid(),
+            StageId = 1,
+            OnStageTime = first,
+            IsOnStagePinned = true,
+            SetLengthMinutes = 60,
+            SoundcheckOrderIndex = 0,
+        };
+        // Simulate stale EarlyChain data from a prior festival mode.
+        slot.EarlyChain.Add(new SlotTimingEvent { EventType = TimingEventType.SETUP_ON_STAGE, StartTime = first.AddHours(-2) });
+        slot.PreShowEvents.Add(new SlotTimingEvent { EventType = TimingEventType.SETUP_ON_STAGE });
+        ro.Slots.Add(slot);
+
+        ro.VenueOptions = new VenueTimingOptions
+        {
+            IncludeSetupOnStage = false,
+            IncludeSoundcheck = false,
+            IncludePreShowLinecheck = false,
+        };
+
+        sut.Recalculate(ro, show);
+
+        Assert.DoesNotContain(slot.PreShowEvents, e => e.EventType == TimingEventType.SETUP_ON_STAGE);
+        Assert.DoesNotContain(slot.EarlyChain, e => e.EventType == TimingEventType.SETUP_ON_STAGE);
     }
 }

@@ -1,6 +1,6 @@
 @using FestivalRider.Models
 
-<div class="d-flex align-items-center gap-2 py-1 px-2 rounded mb-1" style="background:#f8f9fa">
+<div class="d-flex align-items-center gap-2 py-1 px-2 rounded mb-1" style="background:@EventBackground(Event.EventType)">
     <span class="small fw-bold" style="width: 110px;">@GetLabel(Event.EventType)</span>
     <span class="small text-muted" style="width: 70px;">@FormatTime(Event.StartTime)</span>
     <div class="d-flex align-items-center gap-1 flex-grow-1">
@@ -52,5 +52,24 @@
         else if (bool.TryParse(value?.ToString(), out var parsed))
             Event.IsPinned = parsed;
         OnChange.InvokeAsync();
+    }
+
+    private static string EventBackground(TimingEventType type)
+    {
+        return type switch
+        {
+            TimingEventType.SOUNDCHECK => "rgba(253,126,20,0.10)",
+            TimingEventType.ON_STAGE => "rgba(40,167,69,0.10)",
+            TimingEventType.GET_IN => "rgba(23,162,184,0.10)",
+            TimingEventType.LOAD_IN_VENUE or TimingEventType.LOAD_IN_STAGE => "rgba(0,123,255,0.10)",
+            TimingEventType.BACKSTAGE_DROP => "rgba(220,53,69,0.10)",
+            TimingEventType.LOAD_OUT_STAGING or TimingEventType.LOAD_OUT_VENUE => "rgba(0,123,255,0.10)",
+            TimingEventType.CHANGEOVER => "rgba(255,193,7,0.10)",
+            TimingEventType.PRESHOW_LINECHECK => "rgba(143,188,143,0.20)",
+            TimingEventType.SETUP_ON_STAGE => "rgba(255,193,7,0.10)",
+            TimingEventType.CATERING => "rgba(111,66,193,0.08)",
+            TimingEventType.BACKSTAGE_WAIT => "rgba(108,117,125,0.08)",
+            _ => "#f8f9fa",
+        };
     }
 }

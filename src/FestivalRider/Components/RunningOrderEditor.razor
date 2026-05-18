@@ -29,25 +29,26 @@
         <input type="number" class="form-control form-control-sm" style="width: 70px;" value="@Order.SoundcheckGapMinutesOverride" @onchange="e => OnOverrideInt(e, v => Order.SoundcheckGapMinutesOverride = v)" />
     </div>
     <div class="ms-auto d-flex gap-1">
+        <button class="btn btn-sm btn-outline-primary" @onclick="Notify">@UpdateBtnLabel</button>
         <button class="btn btn-sm btn-outline-secondary" @onclick="() => _showTemplate = true">@TemplateBtnLabel</button>
         <button class="btn btn-sm btn-outline-secondary" @onclick="() => _showVenueOptions = true">@VenueOptionsBtnLabel</button>
     </div>
 </div>
 
 <div class="d-flex flex-wrap gap-2 align-items-end mb-2">
-    <TimeInput Label="@VenueOpenLabel" Value="@Order.VenueOpenTimeOverride" BaseDate="BaseDate" OnChange="v => { Order.VenueOpenTimeOverride = v; Notify(); }" />
-    <TimeInput Label="@VenueCloseLabel" Value="@Order.VenueCloseTimeOverride" BaseDate="BaseDate" OnChange="v => { Order.VenueCloseTimeOverride = v; Notify(); }" />
-    <TimeInput Label="@TechnicalGetInLabel" Value="@Order.TechnicalGetInTimeOverride" BaseDate="BaseDate" OnChange="v => { Order.TechnicalGetInTimeOverride = v; Notify(); }" />
-    <TimeInput Label="@DoorsLabel" Value="@Order.DoorsOpeningTimeOverride" BaseDate="BaseDate" OnChange="v => { Order.DoorsOpeningTimeOverride = v; Notify(); }" />
-    <TimeInput Label="@FirstShowLabel" Value="@Order.FirstShowTimeOverride" BaseDate="BaseDate" OnChange="v => { Order.FirstShowTimeOverride = v; Notify(); }" />
-    <TimeInput Label="@SoundCurfewLabel" Value="@Order.SoundCurfewTimeOverride" BaseDate="BaseDate" OnChange="v => { Order.SoundCurfewTimeOverride = v; Notify(); }" />
-    <TimeInput Label="@BackstageCurfewLabel" Value="@Order.BackstageCurfewTimeOverride" BaseDate="BaseDate" OnChange="v => { Order.BackstageCurfewTimeOverride = v; Notify(); }" />
+    <TimeInput Label="@VenueOpenLabel" Value="@(Order.VenueOpenTimeOverride ?? Show.VenueOpenTime)" BaseDate="BaseDate" OnChange="v => { Order.VenueOpenTimeOverride = v; Notify(); }" />
+    <TimeInput Label="@VenueCloseLabel" Value="@(Order.VenueCloseTimeOverride ?? Show.VenueCloseTime)" BaseDate="BaseDate" OnChange="v => { Order.VenueCloseTimeOverride = v; Notify(); }" />
+    <TimeInput Label="@TechnicalGetInLabel" Value="@(Order.TechnicalGetInTimeOverride ?? Show.TechnicalGetInTime)" BaseDate="BaseDate" OnChange="v => { Order.TechnicalGetInTimeOverride = v; Notify(); }" />
+    <TimeInput Label="@DoorsLabel" Value="@(Order.DoorsOpeningTimeOverride ?? Show.DoorsOpeningTime)" BaseDate="BaseDate" OnChange="v => { Order.DoorsOpeningTimeOverride = v; Notify(); }" />
+    <TimeInput Label="@FirstShowLabel" Value="@(Order.FirstShowTimeOverride ?? Show.FirstShowTime)" BaseDate="BaseDate" OnChange="v => { Order.FirstShowTimeOverride = v; Notify(); }" />
+    <TimeInput Label="@SoundCurfewLabel" Value="@(Order.SoundCurfewTimeOverride ?? Show.SoundCurfewTime)" BaseDate="BaseDate" OnChange="v => { Order.SoundCurfewTimeOverride = v; Notify(); }" />
+    <TimeInput Label="@BackstageCurfewLabel" Value="@(Order.BackstageCurfewTimeOverride ?? Show.BackstageCurfewTime)" BaseDate="BaseDate" OnChange="v => { Order.BackstageCurfewTimeOverride = v; Notify(); }" />
 </div>
 
 <div class="d-flex flex-wrap gap-2 align-items-end mb-2">
-    <TimeInput Label="@BreakfastLabel" Value="@Order.BreakfastHoursOverride?.Start" BaseDate="BaseDate" OnChange="v => { Order.BreakfastHoursOverride ??= new TimeSlot(); Order.BreakfastHoursOverride.Start = v ?? BaseDate; Notify(); }" />
-    <TimeInput Label="@LunchLabel" Value="@Order.LunchHoursOverride?.Start" BaseDate="BaseDate" OnChange="v => { Order.LunchHoursOverride ??= new TimeSlot(); Order.LunchHoursOverride.Start = v ?? BaseDate; Notify(); }" />
-    <TimeInput Label="@DinnerLabel" Value="@Order.DinnerHoursOverride?.Start" BaseDate="BaseDate" OnChange="v => { Order.DinnerHoursOverride ??= new TimeSlot(); Order.DinnerHoursOverride.Start = v ?? BaseDate; Notify(); }" />
+    <TimeInput Label="@BreakfastLabel" Value="@(Order.BreakfastHoursOverride?.Start ?? Show.BreakfastHours?.Start)" BaseDate="BaseDate" OnChange="v => { Order.BreakfastHoursOverride ??= new TimeSlot(); Order.BreakfastHoursOverride.Start = v ?? BaseDate; Notify(); }" />
+    <TimeInput Label="@LunchLabel" Value="@(Order.LunchHoursOverride?.Start ?? Show.LunchHours?.Start)" BaseDate="BaseDate" OnChange="v => { Order.LunchHoursOverride ??= new TimeSlot(); Order.LunchHoursOverride.Start = v ?? BaseDate; Notify(); }" />
+    <TimeInput Label="@DinnerLabel" Value="@(Order.DinnerHoursOverride?.Start ?? Show.DinnerHours?.Start)" BaseDate="BaseDate" OnChange="v => { Order.DinnerHoursOverride ??= new TimeSlot(); Order.DinnerHoursOverride.Start = v ?? BaseDate; Notify(); }" />
 </div>
 
 <div class="row g-2">
@@ -59,7 +60,10 @@
                        LegendOnStage="@LegendOnStage"
                        LegendEarly="@LegendEarly"
                        LegendPost="@LegendPost"
-                       OnSelectSlot="OnSelectSlot" />
+                       OnSelectSlot="OnSelectSlot"
+                       OnMoveSlotUp="MoveSlotUp"
+                       OnMoveSlotDown="MoveSlotDown"
+                       OnRemoveSlot="RemoveSlot" />
 
         @if (CanAddSlot)
         {
@@ -168,6 +172,7 @@
     [Parameter] public string PickBandLabel { get; set; } = "Pick band";
     [Parameter] public string PickStageLabel { get; set; } = "Pick stage";
     [Parameter] public string AddSlotLabel { get; set; } = "+ Add slot";
+    [Parameter] public string UpdateBtnLabel { get; set; } = "Update";
     [Parameter] public string TemplateBtnLabel { get; set; } = "Template";
     [Parameter] public string VenueOptionsBtnLabel { get; set; } = "Venue options";
     [Parameter] public string EarlyChainHeading { get; set; } = "Early chain";
@@ -279,12 +284,12 @@
     {
         if (_newSlotBandId == Guid.Empty || Bands.All(b => b.Id != _newSlotBandId)) return;
         var stageId = Stages.Count > 0 ? (_newSlotStageId != 0 ? _newSlotStageId : Stages.First().Id) : 0;
-        var placement = new BandPlacement { BandId = _newSlotBandId, StageId = stageId };
         Order.Slots.Add(new RunningOrderSlot
         {
             Id = Guid.NewGuid(),
             BandId = _newSlotBandId,
             StageId = stageId,
+            SoundcheckOrderIndex = Order.Slots.Count,
         });
         _newSlotBandId = Guid.Empty;
         _newSlotStageId = 0;
@@ -302,6 +307,36 @@
             slot.PostShowEvents.Add(ev);
         else
             slot.PreShowEvents.Add(ev);
+        Notify();
+    }
+
+    private void MoveSlotUp(Guid slotId)
+    {
+        var idx = Order.Slots.FindIndex(s => s.Id == slotId);
+        if (idx <= 0) return;
+        var slot = Order.Slots[idx];
+        Order.Slots.RemoveAt(idx);
+        Order.Slots.Insert(idx - 1, slot);
+        Notify();
+    }
+
+    private void MoveSlotDown(Guid slotId)
+    {
+        var idx = Order.Slots.FindIndex(s => s.Id == slotId);
+        if (idx < 0 || idx >= Order.Slots.Count - 1) return;
+        var slot = Order.Slots[idx];
+        Order.Slots.RemoveAt(idx);
+        Order.Slots.Insert(idx + 1, slot);
+        Notify();
+    }
+
+    private void RemoveSlot(Guid slotId)
+    {
+        var idx = Order.Slots.FindIndex(s => s.Id == slotId);
+        if (idx < 0) return;
+        Order.Slots.RemoveAt(idx);
+        if (_selectedSlotId == slotId)
+            _selectedSlotId = Guid.Empty;
         Notify();
     }
 

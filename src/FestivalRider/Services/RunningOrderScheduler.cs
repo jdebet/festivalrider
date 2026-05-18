@@ -233,37 +233,49 @@ public class RunningOrderScheduler : IRunningOrderScheduler
             }
         }
 
-        // Backward soundcheck pack per stage.
-        var doors = ctx.EffectiveDoors;
-        var first = ctx.EffectiveFirstShow ?? ctx.BaseDate.AddHours(20);
-        var packAnchor = doors is DateTime d ? (d < first ? d : first) : first;
-        packAnchor = packAnchor.AddMinutes(-ctx.EffectiveBreakTime);
-
-        foreach (var stage in stageGroups)
+        // Seed missing traditional events now that OnStageTime is resolved.
+        foreach (var slot in ctx.Order.Slots)
         {
-            var ordered = stage.OrderBy(s => s.SoundcheckOrderIndex).ToList();
-            DateTime cursor = packAnchor;
-            foreach (var slot in ordered)
-            {
-                var sc = slot.PreShowEvents.FirstOrDefault(e => e.EventType == TimingEventType.SOUNDCHECK);
-                if (sc is null)
-                    continue;
-                var dur = sc.DurationMinutes ?? options.DefaultSoundcheckMinutes;
-                if (!sc.IsPinned)
-                {
-                    sc.StartTime = cursor.AddMinutes(-dur);
-                }
-                cursor = (sc.StartTime ?? cursor).AddMinutes(-ctx.EffectiveSoundcheckGap);
+            SeedTraditionalSlotEvents(slot, ctx);
+        }
 
-                if (ctx.EffectiveTechnicalGetIn is DateTime tgi && sc.StartTime is DateTime st && st < tgi)
+        // Soundcheck phase: coordinate soundcheck blocks in reverse show order per stage.
+        var scStageGroups = ctx.Order.Slots.GroupBy(s => s.StageId).ToList();
+        foreach (var stage in scStageGroups)
+        {
+            var ordered = stage.OrderBy(s => ctx.Order.Slots.IndexOf(s)).ToList();
+            var reverseOrdered = ordered.AsEnumerable().Reverse().ToList();
+            var scPhaseEnd = EffectiveFirstShow().AddMinutes(-ctx.EffectiveBreakTime);
+            DateTime? scCursor = scPhaseEnd;
+            foreach (var slot in reverseOrdered)
+            {
+                var setup = slot.PreShowEvents.FirstOrDefault(e => e.EventType == TimingEventType.SETUP_ON_STAGE);
+                var soundcheck = slot.PreShowEvents.FirstOrDefault(e => e.EventType == TimingEventType.SOUNDCHECK);
+                var scDur = soundcheck?.DurationMinutes ?? options.DefaultSoundcheckMinutes;
+                var setupDur = setup?.DurationMinutes ?? options.DefaultSetupOnStageMinutes;
+
+                DateTime scStart;
+                DateTime setupStart;
+                if (soundcheck?.IsPinned == true && soundcheck.StartTime.HasValue)
                 {
-                    result.Warnings.Add(new ScheduleWarning
-                    {
-                        Type = ScheduleWarningType.SoundcheckShrunk,
-                        Message = $"Soundcheck start {st:HH:mm} precedes technical get-in {tgi:HH:mm}.",
-                        SlotId = slot.Id,
-                    });
+                    scStart = soundcheck.StartTime.Value;
+                    setupStart = setup?.StartTime ?? scStart.AddMinutes(-setupDur);
                 }
+                else if (scCursor.HasValue)
+                {
+                    var scEnd = scCursor.Value;
+                    scStart = scEnd.AddMinutes(-scDur);
+                    setupStart = scStart.AddMinutes(-setupDur);
+                    if (soundcheck != null && !soundcheck.IsPinned) soundcheck.StartTime = scStart;
+                    if (setup != null && !setup.IsPinned) setup.StartTime = setupStart;
+                }
+                else
+                {
+                    continue;
+                }
+
+                UpdateEarlyEvents(slot, setupStart, options);
+                scCursor = setupStart.AddMinutes(-ctx.EffectiveSoundcheckGap);
             }
         }
 
@@ -273,13 +285,42 @@ public class RunningOrderScheduler : IRunningOrderScheduler
             if (slot.IsBackstageTimePinned) continue;
             var lead = slot.BackstageLeadMinutes ?? options.DefaultBackstageLeadMinutes;
             var candidates = new List<DateTime>();
-            var changeover = slot.PreShowEvents.FirstOrDefault(e => e.EventType == TimingEventType.CHANGEOVER);
-            if (changeover?.StartTime is DateTime c) candidates.Add(c);
             var linecheck = slot.PreShowEvents.FirstOrDefault(e => e.EventType == TimingEventType.PRESHOW_LINECHECK);
             if (linecheck?.StartTime is DateTime l) candidates.Add(l);
             if (slot.OnStageTime is DateTime o) candidates.Add(o);
             if (candidates.Count == 0) continue;
             slot.BackstageTime = candidates.Min().AddMinutes(-lead);
+        }
+
+        // Warn on soundcheck gap violations (pinned soundchecks may cause this).
+        if (ctx.EffectiveSoundcheckGap > 0)
+        {
+            foreach (var stage in scStageGroups)
+            {
+                var ordered = stage.OrderBy(s => ctx.Order.Slots.IndexOf(s)).ToList();
+                for (int i = 1; i < ordered.Count; i++)
+                {
+                    var prev = ordered[i - 1];
+                    var curr = ordered[i];
+                    var prevSc = prev.PreShowEvents.FirstOrDefault(e => e.EventType == TimingEventType.SOUNDCHECK);
+                    var currSc = curr.PreShowEvents.FirstOrDefault(e => e.EventType == TimingEventType.SOUNDCHECK);
+                    if (prevSc?.StartTime is not DateTime pst || currSc?.StartTime is not DateTime cst)
+                        continue;
+
+                    var prevScDur = prevSc.DurationMinutes ?? options.DefaultSoundcheckMinutes;
+                    var prevScEnd = pst.AddMinutes(prevScDur);
+                    var gap = (cst - prevScEnd).TotalMinutes;
+                    if (gap >= ctx.EffectiveSoundcheckGap)
+                        continue;
+
+                    result.Warnings.Add(new ScheduleWarning
+                    {
+                        Type = ScheduleWarningType.SoundcheckOrderOverlap,
+                        Message = $"Soundcheck gap ({gap:F0} min) less than minimum ({ctx.EffectiveSoundcheckGap} min).",
+                        SlotId = curr.Id,
+                    });
+                }
+            }
         }
 
         // Sound curfew + backstage curfew checks.
@@ -785,6 +826,33 @@ public class RunningOrderScheduler : IRunningOrderScheduler
         return co?.DurationMinutes ?? options.DefaultChangeoverMinutes;
     }
 
+    private static void UpdateEarlyEvents(RunningOrderSlot slot, DateTime setupStart, VenueTimingOptions options)
+    {
+        var earlyTypes = new[]
+        {
+            TimingEventType.LOAD_IN_STAGE,
+            TimingEventType.BACKSTAGE_DROP,
+            TimingEventType.LOAD_IN_VENUE,
+            TimingEventType.GET_IN,
+        };
+        var cursor = setupStart;
+        foreach (var type in earlyTypes)
+        {
+            var ev = slot.PreShowEvents.FirstOrDefault(e => e.EventType == type);
+            if (ev == null || ev.IsPinned) continue;
+            var dur = ev.DurationMinutes ?? type switch
+            {
+                TimingEventType.GET_IN => options.DefaultGetInMinutes,
+                TimingEventType.LOAD_IN_VENUE => options.DefaultLoadInVenueMinutes,
+                TimingEventType.LOAD_IN_STAGE => options.DefaultStageLoadInMinutes,
+                TimingEventType.BACKSTAGE_DROP => options.DefaultBackstageDropMinutes,
+                _ => 15,
+            };
+            cursor = cursor.AddMinutes(-dur);
+            ev.StartTime = cursor;
+        }
+    }
+
     private static void SeedSlotEvents(RunningOrderSlot slot, Ctx ctx)
     {
         if (ctx.Mode == ScheduleMode.Festival)
@@ -797,15 +865,62 @@ public class RunningOrderScheduler : IRunningOrderScheduler
     {
         var opts = ctx.EffectiveVenueOptions;
         if (slot.OnStageTime is not DateTime onStage) return;
+
+        // Determine predecessor for changeover cleanup.
+        var stageSlots = ctx.Order.Slots
+            .Where(s => s.StageId == slot.StageId)
+            .OrderBy(s => s.OnStageTime ?? DateTime.MaxValue)
+            .ToList();
+        var hasPredecessor = stageSlots.FindIndex(s => s.Id == slot.Id) > 0;
+
+        // Cleanup: remove auto-seeded pre-show events whose toggle is now off.
+        slot.PreShowEvents.RemoveAll(e => !e.IsPinned && e.EventType switch
+        {
+            TimingEventType.GET_IN => !opts.IncludeGetIn,
+            TimingEventType.LOAD_IN_VENUE => !opts.IncludeLoadInVenue,
+            TimingEventType.LOAD_IN_STAGE => !opts.IncludeStageLoadIn,
+            TimingEventType.BACKSTAGE_DROP => !opts.IncludeBackstageDrop,
+            TimingEventType.SETUP_ON_STAGE => !opts.IncludeSetupOnStage,
+            TimingEventType.SOUNDCHECK => !opts.IncludeSoundcheck,
+            TimingEventType.PRESHOW_LINECHECK => !opts.IncludePreShowLinecheck,
+            TimingEventType.CHANGEOVER => !hasPredecessor,
+            _ => false,
+        });
+
+        // Also purge stale traditional auto-seeded types from EarlyChain (left over from festival mode / old data).
+        slot.EarlyChain.RemoveAll(e => !e.IsPinned && e.EventType switch
+        {
+            TimingEventType.GET_IN => !opts.IncludeGetIn,
+            TimingEventType.LOAD_IN_VENUE => !opts.IncludeLoadInVenue,
+            TimingEventType.LOAD_IN_STAGE => !opts.IncludeStageLoadIn,
+            TimingEventType.BACKSTAGE_DROP => !opts.IncludeBackstageDrop,
+            TimingEventType.SETUP_ON_STAGE => !opts.IncludeSetupOnStage,
+            TimingEventType.SOUNDCHECK => !opts.IncludeSoundcheck,
+            TimingEventType.PRESHOW_LINECHECK => !opts.IncludePreShowLinecheck,
+            TimingEventType.CHANGEOVER => !hasPredecessor,
+            _ => false,
+        });
+
         var cursor = onStage;
+
         if (opts.IncludePreShowLinecheck)
             SeedBackward(slot, TimingEventType.PRESHOW_LINECHECK, ref cursor, opts.DefaultPreShowLinecheckMinutes);
+
+        if (hasPredecessor)
+        {
+            var changeover = ChangeoverMinutes(slot, opts);
+            SeedBackward(slot, TimingEventType.CHANGEOVER, ref cursor, changeover);
+        }
         if (opts.IncludeSoundcheck)
             SeedBackward(slot, TimingEventType.SOUNDCHECK, ref cursor, opts.DefaultSoundcheckMinutes);
         if (opts.IncludeSetupOnStage)
             SeedBackward(slot, TimingEventType.SETUP_ON_STAGE, ref cursor, opts.DefaultSetupOnStageMinutes);
         if (opts.IncludeStageLoadIn)
             SeedBackward(slot, TimingEventType.LOAD_IN_STAGE, ref cursor, opts.DefaultStageLoadInMinutes);
+        if (opts.IncludeBackstageDrop)
+            SeedBackward(slot, TimingEventType.BACKSTAGE_DROP, ref cursor, opts.DefaultBackstageDropMinutes);
+        if (opts.IncludeLoadInVenue)
+            SeedBackward(slot, TimingEventType.LOAD_IN_VENUE, ref cursor, opts.DefaultLoadInVenueMinutes);
         if (opts.IncludeGetIn)
             SeedBackward(slot, TimingEventType.GET_IN, ref cursor, opts.DefaultGetInMinutes);
     }
@@ -851,18 +966,34 @@ public class RunningOrderScheduler : IRunningOrderScheduler
         }
     }
 
-    private static void SeedBackward(RunningOrderSlot slot, TimingEventType type, ref DateTime cursor, int duration)
+    private static void SeedBackward(RunningOrderSlot slot, TimingEventType type, ref DateTime cursor, int defaultDuration)
     {
-        if (slot.PreShowEvents.Any(e => e.EventType == type)) return;
-        var start = cursor.AddMinutes(-duration);
+        var existing = slot.PreShowEvents.FirstOrDefault(e => e.EventType == type);
+        if (existing is not null)
+        {
+            if (!existing.IsPinned)
+            {
+                var dur = existing.DurationMinutes ?? defaultDuration;
+                var derivedStart = cursor.AddMinutes(-dur);
+                existing.StartTime = derivedStart;
+                cursor = derivedStart;
+            }
+            else
+            {
+                cursor = existing.StartTime ?? cursor;
+            }
+            return;
+        }
+
+        var newStart = cursor.AddMinutes(-defaultDuration);
         slot.PreShowEvents.Add(new SlotTimingEvent
         {
             EventType = type,
-            StartTime = start,
+            StartTime = newStart,
             DurationMinutes = null,
             IsPinned = false,
         });
-        cursor = start;
+        cursor = newStart;
     }
 
     private static RunningOrderSlot CloneSlot(RunningOrderSlot s) => new()

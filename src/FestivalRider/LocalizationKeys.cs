@@ -502,6 +502,7 @@ public static class LocalizationKeys
         public static class Schedule
         {
             public const string Warning = "toast.schedule.warning";
+            public const string Updated = "toast.schedule.updated";
         }
         public static class Bundle
         {

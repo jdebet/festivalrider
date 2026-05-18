@@ -3,6 +3,7 @@
 ## Source of truth
 
 - ALWAYS read the `Active` plan under `Docs/Plans/` before editing code.
+- ALWAYS consult `Docs/domain-knowledge.md` for definitions of scheduling concepts and time windows.
 - NEVER edit `## Decisions (locked)` in any plan; write a successor plan instead.
 - On conflict between this file and the `Active` plan, the plan wins.
 
