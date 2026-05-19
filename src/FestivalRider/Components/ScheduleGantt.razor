@@ -11,20 +11,37 @@
         var maxTime = MaxTime;
         var totalMinutes = Math.Max((maxTime - minTime).TotalMinutes, 1);
 
+        @* Ruler-marker legend row *@
         <div class="fr-gantt-tracks border rounded p-1">
             <div class="fr-gantt-row d-flex align-items-center gap-1 mb-1">
-                <div class="fr-gantt-label" style="width: 120px; flex-shrink: 0;"></div>
-                <div class="d-flex flex-wrap gap-2 small">
-                    @foreach (var item in LegendItems())
+                <div class="fr-gantt-label" style="width: 150px; flex-shrink: 0;"></div>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    @if (VenueOpenTime is DateTime voLabel)
                     {
-                        <span class="fr-gantt-legend-item"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:@EventColor(item.Type);vertical-align:middle;margin-right:4px;"></span>@item.Label</span>
+                        <span class="fr-gantt-marker-chip fr-gantt-marker-venue">Open<span class="fr-gantt-marker-time">@voLabel.ToString("HH:mm")</span></span>
+                    }
+                    @if (VenueCloseTime is DateTime vcLabel)
+                    {
+                        <span class="fr-gantt-marker-chip fr-gantt-marker-venue">Close<span class="fr-gantt-marker-time">@vcLabel.ToString("HH:mm")</span></span>
+                    }
+                    @if (EffectiveTechnicalGetIn is DateTime tgiLabel)
+                    {
+                        <span class="fr-gantt-marker-chip fr-gantt-marker-tech">Tech Get-In<span class="fr-gantt-marker-time">@tgiLabel.ToString("HH:mm")</span></span>
+                    }
+                    @if (EffectiveSoundCurfew is DateTime scLabel)
+                    {
+                        <span class="fr-gantt-marker-chip fr-gantt-marker-curfew">Sound Curfew<span class="fr-gantt-marker-time">@scLabel.ToString("HH:mm")</span></span>
+                    }
+                    @if (EffectiveBackstageCurfew is DateTime bscLabel)
+                    {
+                        <span class="fr-gantt-marker-chip fr-gantt-marker-curfew">Backstage Curfew<span class="fr-gantt-marker-time">@bscLabel.ToString("HH:mm")</span></span>
                     }
                 </div>
             </div>
 
             @* Time ruler *@
             <div class="fr-gantt-row d-flex align-items-center gap-1 mb-1">
-                <div class="fr-gantt-label" style="width: 120px; flex-shrink: 0;"></div>
+                <div class="fr-gantt-label" style="width: 150px; flex-shrink: 0;"></div>
                 <div class="fr-gantt-track position-relative flex-grow-1" style="height: 28px; background: #f8f9fa; border-radius: 4px;">
                     @if (VenueOpenTime is DateTime vo)
                     {
@@ -125,9 +142,9 @@
                             var color = EventColor(ev.EventType, slot);
 
                             <div class="position-absolute top-0 h-100 d-flex align-items-center justify-content-center"
-                                 style="left: @(leftPct.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; width: @(widthPct.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; background: @color; border-radius: 3px; cursor: pointer; font-size: 10px; color: white; overflow: hidden; white-space: nowrap; text-shadow: 0 0 2px rgba(0,0,0,0.7);"
+                                 style="left: @(leftPct.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; width: @(widthPct.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; background: @color; border-radius: 3px; cursor: pointer; font-size: 10px; color: white; overflow: hidden; white-space: nowrap; text-shadow: 0 0 2px rgba(0,0,0,0.7); padding: 0 4px; box-sizing: border-box;"
                                  title="@ev.EventType @FormatTime(start, BaseDate)-@FormatTime(end, BaseDate)">
-                                @if (widthPct > 8)
+                                @if (widthPct > 4 && ShowInlineTime(ev.EventType))
                                 {
                                     <span>@FormatTime(start, BaseDate)</span>
                                 }
@@ -136,6 +153,17 @@
                     </div>
                 </div>
             }
+
+            @* Color legend *@
+            <div class="fr-gantt-row d-flex align-items-center gap-1 mt-1 pt-1" style="border-top: 1px solid #dee2e6;">
+                <div class="fr-gantt-label" style="width: 150px; flex-shrink: 0;"></div>
+                <div class="d-flex flex-wrap gap-2 small">
+                    @foreach (var item in LegendItems())
+                    {
+                        <span class="fr-gantt-legend-item"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:@EventColor(item.Type);vertical-align:middle;margin-right:4px;"></span>@item.Label</span>
+                    }
+                </div>
+            </div>
         </div>
     }
 </div>
@@ -282,6 +310,9 @@
         if (opts.IncludePreShowLinecheck) yield return (TimingEventType.PRESHOW_LINECHECK, GetEventLabel(TimingEventType.PRESHOW_LINECHECK));
         yield return (TimingEventType.ON_STAGE, GetEventLabel(TimingEventType.ON_STAGE));
     }
+
+    private static bool ShowInlineTime(TimingEventType type) =>
+        type is TimingEventType.GET_IN or TimingEventType.SOUNDCHECK or TimingEventType.ON_STAGE;
 
     private int SlotIndex(Guid slotId) => Order.Slots.FindIndex(s => s.Id == slotId);
     private bool CanMoveUp(Guid slotId) => SlotIndex(slotId) > 0;
