@@ -11,76 +11,50 @@
         var maxTime = MaxTime;
         var totalMinutes = Math.Max((maxTime - minTime).TotalMinutes, 1);
 
-        @* Ruler-marker legend row *@
+        @* Ruler with integrated marker legends — single combined track *@
         <div class="fr-gantt-tracks border rounded p-1">
             <div class="fr-gantt-row d-flex align-items-center gap-1 mb-1">
                 <div class="fr-gantt-label" style="width: 150px; flex-shrink: 0;"></div>
-                <div class="d-flex flex-wrap gap-2 align-items-center">
-                    @if (VenueOpenTime is DateTime voLabel)
-                    {
-                        <span class="fr-gantt-marker-chip fr-gantt-marker-venue">Open<span class="fr-gantt-marker-time">@voLabel.ToString("HH:mm")</span></span>
-                    }
-                    @if (VenueCloseTime is DateTime vcLabel)
-                    {
-                        <span class="fr-gantt-marker-chip fr-gantt-marker-venue">Close<span class="fr-gantt-marker-time">@vcLabel.ToString("HH:mm")</span></span>
-                    }
-                    @if (EffectiveTechnicalGetIn is DateTime tgiLabel)
-                    {
-                        <span class="fr-gantt-marker-chip fr-gantt-marker-tech">Tech Get-In<span class="fr-gantt-marker-time">@tgiLabel.ToString("HH:mm")</span></span>
-                    }
-                    @if (EffectiveSoundCurfew is DateTime scLabel)
-                    {
-                        <span class="fr-gantt-marker-chip fr-gantt-marker-curfew">Sound Curfew<span class="fr-gantt-marker-time">@scLabel.ToString("HH:mm")</span></span>
-                    }
-                    @if (EffectiveBackstageCurfew is DateTime bscLabel)
-                    {
-                        <span class="fr-gantt-marker-chip fr-gantt-marker-curfew">Backstage Curfew<span class="fr-gantt-marker-time">@bscLabel.ToString("HH:mm")</span></span>
-                    }
-                </div>
-            </div>
+                @* Combined legend+ruler track: top 20px = label zone, bottom 28px = ruler bar *@
+                <div class="fr-gantt-track position-relative flex-grow-1" style="height: 48px;">
+                    @* ── Ruler bar background (bottom 28px) ── *@
+                    <div class="position-absolute" style="left: 0; bottom: 0; width: 100%; height: 28px; background: #f8f9fa; border-radius: 4px;"></div>
 
-            @* Time ruler *@
-            <div class="fr-gantt-row d-flex align-items-center gap-1 mb-1">
-                <div class="fr-gantt-label" style="width: 150px; flex-shrink: 0;"></div>
-                <div class="fr-gantt-track position-relative flex-grow-1" style="height: 28px; background: #f8f9fa; border-radius: 4px;">
+                    @* ── Shading regions (scoped to ruler bar) ── *@
                     @if (VenueOpenTime is DateTime vo)
                     {
                         var openLeft = Math.Clamp((vo - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
-                        <div class="position-absolute" style="left: 0; top: 0; width: @(openLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; height: 100%; background: rgba(0,0,0,0.08); border-radius: 4px 0 0 4px;"></div>
+                        <div class="position-absolute" style="left: 0; bottom: 0; width: @(openLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; height: 28px; background: rgba(0,0,0,0.08); border-radius: 4px 0 0 4px;"></div>
                     }
                     @if (VenueCloseTime is DateTime vc)
                     {
                         var closeLeft = Math.Clamp((vc - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
-                        <div class="position-absolute" style="left: @(closeLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 0; width: @((100 - closeLeft).ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; height: 100%; background: rgba(0,0,0,0.08); border-radius: 0 4px 4px 0;"></div>
+                        <div class="position-absolute" style="left: @(closeLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; bottom: 0; width: @((100 - closeLeft).ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; height: 28px; background: rgba(0,0,0,0.08); border-radius: 0 4px 4px 0;"></div>
                     }
                     @if (EffectiveSoundCurfew is DateTime sc && VenueCloseTime is DateTime vc2)
                     {
                         var scLeft = Math.Clamp((sc - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
                         var scWidth = Math.Clamp((vc2 - sc).TotalMinutes / totalMinutes * 100, 0, 100 - scLeft);
-                        <div class="position-absolute" style="left: @(scLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 0; width: @(scWidth.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; height: 100%; background: rgba(139, 0, 0, 0.12);"></div>
+                        <div class="position-absolute" style="left: @(scLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; bottom: 0; width: @(scWidth.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; height: 28px; background: rgba(139, 0, 0, 0.12);"></div>
                     }
                     @if (EffectiveBackstageCurfew is DateTime bsc && VenueCloseTime is DateTime vc3)
                     {
                         var bscLeft = Math.Clamp((bsc - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
                         var bscWidth = Math.Clamp((vc3 - bsc).TotalMinutes / totalMinutes * 100, 0, 100 - bscLeft);
-                        <div class="position-absolute" style="left: @(bscLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 0; width: @(bscWidth.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; height: 100%; background: repeating-linear-gradient(45deg, rgba(0,0,0,0.05), rgba(0,0,0,0.05) 8px, rgba(0,0,0,0.12) 8px, rgba(0,0,0,0.12) 16px);"></div>
+                        <div class="position-absolute" style="left: @(bscLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; bottom: 0; width: @(bscWidth.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; height: 28px; background: repeating-linear-gradient(45deg, rgba(0,0,0,0.05), rgba(0,0,0,0.05) 8px, rgba(0,0,0,0.12) 8px, rgba(0,0,0,0.12) 16px);"></div>
                     }
-                    @if (EffectiveTechnicalGetIn is DateTime tgi)
-                    {
-                        var tgiLeft = Math.Clamp((tgi - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
-                        <div class="position-absolute" style="left: @(tgiLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 0; width: 2px; height: 100%; background: #000;"></div>
-                        <span class="position-absolute small" style="left: @(tgiLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 2px; transform: translateX(-50%); font-size: 8px; color: #000; white-space: nowrap; font-weight: bold;">Tech</span>
-                    }
+
+                    @* ── Hour ticks (ruler bar only) ── *@
                     @foreach (var h in RulerHours(minTime, maxTime))
                     {
                         var hLeft = Math.Clamp((h - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
-                        <div class="position-absolute" style="left: @(hLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 0; width: 1px; height: 100%; background: #adb5bd;"></div>
-                        <span class="position-absolute small" style="left: @(hLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 2px; transform: translateX(-50%); font-size: 9px; color: #6c757d; white-space: nowrap;">@h.ToString("HH:mm")</span>
+                        <div class="position-absolute" style="left: @(hLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; bottom: 0; width: 1px; height: 28px; background: #adb5bd;"></div>
+                        <span class="position-absolute" style="left: @(hLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; bottom: 4px; transform: translateX(-50%); font-size: 9px; color: #6c757d; white-space: nowrap;">@h.ToString("HH:mm")</span>
                     }
                     @foreach (var q in RulerQuarters(minTime, maxTime))
                     {
                         var qLeft = Math.Clamp((q - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
-                        <div class="position-absolute" style="left: @(qLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 60%; width: 1px; height: 40%; background: #dee2e6;"></div>
+                        <div class="position-absolute" style="left: @(qLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; bottom: 0; width: 1px; height: @(28 * 0.4)px; background: #dee2e6;"></div>
                     }
                     @if (minTime.Date != maxTime.Date)
                     {
@@ -88,9 +62,51 @@
                         if (midnight > minTime && midnight < maxTime)
                         {
                             var mLeft = ((midnight - minTime).TotalMinutes / totalMinutes * 100);
-                            <div class="position-absolute" style="left: @(mLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 0; width: 2px; height: 100%; background: #dc3545;"></div>
-                            <span class="position-absolute small fw-bold" style="left: @(mLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 14px; transform: translateX(-50%); font-size: 8px; color: #dc3545; white-space: nowrap;">+1d</span>
+                            <div class="position-absolute" style="left: @(mLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; bottom: 0; width: 2px; height: 100%; background: #dc3545;"></div>
+                            <span class="position-absolute fw-bold" style="left: @(mLeft.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 2px; transform: translateX(-50%); font-size: 8px; color: #dc3545; white-space: nowrap;">+1d</span>
                         }
+                    }
+
+                    @* ── Named venue markers — line spans full height, label at top ── *@
+                    @if (VenueOpenTime is DateTime voM)
+                    {
+                        var left = Math.Clamp((voM - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
+                        <div class="position-absolute fr-gantt-named-marker fr-gantt-named-marker-venue" style="left: @(left.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%;">
+                            <div class="fr-gantt-named-marker-line"></div>
+                            <span class="fr-gantt-named-marker-label">Open<span class="fr-gantt-named-marker-time">@voM.ToString("HH:mm")</span></span>
+                        </div>
+                    }
+                    @if (VenueCloseTime is DateTime vcM)
+                    {
+                        var left = Math.Clamp((vcM - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
+                        <div class="position-absolute fr-gantt-named-marker fr-gantt-named-marker-venue" style="left: @(left.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%;">
+                            <div class="fr-gantt-named-marker-line"></div>
+                            <span class="fr-gantt-named-marker-label">Close<span class="fr-gantt-named-marker-time">@vcM.ToString("HH:mm")</span></span>
+                        </div>
+                    }
+                    @if (EffectiveTechnicalGetIn is DateTime tgiM)
+                    {
+                        var left = Math.Clamp((tgiM - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
+                        <div class="position-absolute fr-gantt-named-marker fr-gantt-named-marker-tech" style="left: @(left.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%;">
+                            <div class="fr-gantt-named-marker-line"></div>
+                            <span class="fr-gantt-named-marker-label">Tech Get-In<span class="fr-gantt-named-marker-time">@tgiM.ToString("HH:mm")</span></span>
+                        </div>
+                    }
+                    @if (EffectiveSoundCurfew is DateTime scM)
+                    {
+                        var left = Math.Clamp((scM - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
+                        <div class="position-absolute fr-gantt-named-marker fr-gantt-named-marker-curfew" style="left: @(left.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%;">
+                            <div class="fr-gantt-named-marker-line"></div>
+                            <span class="fr-gantt-named-marker-label">Sound Curfew<span class="fr-gantt-named-marker-time">@scM.ToString("HH:mm")</span></span>
+                        </div>
+                    }
+                    @if (EffectiveBackstageCurfew is DateTime bscM)
+                    {
+                        var left = Math.Clamp((bscM - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
+                        <div class="position-absolute fr-gantt-named-marker fr-gantt-named-marker-curfew" style="left: @(left.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%;">
+                            <div class="fr-gantt-named-marker-line"></div>
+                            <span class="fr-gantt-named-marker-label">Backstage Curfew<span class="fr-gantt-named-marker-time">@bscM.ToString("HH:mm")</span></span>
+                        </div>
                     }
                 </div>
             </div>

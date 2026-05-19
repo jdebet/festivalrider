@@ -1,47 +1,71 @@
-.fr-gantt-marker-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 11px;
-    font-weight: 500;
-    padding: 2px 8px;
-    border-radius: 12px;
+/* Named marker: absolute container anchored at the marker position */
+.fr-gantt-named-marker {
+    top: 0;
+    height: 100%;
+    width: 0;
     cursor: default;
-    user-select: none;
-    white-space: nowrap;
 }
 
-.fr-gantt-marker-chip .fr-gantt-marker-time {
+/* The vertical line running the full height of the combined track */
+.fr-gantt-named-marker-line {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 2px;
+    height: 100%;
+    transform: translateX(-50%);
+}
+
+/* Label anchored to the top, sitting to the right of the line */
+.fr-gantt-named-marker-label {
+    position: absolute;
+    top: 1px;
+    left: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+    user-select: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+}
+
+/* Time portion: hidden by default, slides in on hover */
+.fr-gantt-named-marker-time {
     display: inline-block;
     max-width: 0;
     overflow: hidden;
     opacity: 0;
+    font-weight: 400;
     font-size: 10px;
-    font-weight: 600;
-    transition: max-width 250ms ease, opacity 200ms ease, margin-left 250ms ease;
+    transition: max-width 220ms ease, opacity 180ms ease, margin-left 220ms ease;
     margin-left: 0;
 }
 
-.fr-gantt-marker-chip:hover .fr-gantt-marker-time {
+.fr-gantt-named-marker:hover .fr-gantt-named-marker-time {
     max-width: 60px;
     opacity: 1;
-    margin-left: 2px;
+    margin-left: 3px;
 }
 
-.fr-gantt-marker-venue {
-    background: rgba(0, 0, 0, 0.07);
+/* Colour variants */
+.fr-gantt-named-marker-venue .fr-gantt-named-marker-line {
+    background: #6c757d;
+}
+.fr-gantt-named-marker-venue .fr-gantt-named-marker-label {
     color: #495057;
-    border: 1px solid rgba(0, 0, 0, 0.12);
 }
 
-.fr-gantt-marker-tech {
-    background: rgba(0, 0, 0, 0.9);
-    color: #fff;
-    border: 1px solid #000;
+.fr-gantt-named-marker-tech .fr-gantt-named-marker-line {
+    background: #000;
+}
+.fr-gantt-named-marker-tech .fr-gantt-named-marker-label {
+    color: #000;
 }
 
-.fr-gantt-marker-curfew {
-    background: rgba(139, 0, 0, 0.1);
+.fr-gantt-named-marker-curfew .fr-gantt-named-marker-line {
+    background: #7b0000;
+}
+.fr-gantt-named-marker-curfew .fr-gantt-named-marker-label {
     color: #7b0000;
-    border: 1px solid rgba(139, 0, 0, 0.25);
 }
