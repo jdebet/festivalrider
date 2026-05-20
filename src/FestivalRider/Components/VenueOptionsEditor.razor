@@ -10,6 +10,27 @@
                     <button type="button" class="btn-close" @onclick="() => VisibleChanged.InvokeAsync(false)"></button>
                 </div>
                 <div class="modal-body">
+                    <h6 class="fw-bold mb-2">@RunningOrderOptionsHeading</h6>
+                    <div class="d-flex flex-wrap gap-3 mb-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="small text-muted mb-0">@ModeLabel</label>
+                            <select class="form-select form-select-sm" style="width: 130px;" value="@Order.ModeOverride" @onchange="OnModeChanged">
+                                <option value="">@DefaultLabel (@GetModeLabel(Show.DefaultScheduleMode))</option>
+                                <option value="@ScheduleMode.Traditional">@GetModeLabel(ScheduleMode.Traditional)</option>
+                                <option value="@ScheduleMode.Festival">@GetModeLabel(ScheduleMode.Festival)</option>
+                            </select>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="small text-muted mb-0">@AnchorLabel</label>
+                            <select class="form-select form-select-sm" style="width: 130px;" value="@Order.AnchorEventOverride" @onchange="OnAnchorChanged">
+                                <option value="">@DefaultLabel (@GetEventLabel(Show.DefaultAnchorEvent))</option>
+                                @foreach (var t in Enum.GetValues<TimingEventType>())
+                                {
+                                    <option value="@t">@GetEventLabel(t)</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
                     <table class="table table-sm align-middle">
                         <thead>
                             <tr>
@@ -84,8 +105,18 @@
     [Parameter] public bool Visible { get; set; }
     [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
     [Parameter] public VenueTimingOptions Options { get; set; } = new();
+    [Parameter] public RunningOrder Order { get; set; } = new();
+    [Parameter] public ShowData Show { get; set; } = new();
+    [Parameter] public Func<ScheduleMode, string> GetModeLabel { get; set; } = m => m.ToString();
+    [Parameter] public Func<TimingEventType, string> GetEventLabel { get; set; } = t => t.ToString();
+    [Parameter] public EventCallback<ChangeEventArgs> OnModeChanged { get; set; }
+    [Parameter] public EventCallback<ChangeEventArgs> OnAnchorChanged { get; set; }
     [Parameter] public EventCallback OnChange { get; set; }
     [Parameter] public string Title { get; set; } = "Venue options";
+    [Parameter] public string RunningOrderOptionsHeading { get; set; } = "Running order options";
+    [Parameter] public string ModeLabel { get; set; } = "Mode";
+    [Parameter] public string AnchorLabel { get; set; } = "Anchor";
+    [Parameter] public string DefaultLabel { get; set; } = "Default";
     [Parameter] public string OptionNameHeading { get; set; } = "Venue option";
     [Parameter] public string ToggleHeading { get; set; } = "Include";
     [Parameter] public string DurationHeading { get; set; } = "Duration (min)";

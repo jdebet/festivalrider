@@ -1,25 +1,25 @@
 @using FestivalRider.Models
 @using FestivalRider.Services
 
+<div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+    <div class="d-flex align-items-center gap-1">
+        <label class="small text-muted mb-0">@DayNumberLabel</label>
+        <input type="number" min="1" max="@ShowDayCount" class="form-control form-control-sm fw-bold" style="width: 70px;"
+               value="@Order.ShowDayNumber"
+               @onchange="OnDayChanged" />
+    </div>
+    <div class="ms-auto d-flex gap-1">
+        <button class="btn btn-sm btn-outline-primary" @onclick="Notify">@UpdateBtnLabel</button>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="() => _showTemplate = true">@TemplateBtnLabel</button>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="() => _showVenueOptions = true">@VenueOptionsBtnLabel</button>
+        @if (OnDeleteRequest.HasDelegate)
+        {
+            <button class="btn btn-sm btn-outline-danger" @onclick="() => OnDeleteRequest.InvokeAsync()">@DeleteBtnLabel</button>
+        }
+    </div>
+</div>
+
 <div class="d-flex flex-wrap gap-2 align-items-end mb-2">
-    <div class="d-flex align-items-center gap-1">
-        <label class="small text-muted mb-0">@ModeLabel</label>
-        <select class="form-select form-select-sm" style="width: 130px;" value="@Order.ModeOverride" @onchange="OnModeChanged">
-            <option value="">@DefaultLabel (@Show.DefaultScheduleMode)</option>
-            <option value="@ScheduleMode.Traditional">@GetModeLabel(ScheduleMode.Traditional)</option>
-            <option value="@ScheduleMode.Festival">@GetModeLabel(ScheduleMode.Festival)</option>
-        </select>
-    </div>
-    <div class="d-flex align-items-center gap-1">
-        <label class="small text-muted mb-0">@AnchorLabel</label>
-        <select class="form-select form-select-sm" style="width: 130px;" value="@Order.AnchorEventOverride" @onchange="OnAnchorChanged">
-            <option value="">@DefaultLabel (@GetEventLabel(Show.DefaultAnchorEvent))</option>
-            @foreach (var t in Enum.GetValues<TimingEventType>())
-            {
-                <option value="@t">@GetEventLabel(t)</option>
-            }
-        </select>
-    </div>
     <div class="d-flex align-items-center gap-1">
         <label class="small text-muted mb-0">@BreakLabel</label>
         <input type="number" class="form-control form-control-sm" style="width: 70px;" step="5" value="@Order.BreakTimeMinutesOverride" @onchange="e => OnOverrideInt(e, v => Order.BreakTimeMinutesOverride = v)" />
@@ -28,21 +28,19 @@
         <label class="small text-muted mb-0">@GapLabel</label>
         <input type="number" class="form-control form-control-sm" style="width: 70px;" step="5" value="@Order.SoundcheckGapMinutesOverride" @onchange="e => OnOverrideInt(e, v => Order.SoundcheckGapMinutesOverride = v)" />
     </div>
-    <div class="ms-auto d-flex gap-1">
-        <button class="btn btn-sm btn-outline-primary" @onclick="Notify">@UpdateBtnLabel</button>
-        <button class="btn btn-sm btn-outline-secondary" @onclick="() => _showTemplate = true">@TemplateBtnLabel</button>
-        <button class="btn btn-sm btn-outline-secondary" @onclick="() => _showVenueOptions = true">@VenueOptionsBtnLabel</button>
-    </div>
 </div>
 
 <div class="d-flex flex-wrap gap-2 align-items-end mb-2">
     <TimeInput Label="@VenueOpenLabel" Value="@(Order.VenueOpenTimeOverride ?? Show.VenueOpenTime)" BaseDate="BaseDate" OnChange="v => { Order.VenueOpenTimeOverride = v; Notify(); }" />
     <TimeInput Label="@VenueCloseLabel" Value="@(Order.VenueCloseTimeOverride ?? Show.VenueCloseTime)" BaseDate="BaseDate" OnChange="v => { Order.VenueCloseTimeOverride = v; Notify(); }" />
+    <TimeInput Label="@SoundCurfewLabel" Value="@(Order.SoundCurfewTimeOverride ?? Show.SoundCurfewTime)" BaseDate="BaseDate" OnChange="v => { Order.SoundCurfewTimeOverride = v; Notify(); }" />
+    <TimeInput Label="@BackstageCurfewLabel" Value="@(Order.BackstageCurfewTimeOverride ?? Show.BackstageCurfewTime)" BaseDate="BaseDate" OnChange="v => { Order.BackstageCurfewTimeOverride = v; Notify(); }" />
+</div>
+
+<div class="d-flex flex-wrap gap-2 align-items-end mb-2">
     <TimeInput Label="@TechnicalGetInLabel" Value="@(Order.TechnicalGetInTimeOverride ?? Show.TechnicalGetInTime)" BaseDate="BaseDate" OnChange="v => { Order.TechnicalGetInTimeOverride = v; Notify(); }" />
     <TimeInput Label="@DoorsLabel" Value="@(Order.DoorsOpeningTimeOverride ?? Show.DoorsOpeningTime)" BaseDate="BaseDate" OnChange="v => { Order.DoorsOpeningTimeOverride = v; Notify(); }" />
     <TimeInput Label="@FirstShowLabel" Value="@(Order.FirstShowTimeOverride ?? Show.FirstShowTime)" BaseDate="BaseDate" OnChange="v => { Order.FirstShowTimeOverride = v; Notify(); }" />
-    <TimeInput Label="@SoundCurfewLabel" Value="@(Order.SoundCurfewTimeOverride ?? Show.SoundCurfewTime)" BaseDate="BaseDate" OnChange="v => { Order.SoundCurfewTimeOverride = v; Notify(); }" />
-    <TimeInput Label="@BackstageCurfewLabel" Value="@(Order.BackstageCurfewTimeOverride ?? Show.BackstageCurfewTime)" BaseDate="BaseDate" OnChange="v => { Order.BackstageCurfewTimeOverride = v; Notify(); }" />
 </div>
 
 <div class="d-flex flex-wrap gap-2 align-items-end mb-2">
@@ -116,7 +114,14 @@
                 GetEventLabel="GetEventLabel" />
 
 <VenueOptionsEditor @bind-Visible="_showVenueOptions" Options="GetOrCreateVenueOptions()" OnChange="Notify"
+                  Order="Order" Show="Show"
+                  GetModeLabel="GetModeLabel" GetEventLabel="GetEventLabel"
+                  OnModeChanged="OnModeChanged" OnAnchorChanged="OnAnchorChanged"
                   Title="@VenueOptionsTitle"
+                  RunningOrderOptionsHeading="@RunningOrderOptionsHeading"
+                  ModeLabel="@ModeLabel"
+                  AnchorLabel="@AnchorLabel"
+                  DefaultLabel="@DefaultLabel"
                   CloseLabel="@CloseLabel"
                   GetInLabel="@VenueGetInLabel"
                   LoadInVenueLabel="@VenueLoadInVenueLabel"
@@ -138,6 +143,11 @@
     [Parameter] public Func<ScheduleMode, string> GetModeLabel { get; set; } = m => m.ToString();
     [Parameter] public EventCallback OnChange { get; set; }
 
+    [Parameter] public string DayNumberLabel { get; set; } = "Day";
+    [Parameter] public int ShowDayCount { get; set; } = 31;
+    [Parameter] public string DeleteBtnLabel { get; set; } = "Delete";
+    [Parameter] public EventCallback<ChangeEventArgs> OnDayChanged { get; set; }
+    [Parameter] public EventCallback OnDeleteRequest { get; set; }
     [Parameter] public string ModeLabel { get; set; } = "Mode";
     [Parameter] public string AnchorLabel { get; set; } = "Anchor";
     [Parameter] public string DefaultLabel { get; set; } = "Default";
@@ -181,6 +191,7 @@
     [Parameter] public string PresetFestivalTent { get; set; } = "Festival tent";
     [Parameter] public string PresetTraditionalVenue { get; set; } = "Traditional venue";
     [Parameter] public string VenueOptionsTitle { get; set; } = "Venue options";
+    [Parameter] public string RunningOrderOptionsHeading { get; set; } = "Running order options";
     [Parameter] public string CloseLabel { get; set; } = "Done";
     [Parameter] public string VenueGetInLabel { get; set; } = "Get-in";
     [Parameter] public string VenueLoadInVenueLabel { get; set; } = "Load-in (venue)";
