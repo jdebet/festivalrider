@@ -71,18 +71,6 @@
     margin-right: 3px;
 }
 
-/* Proximity-based label visibility: hidden by default when overlapping */
-.fr-gantt-named-marker-label-hidden {
-    opacity: 0;
-    pointer-events: none;
-}
-
-/* Show label on marker hover regardless of proximity state */
-.fr-gantt-named-marker:hover .fr-gantt-named-marker-label {
-    opacity: 1;
-    pointer-events: auto;
-}
-
 /* Colour variants */
 .fr-gantt-named-marker-venue .fr-gantt-named-marker-line {
     background: #6c757d;
