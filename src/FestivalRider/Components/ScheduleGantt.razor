@@ -12,11 +12,16 @@
         var totalMinutes = Math.Max((maxTime - minTime).TotalMinutes, 1);
 
         @* Ruler with integrated marker legends — single combined track *@
-        <div class="fr-gantt-tracks border rounded p-1">
+        <div class="fr-gantt-tracks border rounded p-1" @onwheel="OnWheelZoom" @onwheel:preventDefault @onmousemove="OnMouseMove" @onclick="() => OnSelectSlot.InvokeAsync(Guid.Empty)">
             <div class="fr-gantt-row d-flex align-items-center gap-1 mb-1">
-                <div class="fr-gantt-label" style="width: 150px; flex-shrink: 0;"></div>
+                <div class="fr-gantt-label d-flex align-items-center justify-content-start" style="width: 175px; flex-shrink: 0;">
+                    @if (_viewWidthMins.HasValue)
+                    {
+                        <button class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:10px;" title="Reset zoom" @onclick="ResetZoom" @onclick:stopPropagation>&#8634; Auto</button>
+                    }
+                </div>
                 @* Combined legend+ruler track: top 20px = label zone, bottom 28px = ruler bar *@
-                <div class="fr-gantt-track position-relative flex-grow-1" style="height: 48px;">
+                <div class="fr-gantt-track position-relative flex-grow-1" style="height: 48px;" @onmousemove="OnRulerMouseMove" @onmouseleave="OnRulerMouseLeave">
                     @* ── Ruler bar background (bottom 28px) ── *@
                     <div class="position-absolute" style="left: 0; bottom: 0; width: 100%; height: 28px; background: #f8f9fa; border-radius: 4px;"></div>
 
@@ -68,44 +73,70 @@
                     }
 
                     @* ── Named venue markers — line spans full height, label at top ── *@
-                    @if (VenueOpenTime is DateTime voM)
-                    {
-                        var left = Math.Clamp((voM - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
-                        <div class="position-absolute fr-gantt-named-marker fr-gantt-named-marker-venue" style="left: @(left.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%;">
-                            <div class="fr-gantt-named-marker-line"></div>
-                            <span class="fr-gantt-named-marker-label">Open<span class="fr-gantt-named-marker-time">@voM.ToString("HH:mm")</span></span>
-                        </div>
+                    @{
+                        // Build marker list with positions
+                        var markers = new List<(string Key, DateTime Time, string Label, string CssClass, double Left)>();
+                        if (VenueOpenTime is DateTime voM && voM >= minTime && voM <= maxTime)
+                            markers.Add(("open", voM, "Open", "fr-gantt-named-marker-venue", (voM - minTime).TotalMinutes / totalMinutes * 100));
+                        if (VenueCloseTime is DateTime vcM && vcM >= minTime && vcM <= maxTime)
+                            markers.Add(("close", vcM, "Close", "fr-gantt-named-marker-venue", (vcM - minTime).TotalMinutes / totalMinutes * 100));
+                        if (EffectiveTechnicalGetIn is DateTime tgiM && tgiM >= minTime && tgiM <= maxTime)
+                            markers.Add(("tech", tgiM, "Tech Get-In", "fr-gantt-named-marker-tech", (tgiM - minTime).TotalMinutes / totalMinutes * 100));
+                        if (EffectiveSoundCurfew is DateTime scM && scM >= minTime && scM <= maxTime)
+                            markers.Add(("sound", scM, "Sound Curfew", "fr-gantt-named-marker-curfew", (scM - minTime).TotalMinutes / totalMinutes * 100));
+                        if (EffectiveBackstageCurfew is DateTime bscM && bscM >= minTime && bscM <= maxTime)
+                            markers.Add(("backstage", bscM, "Backstage Curfew", "fr-gantt-named-marker-curfew", (bscM - minTime).TotalMinutes / totalMinutes * 100));
+                        
+                        // Build adjacency: which markers overlap with which (8% threshold)
+                        const double overlapThreshold = 8.0;
+                        var overlapsWith = new Dictionary<string, HashSet<string>>();
+                        foreach (var m in markers) overlapsWith[m.Key] = new HashSet<string>();
+                        
+                        for (int i = 0; i < markers.Count; i++)
+                        {
+                            for (int j = i + 1; j < markers.Count; j++)
+                            {
+                                if (Math.Abs(markers[i].Left - markers[j].Left) < overlapThreshold)
+                                {
+                                    overlapsWith[markers[i].Key].Add(markers[j].Key);
+                                    overlapsWith[markers[j].Key].Add(markers[i].Key);
+                                }
+                            }
+                        }
+                        
+                        // Find active marker: closest to mouse that HAS overlaps
+                        // Guard: stale _activeMarkerKey may refer to a marker outside current view window
+                        var activeKey = (_activeMarkerKey != null && overlapsWith.ContainsKey(_activeMarkerKey))
+                            ? _activeMarkerKey
+                            : null;
+                        if (_rulerMouseX >= 0 && markers.Count > 0)
+                        {
+                            // Find closest marker to mouse
+                            var closest = markers.MinBy(m => Math.Abs(m.Left - _rulerMouseX));
+                            // Only activate if this marker actually overlaps with something
+                            if (overlapsWith[closest.Key].Count > 0)
+                            {
+                                activeKey = closest.Key;
+                                _activeMarkerKey = closest.Key;
+                            }
+                            else
+                            {
+                                // Mouse near a non-overlapping marker = show all
+                                activeKey = null;
+                                _activeMarkerKey = null;
+                            }
+                        }
+                        // When mouse leaves ruler, retain previous _activeMarkerKey (sticky)
                     }
-                    @if (VenueCloseTime is DateTime vcM)
+                    @foreach (var m in markers)
                     {
-                        var left = Math.Clamp((vcM - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
-                        <div class="position-absolute fr-gantt-named-marker fr-gantt-named-marker-venue" style="left: @(left.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%;">
+                        var rtl = m.Left > 80;
+                        // Hide if: there IS an active marker, AND this marker overlaps with it, AND this is not the active one
+                        var shouldHide = activeKey != null && overlapsWith[activeKey].Contains(m.Key) && m.Key != activeKey;
+                        var labelClass = shouldHide ? "fr-gantt-named-marker-label-hidden" : "";
+                        <div class="position-absolute fr-gantt-named-marker @m.CssClass @(rtl ? "fr-gantt-named-marker-rtl" : "")" style="left: @(m.Left.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%;">
                             <div class="fr-gantt-named-marker-line"></div>
-                            <span class="fr-gantt-named-marker-label">Close<span class="fr-gantt-named-marker-time">@vcM.ToString("HH:mm")</span></span>
-                        </div>
-                    }
-                    @if (EffectiveTechnicalGetIn is DateTime tgiM)
-                    {
-                        var left = Math.Clamp((tgiM - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
-                        <div class="position-absolute fr-gantt-named-marker fr-gantt-named-marker-tech" style="left: @(left.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%;">
-                            <div class="fr-gantt-named-marker-line"></div>
-                            <span class="fr-gantt-named-marker-label">Tech Get-In<span class="fr-gantt-named-marker-time">@tgiM.ToString("HH:mm")</span></span>
-                        </div>
-                    }
-                    @if (EffectiveSoundCurfew is DateTime scM)
-                    {
-                        var left = Math.Clamp((scM - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
-                        <div class="position-absolute fr-gantt-named-marker fr-gantt-named-marker-curfew" style="left: @(left.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%;">
-                            <div class="fr-gantt-named-marker-line"></div>
-                            <span class="fr-gantt-named-marker-label">Sound Curfew<span class="fr-gantt-named-marker-time">@scM.ToString("HH:mm")</span></span>
-                        </div>
-                    }
-                    @if (EffectiveBackstageCurfew is DateTime bscM)
-                    {
-                        var left = Math.Clamp((bscM - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
-                        <div class="position-absolute fr-gantt-named-marker fr-gantt-named-marker-curfew" style="left: @(left.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%;">
-                            <div class="fr-gantt-named-marker-line"></div>
-                            <span class="fr-gantt-named-marker-label">Backstage Curfew<span class="fr-gantt-named-marker-time">@bscM.ToString("HH:mm")</span></span>
+                            <span class="fr-gantt-named-marker-label @labelClass">@m.Label<span class="fr-gantt-named-marker-time">@m.Time.ToString("HH:mm")</span></span>
                         </div>
                     }
                 </div>
@@ -118,50 +149,49 @@
                 var isSelected = slot.Id == SelectedSlotId;
 
                 <div class="fr-gantt-row d-flex align-items-center gap-1 py-1 @(isSelected ? "fr-gantt-row-selected" : "")"
-                     @onclick="() => OnSelectSlot.InvokeAsync(slot.Id)">
-                    <div class="fr-gantt-label small d-flex align-items-center gap-1" style="width: 150px; flex-shrink: 0;">
-                        <span class="text-truncate flex-grow-1">@bandName</span>
+                     @onclick="() => OnSelectSlot.InvokeAsync(slot.Id)" @onclick:stopPropagation>
+                    @* Slot label & buttons *@
+                    <div class="fr-gantt-label small d-flex align-items-center gap-1" style="width: 175px; flex-shrink: 0;">
+                        <span class="flex-grow-1" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.2; @(bandName.Length > 16 ? "font-size: 11px;" : "")">@bandName</span>
                         <button class="btn btn-sm btn-outline-secondary p-0" style="width:20px;height:20px;font-size:9px;line-height:1;flex-shrink:0;" @onclick="() => OnMoveSlotUp.InvokeAsync(slot.Id)" @onclick:stopPropagation disabled="@(!CanMoveUp(slot.Id))">&#9650;</button>
                         <button class="btn btn-sm btn-outline-secondary p-0" style="width:20px;height:20px;font-size:9px;line-height:1;flex-shrink:0;" @onclick="() => OnMoveSlotDown.InvokeAsync(slot.Id)" @onclick:stopPropagation disabled="@(!CanMoveDown(slot.Id))">&#9660;</button>
                         <button class="btn btn-sm btn-outline-danger p-0" style="width:20px;height:20px;font-size:9px;line-height:1;flex-shrink:0;" @onclick="() => OnRemoveSlot.InvokeAsync(slot.Id)" @onclick:stopPropagation>&#215;</button>
                     </div>
-                    <div class="fr-gantt-track position-relative flex-grow-1" style="height: 24px; background: #f8f9fa; border-radius: 4px;">
-                        @if (VenueOpenTime is DateTime voRow)
-                        {
+                    @* Slot events *@
+                    <div class="fr-gantt-track position-relative flex-grow-1 @(isSelected ? "fr-gantt-track-selected" : "")" style="height: 32px; background: #f8f9fa; border-radius: 4px; overflow: hidden;">
+                        @if (VenueOpenTime is DateTime voRow) {
                             var openLeftRow = Math.Clamp((voRow - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
                             <div class="position-absolute" style="left: 0; top: 0; width: @(openLeftRow.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; height: 100%; background: rgba(0,0,0,0.08); border-radius: 4px 0 0 4px;"></div>
                         }
-                        @if (VenueCloseTime is DateTime vcRow)
-                        {
+                        @if (VenueCloseTime is DateTime vcRow) {
                             var closeLeftRow = Math.Clamp((vcRow - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
                             <div class="position-absolute" style="left: @(closeLeftRow.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 0; width: @((100 - closeLeftRow).ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; height: 100%; background: rgba(0,0,0,0.08); border-radius: 0 4px 4px 0;"></div>
                         }
-                        @if (EffectiveSoundCurfew is DateTime scRow && VenueCloseTime is DateTime vcScRow)
-                        {
+                        @if (EffectiveSoundCurfew is DateTime scRow && VenueCloseTime is DateTime vcScRow) {
                             var scLeftRow = Math.Clamp((scRow - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
                             var scWidthRow = Math.Clamp((vcScRow - scRow).TotalMinutes / totalMinutes * 100, 0, 100 - scLeftRow);
                             <div class="position-absolute" style="left: @(scLeftRow.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 0; width: @(scWidthRow.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; height: 100%; background: rgba(139, 0, 0, 0.12);"></div>
                         }
-                        @if (EffectiveBackstageCurfew is DateTime bscRow && VenueCloseTime is DateTime vcBcRow)
-                        {
+                        @if (EffectiveBackstageCurfew is DateTime bscRow && VenueCloseTime is DateTime vcBcRow) {
                             var bscLeftRow = Math.Clamp((bscRow - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
                             var bscWidthRow = Math.Clamp((vcBcRow - bscRow).TotalMinutes / totalMinutes * 100, 0, 100 - bscLeftRow);
                             <div class="position-absolute" style="left: @(bscLeftRow.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; top: 0; width: @(bscWidthRow.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; height: 100%; background: repeating-linear-gradient(45deg, rgba(0,0,0,0.05), rgba(0,0,0,0.05) 8px, rgba(0,0,0,0.12) 8px, rgba(0,0,0,0.12) 16px);"></div>
                         }
-                        @foreach (var ev in AllEvents(slot))
-                        {
+                        @foreach (var ev in AllEvents(slot)) {
                             if (ev.StartTime is null) continue;
                             var start = ev.StartTime.Value;
                             var end = start.AddMinutes(ev.DurationMinutes ?? DefaultDuration(ev.EventType));
-                            var leftPct = Math.Clamp((start - minTime).TotalMinutes / totalMinutes * 100, 0, 100);
-                            var widthPct = Math.Clamp((end - start).TotalMinutes / totalMinutes * 100, 0.5, 100 - leftPct);
+                            if (end <= minTime || start >= maxTime) continue;
+                            var visStart = start < minTime ? minTime : start;
+                            var visEnd = end > maxTime ? maxTime : end;
+                            var leftPct = (visStart - minTime).TotalMinutes / totalMinutes * 100;
+                            var widthPct = Math.Max(0.5, (visEnd - visStart).TotalMinutes / totalMinutes * 100);
                             var color = EventColor(ev.EventType, slot);
 
                             <div class="position-absolute top-0 h-100 d-flex align-items-center justify-content-center"
                                  style="left: @(leftPct.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; width: @(widthPct.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; background: @color; border-radius: 3px; cursor: pointer; font-size: 10px; color: white; overflow: hidden; white-space: nowrap; text-shadow: 0 0 2px rgba(0,0,0,0.7); padding: 0 4px; box-sizing: border-box;"
                                  title="@ev.EventType @FormatTime(start, BaseDate)-@FormatTime(end, BaseDate)">
-                                @if (widthPct > 4 && ShowInlineTime(ev.EventType))
-                                {
+                                @if (widthPct > 4 && ShowInlineTime(ev.EventType)) {
                                     <span>@FormatTime(start, BaseDate)</span>
                                 }
                             </div>
@@ -172,7 +202,7 @@
 
             @* Color legend *@
             <div class="fr-gantt-row d-flex align-items-center gap-1 mt-1 pt-1" style="border-top: 1px solid #dee2e6;">
-                <div class="fr-gantt-label" style="width: 150px; flex-shrink: 0;"></div>
+                <div class="fr-gantt-label" style="width: 175px; flex-shrink: 0;"></div>
                 <div class="d-flex flex-wrap gap-2 small">
                     @foreach (var item in LegendItems())
                     {
@@ -240,8 +270,131 @@
     private DateTime? EffectiveSoundCurfew => Order.SoundCurfewTimeOverride ?? Show.SoundCurfewTime;
     private DateTime? EffectiveBackstageCurfew => Order.BackstageCurfewTimeOverride ?? Show.BackstageCurfewTime;
 
-    private DateTime MinTime => EventMinTime;
-    private DateTime MaxTime => EventMaxTime;
+    private double? _viewOffsetMins = null;
+    private double? _viewWidthMins = null;
+    private const double LabelColumnPx = 183.0;
+    private double _tracksContainerWidthPx = 800.0;
+    
+    private double _rulerMouseX = -1; // Percentage position on ruler track (-1 = not over ruler)
+    private string? _activeMarkerKey = null; // Last active marker key, retained on mouse leave
+
+    private DateTime AbsoluteMin
+    {
+        get
+        {
+            var evMin = EventMinTime;
+            if (VenueOpenTime is DateTime vo)
+            {
+                var candidate = vo.AddHours(-4);
+                return candidate < evMin ? candidate : evMin;
+            }
+            return evMin;
+        }
+    }
+
+    private DateTime AbsoluteMax
+    {
+        get
+        {
+            var evMax = EventMaxTime;
+            if (VenueCloseTime is DateTime vc)
+            {
+                var candidate = vc.AddHours(4);
+                return candidate > evMax ? candidate : evMax;
+            }
+            return evMax;
+        }
+    }
+
+    private DateTime MinTime
+    {
+        get
+        {
+            if (!_viewWidthMins.HasValue) return EventMinTime;
+            var absMin = AbsoluteMin;
+            return absMin.AddMinutes(_viewOffsetMins ?? 0);
+        }
+    }
+
+    private DateTime MaxTime
+    {
+        get
+        {
+            if (!_viewWidthMins.HasValue) return EventMaxTime;
+            var absMin = AbsoluteMin;
+            return absMin.AddMinutes((_viewOffsetMins ?? 0) + _viewWidthMins.Value);
+        }
+    }
+
+    private void OnMouseMove(MouseEventArgs e)
+    {
+        // Grow width estimate whenever mouse is further right than current estimate
+        if (e.OffsetX > _tracksContainerWidthPx * 0.9)
+            _tracksContainerWidthPx = e.OffsetX * 1.1;
+        // Shrink estimate if mouse is at far right but less than estimate (resized smaller)
+        if (e.OffsetX > _tracksContainerWidthPx * 0.5 && e.OffsetX < _tracksContainerWidthPx * 0.9)
+            _tracksContainerWidthPx = Math.Max(e.OffsetX * 1.1, 400);
+    }
+
+    private void OnRulerMouseMove(MouseEventArgs e)
+    {
+        var trackPx = Math.Max(_tracksContainerWidthPx - LabelColumnPx, 1);
+        var xInTrack = e.OffsetX; // Offset is relative to the ruler track div now
+        _rulerMouseX = Math.Clamp(xInTrack / trackPx * 100, 0, 100);
+    }
+
+    private void OnRulerMouseLeave(MouseEventArgs e)
+    {
+        _rulerMouseX = -1;
+        // _activeMarkerKey is intentionally retained for "sticky" label behavior
+    }
+
+    private void OnWheelZoom(WheelEventArgs e)
+    {
+        var absMin = AbsoluteMin;
+        var absMax = AbsoluteMax;
+        var absTotalMins = (absMax - absMin).TotalMinutes;
+
+        var curViewWidth = _viewWidthMins ?? (EventMaxTime - EventMinTime).TotalMinutes;
+        var curOffset = _viewOffsetMins ?? (EventMinTime - absMin).TotalMinutes;
+
+        var isPan = e.ShiftKey || (e.DeltaX != 0 && Math.Abs(e.DeltaX) > Math.Abs(e.DeltaY));
+        if (isPan)
+        {
+            var panDelta = e.ShiftKey ? e.DeltaY : e.DeltaX;
+            var panMins = panDelta / 100.0 * curViewWidth;
+            var panOffset = Math.Clamp(curOffset + panMins, 0, Math.Max(0, absTotalMins - curViewWidth));
+            _viewOffsetMins = panOffset;
+            _viewWidthMins = curViewWidth;
+            return;
+        }
+
+        // Refine width estimate from wheel event position
+        if (e.OffsetX > _tracksContainerWidthPx * 0.8)
+            _tracksContainerWidthPx = Math.Max(e.OffsetX * 1.05, _tracksContainerWidthPx);
+        
+        // Only zoom if mouse is over the track area (not the label column)
+        if (e.OffsetX <= LabelColumnPx)
+            return;
+        
+        var trackPx = Math.Max(_tracksContainerWidthPx - LabelColumnPx, 1);
+        var xInTrack = e.OffsetX - LabelColumnPx;
+        var zoomFraction = xInTrack / trackPx;
+        var pivotMins = curOffset + zoomFraction * curViewWidth;
+        var zoomIn = e.DeltaY > 0;
+        var factor = zoomIn ? 0.8 : 1.25;
+        var newWidth = Math.Clamp(curViewWidth * factor, 30, absTotalMins);
+        var newOffset = pivotMins - zoomFraction * newWidth;
+        newOffset = Math.Clamp(newOffset, 0, Math.Max(0, absTotalMins - newWidth));
+        _viewOffsetMins = newOffset;
+        _viewWidthMins = newWidth;
+    }
+
+    private void ResetZoom()
+    {
+        _viewOffsetMins = null;
+        _viewWidthMins = null;
+    }
 
     private static IEnumerable<SlotTimingEvent> AllEvents(RunningOrderSlot slot)
     {
