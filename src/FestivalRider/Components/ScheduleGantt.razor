@@ -103,7 +103,13 @@
                      @onclick="() => OnSelectSlot.InvokeAsync(slot.Id)" @onclick:stopPropagation>
                     @* Slot label & buttons *@
                     <div class="fr-gantt-label small d-flex align-items-center gap-1" style="width: 175px; flex-shrink: 0;">
-                        <span class="flex-grow-1" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.2; @(bandName.Length > 16 ? "font-size: 11px;" : "")">@bandName</span>
+                        @{ var stageName = Stages.FirstOrDefault(s => s.Id == slot.StageId)?.Name; }
+                        <div class="flex-grow-1 d-flex flex-column" style="min-width: 0;">
+                            <span style="display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.2; @(bandName.Length > 16 ? "font-size: 11px;" : "")">@bandName</span>
+                            @if (!string.IsNullOrEmpty(stageName)) {
+                                <span class="badge text-bg-secondary fw-normal" style="font-size: 9px; align-self: flex-start; margin-top: 1px;">@stageName</span>
+                            }
+                        </div>
                         <button class="btn btn-sm btn-outline-secondary p-0" style="width:20px;height:20px;font-size:9px;line-height:1;flex-shrink:0;" @onclick="() => OnMoveSlotUp.InvokeAsync(slot.Id)" @onclick:stopPropagation disabled="@(!CanMoveUp(slot.Id))">&#9650;</button>
                         <button class="btn btn-sm btn-outline-secondary p-0" style="width:20px;height:20px;font-size:9px;line-height:1;flex-shrink:0;" @onclick="() => OnMoveSlotDown.InvokeAsync(slot.Id)" @onclick:stopPropagation disabled="@(!CanMoveDown(slot.Id))">&#9660;</button>
                         <button class="btn btn-sm btn-outline-danger p-0" style="width:20px;height:20px;font-size:9px;line-height:1;flex-shrink:0;" @onclick="() => OnRemoveSlot.InvokeAsync(slot.Id)" @onclick:stopPropagation>&#215;</button>
@@ -170,6 +176,7 @@
     [Parameter] public ShowData Show { get; set; } = new();
     [Parameter] public Guid? SelectedSlotId { get; set; }
     [Parameter] public IReadOnlyList<Band> Bands { get; set; } = new List<Band>();
+    [Parameter] public IReadOnlyList<Stage> Stages { get; set; } = new List<Stage>();
     [Parameter] public string SelectSlotHint { get; set; } = "Click a band to view details.";
     [Parameter] public string UnknownBandLabel { get; set; } = "Unknown";
     [Parameter] public Func<TimingEventType, string> GetEventLabel { get; set; } = t => t.ToString();

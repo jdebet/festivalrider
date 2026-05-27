@@ -1,0 +1,168 @@
+@using FestivalRider.Models
+
+@if (Visible)
+{
+    <div class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@Title</h5>
+                    <button type="button" class="btn-close" @onclick="Cancel"></button>
+                </div>
+                <div class="modal-body">
+
+                    @if (_step == Step.PickMode)
+                    {
+                        <p class="text-muted small mb-3">@PickModeHint</p>
+                        <div class="d-flex gap-3">
+                            <button class="btn btn-outline-primary flex-fill py-4 d-flex flex-column align-items-center gap-2"
+                                    @onclick="() => _step = Step.PickFestivalTemplate">
+                                <span style="font-size: 2rem;">🎪</span>
+                                <span class="fw-bold">@FestivalModeLabel</span>
+                                <span class="text-muted small">@FestivalModeHint</span>
+                            </button>
+                            <button class="btn btn-outline-secondary flex-fill py-4 d-flex flex-column align-items-center gap-2"
+                                    @onclick="CreateVenue">
+                                <span style="font-size: 2rem;">🏛️</span>
+                                <span class="fw-bold">@VenueModeLabel</span>
+                                <span class="text-muted small">@VenueModeHint</span>
+                            </button>
+                        </div>
+                    }
+                    else if (_step == Step.PickFestivalTemplate)
+                    {
+                        <div class="d-flex align-items-center gap-2 mb-3">
+                            <button class="btn btn-sm btn-link p-0" @onclick="() => _step = Step.PickMode">&#8592; @BackLabel</button>
+                        </div>
+                        <p class="text-muted small mb-3">@FestivalTemplateHint</p>
+                        <div class="d-flex gap-3">
+                            <button class="btn btn-outline-primary flex-fill py-3 d-flex flex-column align-items-center gap-2"
+                                    @onclick="CreateFestivalDefault">
+                                <span style="font-size: 1.5rem;">⚡</span>
+                                <span class="fw-bold">@DefaultTemplateLabel</span>
+                                <span class="text-muted small">@DefaultTemplateHint</span>
+                            </button>
+                            <button class="btn btn-outline-secondary flex-fill py-3 d-flex flex-column align-items-center gap-2"
+                                    @onclick="GoCustomTemplate">
+                                <span style="font-size: 1.5rem;">✏️</span>
+                                <span class="fw-bold">@CustomTemplateLabel</span>
+                                <span class="text-muted small">@CustomTemplateHint</span>
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="d-flex align-items-center gap-2 mb-3">
+                            <button class="btn btn-sm btn-link p-0" @onclick="() => _step = Step.PickFestivalTemplate">&#8592; @BackLabel</button>
+                            <span class="text-muted small">@CustomTemplateHint</span>
+                        </div>
+                        <TemplateEditor Inline="true"
+                                        Template="_template"
+                                        OnChange="EventCallback.Empty"
+                                        PresetFestivalMainStage="@PresetFestivalMainStage"
+                                        PresetFestivalTent="@PresetFestivalTent"
+                                        PresetTraditionalVenue="@PresetTraditionalVenue"
+                                        DefaultSetLengthLabel="@DefaultSetLengthLabel"
+                                        AddEntryBtn="@AddEntryBtn"
+                                        GetEventLabel="GetEventLabel" />
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="Cancel">@CancelLabel</button>
+                    @if (_step == Step.CustomTemplate)
+                    {
+                        <button type="button" class="btn btn-primary" @onclick="CreateFestivalCustom">@CreateLabel</button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private enum Step { PickMode, PickFestivalTemplate, CustomTemplate }
+
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+    [Parameter] public EventCallback<(ScheduleMode Mode, FestivalTimingTemplate? Template)> OnCreate { get; set; }
+
+    [Parameter] public string Title { get; set; } = "New running order";
+    [Parameter] public string PickModeHint { get; set; } = "Choose the scheduling mode for this running order.";
+    [Parameter] public string FestivalModeLabel { get; set; } = "Festival";
+    [Parameter] public string FestivalModeHint { get; set; } = "Band-by-band event chains anchored to on-stage time.";
+    [Parameter] public string VenueModeLabel { get; set; } = "Venue";
+    [Parameter] public string VenueModeHint { get; set; } = "Traditional sequential soundcheck cascade.";
+    [Parameter] public string BackLabel { get; set; } = "Back";
+    [Parameter] public string FestivalTemplateHint { get; set; } = "How do you want to set up the festival template?";
+    [Parameter] public string DefaultTemplateLabel { get; set; } = "Default template";
+    [Parameter] public string DefaultTemplateHint { get; set; } = "Start with the festival main stage preset.";
+    [Parameter] public string CustomTemplateLabel { get; set; } = "Custom template";
+    [Parameter] public string CustomTemplateHint { get; set; } = "Configure the timing template before creating.";
+    [Parameter] public string DefaultSetLengthLabel { get; set; } = "Default set length (min)";
+    [Parameter] public string PresetFestivalMainStage { get; set; } = "Festival main stage";
+    [Parameter] public string PresetFestivalTent { get; set; } = "Festival tent";
+    [Parameter] public string PresetTraditionalVenue { get; set; } = "Traditional venue";
+    [Parameter] public string AddEntryBtn { get; set; } = "+ Add entry";
+    [Parameter] public string CancelLabel { get; set; } = "Cancel";
+    [Parameter] public string CreateLabel { get; set; } = "Create";
+    [Parameter] public Func<TimingEventType, string> GetEventLabel { get; set; } = t => t.ToString();
+
+    private Step _step = Step.PickMode;
+    private FestivalTimingTemplate _template = new();
+
+    protected override void OnParametersSet()
+    {
+        if (!Visible) _step = Step.PickMode;
+    }
+
+    private void CreateFestivalDefault()
+    {
+        _template = ApplyFestivalMainStagePreset(new FestivalTimingTemplate());
+        OnCreate.InvokeAsync((ScheduleMode.Festival, _template));
+        VisibleChanged.InvokeAsync(false);
+    }
+
+    private void GoCustomTemplate()
+    {
+        _template = ApplyFestivalMainStagePreset(new FestivalTimingTemplate());
+        _step = Step.CustomTemplate;
+    }
+
+    private static FestivalTimingTemplate ApplyFestivalMainStagePreset(FestivalTimingTemplate t)
+    {
+        t.DefaultSetLengthMinutes = 60;
+        t.PreShowEntries.AddRange(new[]
+        {
+            new TimingChainEntry { EventType = TimingEventType.CHANGEOVER, DefaultDurationMinutes = 15 },
+            new TimingChainEntry { EventType = TimingEventType.PRESHOW_LINECHECK, DefaultDurationMinutes = 10 },
+            new TimingChainEntry { EventType = TimingEventType.SOUNDCHECK, DefaultDurationMinutes = 30 },
+            new TimingChainEntry { EventType = TimingEventType.SETUP_ON_STAGE, DefaultDurationMinutes = 15 },
+            new TimingChainEntry { EventType = TimingEventType.LOAD_IN_STAGE, DefaultDurationMinutes = 30 },
+        });
+        t.PostShowEntries.AddRange(new[]
+        {
+            new TimingChainEntry { EventType = TimingEventType.LOAD_OUT_STAGING, DefaultDurationMinutes = 30 },
+            new TimingChainEntry { EventType = TimingEventType.LOAD_OUT_VENUE, DefaultDurationMinutes = 30 },
+        });
+        return t;
+    }
+
+    private void CreateVenue()
+    {
+        OnCreate.InvokeAsync((ScheduleMode.Traditional, null));
+        VisibleChanged.InvokeAsync(false);
+    }
+
+    private void CreateFestivalCustom()
+    {
+        OnCreate.InvokeAsync((ScheduleMode.Festival, _template));
+        VisibleChanged.InvokeAsync(false);
+    }
+
+    private void Cancel()
+    {
+        _step = Step.PickMode;
+        VisibleChanged.InvokeAsync(false);
+    }
+
+}

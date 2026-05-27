@@ -1,5 +1,6 @@
 @page "/shows"
 @using System.Globalization
+@using FestivalRider.Models
 @implements IDisposable
 @inject IBandService BandService
 @inject ILocalizationService Localization
@@ -114,6 +115,48 @@
                 <button type="button" class="btn btn-outline-primary w-100" @onclick="AddStage">@Localization.T("page.settings.showDetails.addStageBtn")</button>
             </div>
         </div>
+
+        <h6 class="mt-3">@Localization.T("page.settings.showDetails.stageLinkGroups")</h6>
+        <p class="text-muted small mb-2">@Localization.T("page.settings.showDetails.stageLinkGroupsHint")</p>
+        @if (_show.StageLinkGroups.Count == 0)
+        {
+            <div class="text-muted small mb-2">@Localization.T("page.settings.showDetails.noStageLinkGroups")</div>
+        }
+        else
+        {
+            @foreach (var grp in _show.StageLinkGroups.ToList())
+            {
+                var g = grp;
+                <div class="border rounded p-2 mb-2 d-flex flex-wrap align-items-center gap-2" @key="g.Id">
+                    <div class="d-flex flex-wrap gap-1 flex-grow-1">
+                        @foreach (var s in _show.Stages)
+                        {
+                            var stg = s;
+                            var linked = g.StageIds.Contains(stg.Id);
+                            <div class="form-check form-check-inline m-0">
+                                <input type="checkbox" class="form-check-input" id="slg-@(g.Id)-@stg.Id"
+                                       checked="@linked"
+                                       @onchange="e => ToggleStageLinkMember(g, stg.Id, e.Value)" />
+                                <label class="form-check-label small" for="slg-@(g.Id)-@stg.Id">@stg.Name</label>
+                            </div>
+                        }
+                    </div>
+                    <select class="form-select form-select-sm" style="width: 150px;"
+                            value="@g.Constraint"
+                            @onchange="e => SetStageLinkConstraint(g, e.Value)">
+                        <option value="@StageLinkConstraint.All">@Localization.T("enum.StageLinkConstraint.All")</option>
+                        <option value="@StageLinkConstraint.OnStageOnly">@Localization.T("enum.StageLinkConstraint.OnStageOnly")</option>
+                    </select>
+                    <button type="button" class="btn btn-sm btn-outline-danger"
+                            @onclick="() => RemoveStageLinkGroup(g.Id)">@Localization.T("page.settings.shows.delete")</button>
+                </div>
+            }
+        }
+        @if (_show.Stages.Count >= 2)
+        {
+            <button type="button" class="btn btn-sm btn-outline-primary mb-2"
+                    @onclick="AddStageLinkGroup">@Localization.T("page.settings.showDetails.addStageLinkGroupBtn")</button>
+        }
 
         <button type="submit" class="btn btn-primary">@Localization.T("page.settings.showDetails.saveBtn")</button>
     </EditForm>
@@ -271,6 +314,32 @@
         _confirmClear = false;
         await Storage.ClearAsync();
         Toasts.Show(Localization.T("toast.settings.cleared"), ToastLevel.Warning);
+    }
+
+    private void AddStageLinkGroup()
+    {
+        _show.StageLinkGroups.Add(new StageLinkGroup
+        {
+            StageIds = _show.Stages.Take(2).Select(s => s.Id).ToList(),
+        });
+    }
+
+    private void RemoveStageLinkGroup(Guid id)
+    {
+        _show.StageLinkGroups.RemoveAll(g => g.Id == id);
+    }
+
+    private void ToggleStageLinkMember(StageLinkGroup grp, int stageId, object? value)
+    {
+        var on = value is bool b ? b : bool.TryParse(value?.ToString(), out var p) && p;
+        if (on) { if (!grp.StageIds.Contains(stageId)) grp.StageIds.Add(stageId); }
+        else grp.StageIds.RemoveAll(id => id == stageId);
+    }
+
+    private void SetStageLinkConstraint(StageLinkGroup grp, object? value)
+    {
+        if (value is string s && Enum.TryParse<StageLinkConstraint>(s, out var c))
+            grp.Constraint = c;
     }
 
     private async Task ExportShow(ShowData show)

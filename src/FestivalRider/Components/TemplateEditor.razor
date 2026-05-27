@@ -1,6 +1,10 @@
 @using FestivalRider.Models
 
-@if (Visible)
+@if (Inline)
+{
+    @RenderBody()
+}
+else if (Visible)
 {
     <div class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
         <div class="modal-dialog modal-lg">
@@ -48,6 +52,7 @@
 
 @code {
     [Parameter] public bool Visible { get; set; }
+    [Parameter] public bool Inline { get; set; }
     [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
     [Parameter] public FestivalTimingTemplate Template { get; set; } = new();
     [Parameter] public EventCallback OnChange { get; set; }
@@ -251,4 +256,33 @@
     }
 
     private void Notify() => OnChange.InvokeAsync();
+
+    private RenderFragment RenderBody() => __builder =>
+    {
+        <div class="d-flex gap-1 mb-2">
+            <button class="btn btn-sm btn-outline-secondary" @onclick="LoadFestivalMainStage">@PresetFestivalMainStage</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="LoadFestivalTent">@PresetFestivalTent</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="LoadTraditionalVenue">@PresetTraditionalVenue</button>
+        </div>
+        <div class="row g-2">
+            <div class="col-md-4">
+                <h6 class="small fw-bold">Early chain</h6>
+                @RenderList(Template.EarlyChain, "early")
+            </div>
+            <div class="col-md-4">
+                <h6 class="small fw-bold">Pre-show (closest to anchor first)</h6>
+                @RenderList(Template.PreShowEntries, "pre")
+            </div>
+            <div class="col-md-4">
+                <h6 class="small fw-bold">Post-show</h6>
+                @RenderList(Template.PostShowEntries, "post")
+            </div>
+        </div>
+        <div class="mt-2">
+            <label class="form-label small mb-0">@DefaultSetLengthLabel</label>
+            <input type="number" class="form-control form-control-sm" style="width: 100px;"
+                   value="@Template.DefaultSetLengthMinutes"
+                   @onchange="e => { if (int.TryParse(e.Value?.ToString(), out var v)) Template.DefaultSetLengthMinutes = v; Notify(); }" />
+        </div>
+    };
 }

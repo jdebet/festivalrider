@@ -7,7 +7,13 @@
 else
 {
     <div class="d-flex justify-content-between align-items-center mb-2">
-        <h6 class="m-0 fw-bold">@BandName</h6>
+        <div>
+            <h6 class="m-0 fw-bold">@BandName</h6>
+            @if (!string.IsNullOrEmpty(StageName))
+            {
+                <span class="badge text-bg-secondary fw-normal" style="font-size: 10px;">@StageName</span>
+            }
+        </div>
     </div>
 
     @if (Slot.EarlyChain.Count > 0)
@@ -158,6 +164,7 @@ else
     [Parameter] public RunningOrder Order { get; set; } = new();
     [Parameter] public ShowData Show { get; set; } = new();
     [Parameter] public string BandName { get; set; } = "Band";
+    [Parameter] public string StageName { get; set; } = string.Empty;
     [Parameter] public string SelectSlotHint { get; set; } = "Select a slot.";
     [Parameter] public string EarlyChainHeading { get; set; } = "Early chain";
     [Parameter] public string PreShowHeading { get; set; } = "Pre-show";

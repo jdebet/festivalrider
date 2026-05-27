@@ -1,0 +1,158 @@
+@using FestivalRider.Models
+
+@if (Visible)
+{
+    <div class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@Title</h5>
+                    <button type="button" class="btn-close" @onclick="Close"></button>
+                </div>
+                <div class="modal-body">
+
+                    @* ── Mode row ── *@
+                    @{ var effectiveMode = Order.ModeOverride ?? Show.DefaultScheduleMode; }
+                    <div class="d-flex flex-wrap gap-3 align-items-center mb-3 pb-3 border-bottom">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="small fw-semibold">@ModeLabel:</span>
+                            <span class="badge bg-secondary fs-6 px-3 py-2">@GetModeLabel(effectiveMode)</span>
+                            @if (Order.ModeOverride is null)
+                            {
+                                <span class="text-muted small">(@DefaultLabel)</span>
+                            }
+                        </div>
+                        <button type="button" class="btn btn-sm btn-danger" @onclick="() => _pickingMode = true">@ModeChangeConfirmLabel</button>
+
+                        <div class="d-flex align-items-center gap-2 ms-auto">
+                            <label class="small fw-semibold mb-0">@AnchorLabel</label>
+                            <select class="form-select form-select-sm" style="width: 160px;"
+                                    value="@(Order.AnchorEventOverride?.ToString() ?? "")"
+                                    @onchange="OnAnchorChanged">
+                                <option value="">@DefaultLabel (@GetEventLabel(Show.DefaultAnchorEvent))</option>
+                                @foreach (var t in Enum.GetValues<TimingEventType>())
+                                {
+                                    <option value="@t">@GetEventLabel(t)</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    @* ── Festival template (only when mode = Festival) ── *@
+                    @if (effectiveMode == ScheduleMode.Festival)
+                    {
+                        <h6 class="fw-bold mb-2">@TemplateHeading</h6>
+                        <TemplateEditor Inline="true"
+                                        Template="GetOrCreateTemplate()"
+                                        OnChange="Notify"
+                                        PresetFestivalMainStage="@PresetFestivalMainStage"
+                                        PresetFestivalTent="@PresetFestivalTent"
+                                        PresetTraditionalVenue="@PresetTraditionalVenue"
+                                        DefaultSetLengthLabel="@DefaultSetLengthLabel"
+                                        AddEntryBtn="@AddEntryBtn"
+                                        GetEventLabel="GetEventLabel" />
+                    }
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" @onclick="Close">@CloseLabel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* ── Change-mode inner modal ── *@
+@if (_pickingMode)
+{
+    <div class="modal d-block" tabindex="-1" style="background: rgba(0,0,0,0.6);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@ModeChangeConfirmTitle</h5>
+                    <button type="button" class="btn-close" @onclick="() => _pickingMode = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning small mb-3">@ModeChangeConfirmMessage</div>
+                    <div class="d-flex gap-3">
+                        <button class="btn flex-fill py-3 @((_pendingMode ?? Order.ModeOverride ?? Show.DefaultScheduleMode) == ScheduleMode.Traditional ? "btn-primary" : "btn-outline-primary")"
+                                @onclick="() => _pendingMode = ScheduleMode.Traditional">
+                            <div class="fw-bold">@GetModeLabel(ScheduleMode.Traditional)</div>
+                        </button>
+                        <button class="btn flex-fill py-3 @((_pendingMode ?? Order.ModeOverride ?? Show.DefaultScheduleMode) == ScheduleMode.Festival ? "btn-primary" : "btn-outline-primary")"
+                                @onclick="() => _pendingMode = ScheduleMode.Festival">
+                            <div class="fw-bold">@GetModeLabel(ScheduleMode.Festival)</div>
+                        </button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="() => _pickingMode = false">@CancelLabel</button>
+                    <button type="button" class="btn btn-danger" @onclick="ApplyModeChange">@ModeChangeConfirmLabel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+    [Parameter] public RunningOrder Order { get; set; } = new();
+    [Parameter] public ShowData Show { get; set; } = new();
+    [Parameter] public EventCallback OnChange { get; set; }
+
+    [Parameter] public string Title { get; set; } = "Schedule options";
+    [Parameter] public string ModeLabel { get; set; } = "Mode";
+    [Parameter] public string AnchorLabel { get; set; } = "Anchor";
+    [Parameter] public string DefaultLabel { get; set; } = "Default";
+    [Parameter] public string TemplateHeading { get; set; } = "Festival timing template";
+    [Parameter] public string PresetFestivalMainStage { get; set; } = "Festival main stage";
+    [Parameter] public string PresetFestivalTent { get; set; } = "Festival tent";
+    [Parameter] public string PresetTraditionalVenue { get; set; } = "Traditional venue";
+    [Parameter] public string DefaultSetLengthLabel { get; set; } = "Default set length (min)";
+    [Parameter] public string AddEntryBtn { get; set; } = "+ Add entry";
+    [Parameter] public string CloseLabel { get; set; } = "Done";
+    [Parameter] public string CancelLabel { get; set; } = "Cancel";
+    [Parameter] public string ModeChangeConfirmTitle { get; set; } = "Change schedule mode?";
+    [Parameter] public string ModeChangeConfirmMessage { get; set; } = "Changing the schedule mode will recalculate all band timings. Pinned times are preserved, but unpinned events will be re-placed. Continue?";
+    [Parameter] public string ModeChangeConfirmLabel { get; set; } = "Change mode";
+    [Parameter] public Func<ScheduleMode, string> GetModeLabel { get; set; } = m => m.ToString();
+    [Parameter] public Func<TimingEventType, string> GetEventLabel { get; set; } = t => t.ToString();
+
+    private bool _pickingMode;
+    private ScheduleMode? _pendingMode;
+
+    protected override void OnParametersSet()
+    {
+        if (!_pickingMode)
+            _pendingMode = null;
+    }
+
+    private void Close() => VisibleChanged.InvokeAsync(false);
+
+    private void ApplyModeChange()
+    {
+        if (_pendingMode is ScheduleMode m)
+            Order.ModeOverride = m;
+        _pickingMode = false;
+        _pendingMode = null;
+        Notify();
+    }
+
+    private void OnAnchorChanged(ChangeEventArgs e)
+    {
+        if (e.Value is string s && Enum.TryParse<TimingEventType>(s, out var t))
+            Order.AnchorEventOverride = t;
+        else
+            Order.AnchorEventOverride = null;
+        Notify();
+    }
+
+    private FestivalTimingTemplate GetOrCreateTemplate()
+    {
+        Order.FestivalTemplate ??= new FestivalTimingTemplate();
+        return Order.FestivalTemplate;
+    }
+
+    private void Notify() => OnChange.InvokeAsync();
+}

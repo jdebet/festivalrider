@@ -198,6 +198,41 @@ public static class LocalizationKeys
                     public const string HasPersonalBackstageCurfew = "page.runningOrder.panel.flag.hasPersonalBackstageCurfew";
                 }
             }
+            public static class Create
+            {
+                public const string Title = "page.runningOrder.create.title";
+                public const string PickModeHint = "page.runningOrder.create.pickModeHint";
+                public const string FestivalModeLabel = "page.runningOrder.create.festivalModeLabel";
+                public const string FestivalModeHint = "page.runningOrder.create.festivalModeHint";
+                public const string VenueModeLabel = "page.runningOrder.create.venueModeLabel";
+                public const string VenueModeHint = "page.runningOrder.create.venueModeHint";
+                public const string BackLabel = "page.runningOrder.create.backLabel";
+                public const string FestivalTemplateHint = "page.runningOrder.create.festivalTemplateHint";
+                public const string DefaultTemplateLabel = "page.runningOrder.create.defaultTemplateLabel";
+                public const string DefaultTemplateHint = "page.runningOrder.create.defaultTemplateHint";
+                public const string CustomTemplateLabel = "page.runningOrder.create.customTemplateLabel";
+                public const string CustomTemplateHint = "page.runningOrder.create.customTemplateHint";
+                public const string CancelLabel = "page.runningOrder.create.cancelLabel";
+                public const string CreateLabel = "page.runningOrder.create.createLabel";
+            }
+            public static class ScheduleOptions
+            {
+                public const string Title = "page.runningOrder.scheduleOptions.title";
+                public const string ModeLabel = "page.runningOrder.scheduleOptions.modeLabel";
+                public const string AnchorLabel = "page.runningOrder.scheduleOptions.anchorLabel";
+                public const string DefaultLabel = "page.runningOrder.scheduleOptions.defaultLabel";
+                public const string TemplateHeading = "page.runningOrder.scheduleOptions.templateHeading";
+                public const string CloseLabel = "page.runningOrder.scheduleOptions.closeLabel";
+                public const string CancelLabel = "page.runningOrder.scheduleOptions.cancelLabel";
+                public const string ModeChangeConfirmTitle = "page.runningOrder.scheduleOptions.modeChangeConfirmTitle";
+                public const string ModeChangeConfirmMessage = "page.runningOrder.scheduleOptions.modeChangeConfirmMessage";
+                public const string ModeChangeConfirmLabel = "page.runningOrder.scheduleOptions.modeChangeConfirmLabel";
+            }
+            public static class VenueDefaults
+            {
+                public const string SectionTitle = "page.runningOrder.venueDefaults.sectionTitle";
+                public const string SaveBtn = "page.runningOrder.venueDefaults.saveBtn";
+            }
             public static class Template
             {
                 public const string Title = "page.runningOrder.template.title";
@@ -266,6 +301,10 @@ public static class LocalizationKeys
                 public const string NoStages = "page.settings.showDetails.noStages";
                 public const string NewStagePlaceholder = "page.settings.showDetails.newStagePlaceholder";
                 public const string AddStageBtn = "page.settings.showDetails.addStageBtn";
+                public const string StageLinkGroups = "page.settings.showDetails.stageLinkGroups";
+                public const string StageLinkGroupsHint = "page.settings.showDetails.stageLinkGroupsHint";
+                public const string NoStageLinkGroups = "page.settings.showDetails.noStageLinkGroups";
+                public const string AddStageLinkGroupBtn = "page.settings.showDetails.addStageLinkGroupBtn";
                 public const string SaveBtn = "page.settings.showDetails.saveBtn";
             }
             public static class ShowCsv

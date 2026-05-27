@@ -42,7 +42,7 @@
         </div>
         <div class="ms-auto d-flex gap-1">
             <button class="btn btn-sm btn-primary px-3" @onclick="Notify">@UpdateBtnLabel</button>
-            <button class="btn btn-sm btn-outline-secondary" @onclick="() => _showTemplate = true">@TemplateBtnLabel</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => _showScheduleOptions = true">@ScheduleOptionsBtnLabel</button>
             <button class="btn btn-sm btn-outline-secondary" @onclick="() => _showVenueOptions = true">@VenueOptionsBtnLabel</button>
             @if (OnDeleteRequest.HasDelegate)
             {
@@ -129,7 +129,7 @@
 
 <div class="row g-2">
     <div class="col-lg-8">
-        <ScheduleGantt Order="Order" Show="Show" SelectedSlotId="_selectedSlotId" Bands="Bands"
+        <ScheduleGantt Order="Order" Show="Show" SelectedSlotId="_selectedSlotId" Bands="Bands" Stages="Stages"
                        SelectSlotHint="@SelectSlotHint"
                        UnknownBandLabel="@UnknownBandLabel"
                        GetEventLabel="GetEventLabel"
@@ -160,7 +160,7 @@
         }
     </div>
     <div class="col-lg-4">
-        <ScheduleBandPanel Slot="SelectedSlot" Order="Order" Show="Show" BandName="@SelectedBandName"
+        <ScheduleBandPanel Slot="SelectedSlot" Order="Order" Show="Show" BandName="@SelectedBandName" StageName="@SelectedStageName"
                              GetEventLabel="GetEventLabel"
                              EarlyChainHeading="@EarlyChainHeading"
                              PreShowHeading="@PreShowHeading"
@@ -183,18 +183,27 @@
     </div>
 </div>
 
-<TemplateEditor @bind-Visible="_showTemplate" Template="GetOrCreateTemplate()" OnChange="Notify"
-                Title="@TemplateTitle"
-                PresetFestivalMainStage="@PresetFestivalMainStage"
-                PresetFestivalTent="@PresetFestivalTent"
-                PresetTraditionalVenue="@PresetTraditionalVenue"
-                CloseLabel="@CloseLabel"
-                GetEventLabel="GetEventLabel" />
+<ScheduleOptionsModal @bind-Visible="_showScheduleOptions" Order="Order" Show="Show" OnChange="Notify"
+                      Title="@ScheduleOptionsTitle"
+                      ModeLabel="@ModeLabel"
+                      AnchorLabel="@AnchorLabel"
+                      DefaultLabel="@DefaultLabel"
+                      TemplateHeading="@TemplateTitle"
+                      DefaultSetLengthLabel="@DefaultSetLengthLabel"
+                      PresetFestivalMainStage="@PresetFestivalMainStage"
+                      PresetFestivalTent="@PresetFestivalTent"
+                      PresetTraditionalVenue="@PresetTraditionalVenue"
+                      CloseLabel="@CloseLabel"
+                      CancelLabel="@CancelLabel"
+                      ModeChangeConfirmTitle="@ModeChangeConfirmTitle"
+                      ModeChangeConfirmMessage="@ModeChangeConfirmMessage"
+                      ModeChangeConfirmLabel="@ModeChangeConfirmLabel"
+                      GetModeLabel="GetModeLabel"
+                      GetEventLabel="GetEventLabel" />
 
 <VenueOptionsEditor @bind-Visible="_showVenueOptions" Options="GetOrCreateVenueOptions()" OnChange="Notify"
                   Order="Order" Show="Show"
                   GetModeLabel="GetModeLabel" GetEventLabel="GetEventLabel"
-                  OnModeChanged="OnModeChanged" OnAnchorChanged="OnAnchorChanged"
                   Title="@VenueOptionsTitle"
                   RunningOrderOptionsHeading="@RunningOrderOptionsHeading"
                   ModeLabel="@ModeLabel"
@@ -247,7 +256,8 @@
     [Parameter] public string PickStageLabel { get; set; } = "Pick stage";
     [Parameter] public string AddSlotLabel { get; set; } = "+ Add slot";
     [Parameter] public string UpdateBtnLabel { get; set; } = "Update";
-    [Parameter] public string TemplateBtnLabel { get; set; } = "Template";
+    [Parameter] public string ScheduleOptionsBtnLabel { get; set; } = "Schedule options";
+    [Parameter] public string ScheduleOptionsTitle { get; set; } = "Schedule options";
     [Parameter] public string VenueOptionsBtnLabel { get; set; } = "Venue options";
     [Parameter] public string EarlyChainHeading { get; set; } = "Early chain";
     [Parameter] public string PreShowHeading { get; set; } = "Pre-show";
@@ -265,12 +275,20 @@
     [Parameter] public string AddEventPickerTitle { get; set; } = "Add event";
     [Parameter] public string AddEventPlacementHint { get; set; } = "Event will be placed automatically.";
     [Parameter] public string TemplateTitle { get; set; } = "Timing template";
+    [Parameter] public string EarlyChainLabel { get; set; } = "Early chain";
+    [Parameter] public string PreShowLabel { get; set; } = "Pre-show (closest to anchor first)";
+    [Parameter] public string PostShowLabel { get; set; } = "Post-show";
+    [Parameter] public string DefaultSetLengthLabel { get; set; } = "Default set length (min)";
     [Parameter] public string PresetFestivalMainStage { get; set; } = "Festival main stage";
     [Parameter] public string PresetFestivalTent { get; set; } = "Festival tent";
     [Parameter] public string PresetTraditionalVenue { get; set; } = "Traditional venue";
     [Parameter] public string VenueOptionsTitle { get; set; } = "Venue options";
     [Parameter] public string RunningOrderOptionsHeading { get; set; } = "Running order options";
     [Parameter] public string CloseLabel { get; set; } = "Done";
+    [Parameter] public string CancelLabel { get; set; } = "Cancel";
+    [Parameter] public string ModeChangeConfirmTitle { get; set; } = "Change schedule mode?";
+    [Parameter] public string ModeChangeConfirmMessage { get; set; } = "Changing the schedule mode will recalculate all band timings. Pinned times are preserved, but unpinned events will be re-placed. Continue?";
+    [Parameter] public string ModeChangeConfirmLabel { get; set; } = "Change mode";
     [Parameter] public string VenueGetInLabel { get; set; } = "Get-in";
     [Parameter] public string VenueLoadInVenueLabel { get; set; } = "Load-in (venue)";
     [Parameter] public string VenueStageLoadInLabel { get; set; } = "Load-in (stage)";
@@ -283,9 +301,9 @@
     [Parameter] public string VenueSetLengthLabel { get; set; } = "Set length";
 
     private Guid _selectedSlotId = Guid.Empty;
+    private bool _showScheduleOptions = false;
     private Guid _newSlotBandId = Guid.Empty;
     private int _newSlotStageId = 0;
-    private bool _showTemplate = false;
     private bool _showVenueOptions = false;
     private bool _editingBreak = false;
     private bool _editingGap = false;
@@ -334,6 +352,16 @@
             if (slot is null) return "Band";
             var band = Bands.FirstOrDefault(b => b.Id == slot.BandId);
             return band?.Name ?? UnknownBandLabel;
+        }
+    }
+
+    private string SelectedStageName
+    {
+        get
+        {
+            var slot = SelectedSlot;
+            if (slot is null) return string.Empty;
+            return Stages.FirstOrDefault(s => s.Id == slot.StageId)?.Name ?? string.Empty;
         }
     }
 

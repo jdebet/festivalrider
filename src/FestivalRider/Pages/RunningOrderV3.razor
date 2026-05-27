@@ -12,13 +12,26 @@
 
 <div class="d-flex justify-content-between align-items-center mb-2">
     <h1 class="h4 m-0">@Localization.T("page.runningOrder.heading") v3</h1>
-    <button class="btn btn-primary btn-sm" @onclick="AddRunningOrder">@Localization.T("page.runningOrder.addBtn")</button>
+    <button class="btn btn-primary btn-sm" @onclick="() => _showCreateModal = true">@Localization.T("page.runningOrder.addBtn")</button>
 </div>
 
 @if (BandService.Bands.Count == 0)
 {
     <div class="alert alert-warning py-2 small">@Localization.T("page.runningOrder.noBands")</div>
 }
+
+<RiderSection Title="@Localization.T(LocalizationKeys.Page.RunningOrder.VenueDefaults.SectionTitle)">
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+        @VenueTimeChip("🟢", Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.VenueOpenLabel), _show.VenueOpenTime, v => _show.VenueOpenTime = v)
+        @VenueTimeChip("🔴", Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.VenueCloseLabel), _show.VenueCloseTime, v => _show.VenueCloseTime = v)
+        @VenueTimeChip("🔧", Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.TechnicalGetInLabel), _show.TechnicalGetInTime, v => _show.TechnicalGetInTime = v)
+        @VenueTimeChip("🚪", Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.DoorsLabel), _show.DoorsOpeningTime, v => _show.DoorsOpeningTime = v)
+        @VenueTimeChip("🎤", Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.FirstShowLabel), _show.FirstShowTime, v => _show.FirstShowTime = v)
+        @VenueTimeChip("🔇", Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.SoundCurfewLabel), _show.SoundCurfewTime, v => _show.SoundCurfewTime = v)
+        @VenueTimeChip("🚫", Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.BackstageCurfewLabel), _show.BackstageCurfewTime, v => _show.BackstageCurfewTime = v)
+        <button class="btn btn-sm btn-primary ms-2" @onclick="SaveVenueDefaults">@Localization.T(LocalizationKeys.Page.RunningOrder.VenueDefaults.SaveBtn)</button>
+    </div>
+</RiderSection>
 
 @if (!BandService.RunningOrdersForActiveShow.Any())
 {
@@ -35,12 +48,53 @@ else
                                 DayNumberLabel="@Localization.T("page.runningOrder.dayLabel")"
                                 ShowDayCount="@_show.ShowDayCount"
                                 DeleteBtnLabel="@Localization.T("page.runningOrder.deleteBtn")"
+                                ScheduleOptionsBtnLabel="@Localization.T(LocalizationKeys.Page.RunningOrder.ScheduleOptions.Title)"
+                                ScheduleOptionsTitle="@Localization.T(LocalizationKeys.Page.RunningOrder.ScheduleOptions.Title)"
+                                ModeLabel="@Localization.T(LocalizationKeys.Page.RunningOrder.ScheduleOptions.ModeLabel)"
+                                AnchorLabel="@Localization.T(LocalizationKeys.Page.RunningOrder.ScheduleOptions.AnchorLabel)"
+                                DefaultLabel="@Localization.T(LocalizationKeys.Page.RunningOrder.ScheduleOptions.DefaultLabel)"
+                                TemplateTitle="@Localization.T(LocalizationKeys.Page.RunningOrder.ScheduleOptions.TemplateHeading)"
+                                PresetFestivalMainStage="@Localization.T(LocalizationKeys.Page.RunningOrder.Template.Preset.FestivalMainStage)"
+                                PresetFestivalTent="@Localization.T(LocalizationKeys.Page.RunningOrder.Template.Preset.FestivalTent)"
+                                PresetTraditionalVenue="@Localization.T(LocalizationKeys.Page.RunningOrder.Template.Preset.TraditionalVenue)"
+                                DefaultSetLengthLabel="@Localization.T(LocalizationKeys.Page.RunningOrder.VenueOptions.DefaultSetLengthMinutes)"
+                                EarlyChainLabel="@Localization.T(LocalizationKeys.Page.RunningOrder.Panel.EarlyChainHeading)"
+                                PreShowLabel="@Localization.T(LocalizationKeys.Page.RunningOrder.Panel.PreShowHeading)"
+                                PostShowLabel="@Localization.T(LocalizationKeys.Page.RunningOrder.Panel.PostShowHeading)"
+                                CloseLabel="@Localization.T(LocalizationKeys.Page.RunningOrder.ScheduleOptions.CloseLabel)"
+                                CancelLabel="@Localization.T(LocalizationKeys.Page.RunningOrder.ScheduleOptions.CancelLabel)"
+                                ModeChangeConfirmTitle="@Localization.T(LocalizationKeys.Page.RunningOrder.ScheduleOptions.ModeChangeConfirmTitle)"
+                                ModeChangeConfirmMessage="@Localization.T(LocalizationKeys.Page.RunningOrder.ScheduleOptions.ModeChangeConfirmMessage)"
+                                ModeChangeConfirmLabel="@Localization.T(LocalizationKeys.Page.RunningOrder.ScheduleOptions.ModeChangeConfirmLabel)"
                                 OnDayChanged="e => OnDayChanged(ro, e)"
                                 OnDeleteRequest="() => RequestDelete(ro.Id)"
                                 OnChange="() => OnOrderChanged(ro)" />
         </RiderSection>
     }
 }
+
+<CreateRunningOrderModal @bind-Visible="_showCreateModal"
+                        OnCreate="OnCreateRunningOrder"
+                        GetEventLabel="GetEventLabel"
+                        Title="@Localization.T(LocalizationKeys.Page.RunningOrder.Create.Title)"
+                        PickModeHint="@Localization.T(LocalizationKeys.Page.RunningOrder.Create.PickModeHint)"
+                        FestivalModeLabel="@Localization.T(LocalizationKeys.Page.RunningOrder.Create.FestivalModeLabel)"
+                        FestivalModeHint="@Localization.T(LocalizationKeys.Page.RunningOrder.Create.FestivalModeHint)"
+                        VenueModeLabel="@Localization.T(LocalizationKeys.Page.RunningOrder.Create.VenueModeLabel)"
+                        VenueModeHint="@Localization.T(LocalizationKeys.Page.RunningOrder.Create.VenueModeHint)"
+                        BackLabel="@Localization.T(LocalizationKeys.Page.RunningOrder.Create.BackLabel)"
+                        FestivalTemplateHint="@Localization.T(LocalizationKeys.Page.RunningOrder.Create.FestivalTemplateHint)"
+                        DefaultTemplateLabel="@Localization.T(LocalizationKeys.Page.RunningOrder.Create.DefaultTemplateLabel)"
+                        DefaultTemplateHint="@Localization.T(LocalizationKeys.Page.RunningOrder.Create.DefaultTemplateHint)"
+                        CustomTemplateLabel="@Localization.T(LocalizationKeys.Page.RunningOrder.Create.CustomTemplateLabel)"
+                        CustomTemplateHint="@Localization.T(LocalizationKeys.Page.RunningOrder.Create.CustomTemplateHint)"
+                        DefaultSetLengthLabel="@Localization.T(LocalizationKeys.Page.RunningOrder.VenueOptions.DefaultSetLengthMinutes)"
+                        PresetFestivalMainStage="@Localization.T(LocalizationKeys.Page.RunningOrder.Template.Preset.FestivalMainStage)"
+                        PresetFestivalTent="@Localization.T(LocalizationKeys.Page.RunningOrder.Template.Preset.FestivalTent)"
+                        PresetTraditionalVenue="@Localization.T(LocalizationKeys.Page.RunningOrder.Template.Preset.TraditionalVenue)"
+                        AddEntryBtn="@Localization.T(LocalizationKeys.Page.RunningOrder.Template.AddEntryBtn)"
+                        CancelLabel="@Localization.T(LocalizationKeys.Page.RunningOrder.Create.CancelLabel)"
+                        CreateLabel="@Localization.T(LocalizationKeys.Page.RunningOrder.Create.CreateLabel)" />
 
 <ConfirmDialog Show="_pendingDeleteId.HasValue"
                Title="@Localization.T("confirm.deleteRunningOrder.title")"
@@ -51,6 +105,7 @@ else
 
 @code {
     private ShowData _show = new();
+    private bool _showCreateModal;
     private Guid? _pendingDeleteId;
     private string _deleteMessage = string.Empty;
 
@@ -92,7 +147,7 @@ else
         return date.ToString("ddd dd MMM yyyy");
     }
 
-    private void AddRunningOrder()
+    private void OnCreateRunningOrder((ScheduleMode Mode, FestivalTimingTemplate? Template) args)
     {
         var scoped = BandService.RunningOrdersForActiveShow.ToList();
         var nextDay = scoped.Count == 0
@@ -102,8 +157,12 @@ else
         {
             ShowId = BandService.ActiveShowId,
             ShowDayNumber = Math.Max(1, nextDay),
+            ModeOverride = args.Mode,
+            FestivalTemplate = args.Template,
         };
         BandService.AddRunningOrder(ro);
+        Scheduler.Recalculate(ro, _show);
+        BandService.UpdateRunningOrder(ro);
     }
 
     private void ConfirmDelete()
@@ -154,6 +213,31 @@ else
 
     private string GetEventLabel(TimingEventType t) => Localization.T($"enum.TimingEventType.{t}");
     private string GetModeLabel(ScheduleMode m) => Localization.T($"enum.ScheduleMode.{m}");
+
+    private void SaveVenueDefaults()
+    {
+        BandService.UpdateShow(_show);
+        Toasts.Show(Localization.T(LocalizationKeys.Toast.Settings.ShowDetailsSaved), ToastLevel.Success);
+    }
+
+    private RenderFragment VenueTimeChip(string icon, string label, DateTime? value, Action<DateTime?> onChange) => __builder =>
+    {
+        var timeStr = value?.ToString("HH:mm") ?? string.Empty;
+        <span class="d-inline-flex align-items-center gap-1 rounded-pill border px-2 py-1"
+              style="background:#e9ecef; border-color: rgba(0,0,0,0.12) !important; font-size:13px; white-space:nowrap;">
+            <span>@icon</span>
+            <span class="text-muted fw-semibold">@label</span>
+            <span style="width:4px;"></span>
+            <input type="time" class="border-0 bg-transparent fw-bold" style="font-size:13px; width:52px; padding:0;"
+                   value="@timeStr"
+                   @onchange="e => {
+                       if (e.Value is string s && TimeOnly.TryParse(s, out var t))
+                           onChange(DateTime.Today.Add(t.ToTimeSpan()));
+                       else
+                           onChange(null);
+                   }" />
+        </span>
+    };
 
     public void Dispose()
     {
