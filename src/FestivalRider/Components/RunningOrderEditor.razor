@@ -1,52 +1,130 @@
 @using FestivalRider.Models
 @using FestivalRider.Services
+@using Microsoft.AspNetCore.Components.Web
 
-<div class="d-flex flex-wrap gap-2 align-items-center mb-2">
-    <div class="d-flex align-items-center gap-1">
-        <label class="small text-muted mb-0">@DayNumberLabel</label>
-        <input type="number" min="1" max="@ShowDayCount" class="form-control form-control-sm fw-bold" style="width: 70px;"
-               value="@Order.ShowDayNumber"
-               @onchange="OnDayChanged" />
+<style>
+    .fr-inline-edit {
+        border: none;
+        background: transparent;
+        outline: none;
+        padding: 0;
+        margin: 0;
+        font-size: 13px;
+        line-height: 1;
+        height: 13px;
+        text-align: center;
+        min-width: 36px;
+        width: auto;
+        color: inherit;
+        font-weight: 700;
+        -webkit-appearance: none;
+        -moz-appearance: textfield;
+        appearance: none;
+        box-sizing: content-box;
+    }
+    .fr-inline-edit::-webkit-calendar-picker-indicator { display: none; -webkit-appearance: none; }
+    .fr-inline-edit::-webkit-inner-spin-button,
+    .fr-inline-edit::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    .fr-inline-edit::-webkit-datetime-edit { padding: 0; }
+    .fr-inline-edit::-webkit-datetime-edit-fields-wrapper { padding: 0; }
+    .fr-inline-edit[type="time"] { min-width: 48px; }
+</style>
+
+<div class="card mb-3 shadow-sm">
+    <div class="card-header d-flex align-items-center gap-3 py-2" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing:.05em;">@DayNumberLabel</span>
+            <input type="number" min="1" max="@ShowDayCount"
+                   class="form-control form-control-sm fw-bold text-center border-0 bg-white shadow-sm"
+                   style="width: 60px; font-size: 1.1rem; border-radius: 8px;"
+                   value="@Order.ShowDayNumber"
+                   @onchange="OnDayChanged" />
+        </div>
+        <div class="ms-auto d-flex gap-1">
+            <button class="btn btn-sm btn-primary px-3" @onclick="Notify">@UpdateBtnLabel</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => _showTemplate = true">@TemplateBtnLabel</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => _showVenueOptions = true">@VenueOptionsBtnLabel</button>
+            @if (OnDeleteRequest.HasDelegate)
+            {
+                <button class="btn btn-sm btn-outline-danger" @onclick="() => OnDeleteRequest.InvokeAsync()">@DeleteBtnLabel</button>
+            }
+        </div>
     </div>
-    <div class="ms-auto d-flex gap-1">
-        <button class="btn btn-sm btn-outline-primary" @onclick="Notify">@UpdateBtnLabel</button>
-        <button class="btn btn-sm btn-outline-secondary" @onclick="() => _showTemplate = true">@TemplateBtnLabel</button>
-        <button class="btn btn-sm btn-outline-secondary" @onclick="() => _showVenueOptions = true">@VenueOptionsBtnLabel</button>
-        @if (OnDeleteRequest.HasDelegate)
-        {
-            <button class="btn btn-sm btn-outline-danger" @onclick="() => OnDeleteRequest.InvokeAsync()">@DeleteBtnLabel</button>
-        }
+    
+    @* Running Order Timings *@
+    <div class="card-body py-2 px-3 d-flex flex-column gap-2">
+
+        @* ── Row 1: Venue bounds + curfews ── *@
+        <div class="d-flex flex-wrap gap-2 align-items-center border-start border-3 ps-2" style="border-color: #198754 !important;">
+            @TimeChip("venue-open", "🟢", VenueOpenLabel, Order.VenueOpenTimeOverride ?? Show.VenueOpenTime, "#d1e7dd", v => { Order.VenueOpenTimeOverride = v; Notify(); })
+            @TimeChip("venue-close", "🔴", VenueCloseLabel, Order.VenueCloseTimeOverride ?? Show.VenueCloseTime, "#f8d7da", v => { Order.VenueCloseTimeOverride = v; Notify(); })
+            <span class="text-muted" style="font-size:10px;">│</span>
+            @TimeChip("sound-curfew", "🔇", SoundCurfewLabel, Order.SoundCurfewTimeOverride ?? Show.SoundCurfewTime, "#f8d7da", v => { Order.SoundCurfewTimeOverride = v; Notify(); })
+            @TimeChip("backstage-curfew", "🚫", BackstageCurfewLabel, Order.BackstageCurfewTimeOverride ?? Show.BackstageCurfewTime, "#f8d7da", v => { Order.BackstageCurfewTimeOverride = v; Notify(); })
+        </div>
+
+        @* ── Row 2: Schedule anchors + timing scalars ── *@
+        <div class="d-flex flex-wrap gap-2 align-items-center border-start border-3 ps-2" style="border-color: #0d6efd !important;">
+            @TimeChip("tech-getin", "🔧", TechnicalGetInLabel, Order.TechnicalGetInTimeOverride ?? Show.TechnicalGetInTime, "#cfe2ff", v => { Order.TechnicalGetInTimeOverride = v; Notify(); })
+            @TimeChip("doors", "🚪", DoorsLabel, Order.DoorsOpeningTimeOverride ?? Show.DoorsOpeningTime, "#cfe2ff", v => { Order.DoorsOpeningTimeOverride = v; Notify(); })
+            @TimeChip("first-show", "🎤", FirstShowLabel, Order.FirstShowTimeOverride ?? Show.FirstShowTime, "#cfe2ff", v => { Order.FirstShowTimeOverride = v; Notify(); })
+            <span class="text-muted" style="font-size:10px;">│</span>
+            <span class="d-inline-flex align-items-center gap-1 rounded-pill border px-2 py-1" style="background:#e7f1ff; border-color:#9ec5fe !important; font-size:13px; white-space:nowrap;">
+                <span>⏱</span>
+                <span class="text-muted fw-semibold">@BreakLabel</span>
+                <span style="width:4px;"></span>
+                @if (_editingBreak)
+                {
+                    <input type="number" class="fr-inline-edit"
+                           @ref="_breakInputRef"
+                           @bind="_breakEditValue"
+                           @bind:after="SaveBreakAndClear"
+                           @onblur="SaveBreakAndClear"
+                           @onkeydown="HandleBreakKeyDown" />
+                }
+                else
+                {
+                    <span class="fw-bold text-dark" style="min-width:36px; text-align:center; cursor:pointer; line-height:1;" @onclick="StartEditingBreak">@(Order.BreakTimeMinutesOverride?.ToString() ?? "—")</span>
+                }
+                <button type="button" class="btn btn-link p-0 text-muted lh-1" style="font-size:13px; text-decoration:none; min-width:16px;"
+                        @onclick="() => OnOverrideInt((Order.BreakTimeMinutesOverride ?? Show.BreakTimeMinutes) - 5, v => Order.BreakTimeMinutesOverride = v)">−</button>
+                <button type="button" class="btn btn-link p-0 text-muted lh-1" style="font-size:13px; text-decoration:none; min-width:16px;"
+                        @onclick="() => OnOverrideInt((Order.BreakTimeMinutesOverride ?? Show.BreakTimeMinutes) + 5, v => Order.BreakTimeMinutesOverride = v)">+</button>
+                <span class="text-muted" style="font-size:11px;">min</span>
+            </span>
+            <span class="d-inline-flex align-items-center gap-1 rounded-pill border px-2 py-1" style="background:#e7f1ff; border-color:#9ec5fe !important; font-size:13px; white-space:nowrap;">
+                <span>↔</span>
+                <span class="text-muted fw-semibold">@GapLabel</span>
+                <span style="width:4px;"></span>
+                @if (_editingGap)
+                {
+                    <input type="number" class="fr-inline-edit"
+                           @ref="_gapInputRef"
+                           @bind="_gapEditValue"
+                           @bind:after="SaveGapAndClear"
+                           @onblur="SaveGapAndClear"
+                           @onkeydown="HandleGapKeyDown" />
+                }
+                else
+                {
+                    <span class="fw-bold text-dark" style="min-width:36px; text-align:center; cursor:pointer; line-height:1;" @onclick="StartEditingGap">@(Order.SoundcheckGapMinutesOverride?.ToString() ?? "—")</span>
+                }
+                <button type="button" class="btn btn-link p-0 text-muted lh-1" style="font-size:13px; text-decoration:none; min-width:16px;"
+                        @onclick="() => OnOverrideInt((Order.SoundcheckGapMinutesOverride ?? Show.SoundcheckGapMinutes) - 5, v => Order.SoundcheckGapMinutesOverride = v)">−</button>
+                <button type="button" class="btn btn-link p-0 text-muted lh-1" style="font-size:13px; text-decoration:none; min-width:16px;"
+                        @onclick="() => OnOverrideInt((Order.SoundcheckGapMinutesOverride ?? Show.SoundcheckGapMinutes) + 5, v => Order.SoundcheckGapMinutesOverride = v)">+</button>
+                <span class="text-muted" style="font-size:11px;">min</span>
+            </span>
+        </div>
+
+        @* ── Row 3: Catering ── *@
+        <div class="d-flex flex-wrap gap-2 align-items-center border-start border-3 ps-2" style="border-color: #6f42c1 !important;">
+            @TimeChip("breakfast", "🍳", BreakfastLabel, Order.BreakfastHoursOverride?.Start ?? Show.BreakfastHours?.Start, "#e8d5f5", v => { Order.BreakfastHoursOverride ??= new TimeSlot(); Order.BreakfastHoursOverride.Start = v ?? BaseDate; Notify(); })
+            @TimeChip("lunch", "🥗", LunchLabel, Order.LunchHoursOverride?.Start ?? Show.LunchHours?.Start, "#e8d5f5", v => { Order.LunchHoursOverride ??= new TimeSlot(); Order.LunchHoursOverride.Start = v ?? BaseDate; Notify(); })
+            @TimeChip("dinner", "🍽", DinnerLabel, Order.DinnerHoursOverride?.Start ?? Show.DinnerHours?.Start, "#e8d5f5", v => { Order.DinnerHoursOverride ??= new TimeSlot(); Order.DinnerHoursOverride.Start = v ?? BaseDate; Notify(); })
+        </div>
+
     </div>
-</div>
-
-<div class="d-flex flex-wrap gap-2 align-items-end mb-2">
-    <div class="d-flex align-items-center gap-1">
-        <label class="small text-muted mb-0">@BreakLabel</label>
-        <input type="number" class="form-control form-control-sm" style="width: 70px;" step="5" value="@Order.BreakTimeMinutesOverride" @onchange="e => OnOverrideInt(e, v => Order.BreakTimeMinutesOverride = v)" />
-    </div>
-    <div class="d-flex align-items-center gap-1">
-        <label class="small text-muted mb-0">@GapLabel</label>
-        <input type="number" class="form-control form-control-sm" style="width: 70px;" step="5" value="@Order.SoundcheckGapMinutesOverride" @onchange="e => OnOverrideInt(e, v => Order.SoundcheckGapMinutesOverride = v)" />
-    </div>
-</div>
-
-<div class="d-flex flex-wrap gap-2 align-items-end mb-2">
-    <TimeInput Label="@VenueOpenLabel" Value="@(Order.VenueOpenTimeOverride ?? Show.VenueOpenTime)" BaseDate="BaseDate" OnChange="v => { Order.VenueOpenTimeOverride = v; Notify(); }" />
-    <TimeInput Label="@VenueCloseLabel" Value="@(Order.VenueCloseTimeOverride ?? Show.VenueCloseTime)" BaseDate="BaseDate" OnChange="v => { Order.VenueCloseTimeOverride = v; Notify(); }" />
-    <TimeInput Label="@SoundCurfewLabel" Value="@(Order.SoundCurfewTimeOverride ?? Show.SoundCurfewTime)" BaseDate="BaseDate" OnChange="v => { Order.SoundCurfewTimeOverride = v; Notify(); }" />
-    <TimeInput Label="@BackstageCurfewLabel" Value="@(Order.BackstageCurfewTimeOverride ?? Show.BackstageCurfewTime)" BaseDate="BaseDate" OnChange="v => { Order.BackstageCurfewTimeOverride = v; Notify(); }" />
-</div>
-
-<div class="d-flex flex-wrap gap-2 align-items-end mb-2">
-    <TimeInput Label="@TechnicalGetInLabel" Value="@(Order.TechnicalGetInTimeOverride ?? Show.TechnicalGetInTime)" BaseDate="BaseDate" OnChange="v => { Order.TechnicalGetInTimeOverride = v; Notify(); }" />
-    <TimeInput Label="@DoorsLabel" Value="@(Order.DoorsOpeningTimeOverride ?? Show.DoorsOpeningTime)" BaseDate="BaseDate" OnChange="v => { Order.DoorsOpeningTimeOverride = v; Notify(); }" />
-    <TimeInput Label="@FirstShowLabel" Value="@(Order.FirstShowTimeOverride ?? Show.FirstShowTime)" BaseDate="BaseDate" OnChange="v => { Order.FirstShowTimeOverride = v; Notify(); }" />
-</div>
-
-<div class="d-flex flex-wrap gap-2 align-items-end mb-2">
-    <TimeInput Label="@BreakfastLabel" Value="@(Order.BreakfastHoursOverride?.Start ?? Show.BreakfastHours?.Start)" BaseDate="BaseDate" OnChange="v => { Order.BreakfastHoursOverride ??= new TimeSlot(); Order.BreakfastHoursOverride.Start = v ?? BaseDate; Notify(); }" />
-    <TimeInput Label="@LunchLabel" Value="@(Order.LunchHoursOverride?.Start ?? Show.LunchHours?.Start)" BaseDate="BaseDate" OnChange="v => { Order.LunchHoursOverride ??= new TimeSlot(); Order.LunchHoursOverride.Start = v ?? BaseDate; Notify(); }" />
-    <TimeInput Label="@DinnerLabel" Value="@(Order.DinnerHoursOverride?.Start ?? Show.DinnerHours?.Start)" BaseDate="BaseDate" OnChange="v => { Order.DinnerHoursOverride ??= new TimeSlot(); Order.DinnerHoursOverride.Start = v ?? BaseDate; Notify(); }" />
 </div>
 
 <div class="row g-2">
@@ -209,6 +287,38 @@
     private int _newSlotStageId = 0;
     private bool _showTemplate = false;
     private bool _showVenueOptions = false;
+    private bool _editingBreak = false;
+    private bool _editingGap = false;
+    private int _breakEditValue;
+    private int _gapEditValue;
+    private string? _editingTimeChipKey;
+    private string _timeEditValue = string.Empty;
+
+    private ElementReference _breakInputRef;
+    private ElementReference _gapInputRef;
+    private ElementReference _timeChipInputRef;
+    private bool _focusBreakPending;
+    private bool _focusGapPending;
+    private bool _focusTimeChipPending;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusBreakPending)
+        {
+            _focusBreakPending = false;
+            try { await _breakInputRef.FocusAsync(); } catch { /* ref not yet bound */ }
+        }
+        if (_focusGapPending)
+        {
+            _focusGapPending = false;
+            try { await _gapInputRef.FocusAsync(); } catch { /* ref not yet bound */ }
+        }
+        if (_focusTimeChipPending)
+        {
+            _focusTimeChipPending = false;
+            try { await _timeChipInputRef.FocusAsync(); } catch { /* ref not yet bound */ }
+        }
+    }
 
     private DateTime BaseDate => Show.DateOfOpening == default
         ? DateTime.Today
@@ -263,10 +373,16 @@
 
     private void OnOverrideInt(ChangeEventArgs e, Action<int?> setter)
     {
-        if (int.TryParse(e.Value?.ToString(), out var v) && v > 0)
+        if (int.TryParse(e.Value?.ToString(), out var v) && v >= 0)
             setter(v);
         else
             setter(null);
+        Notify();
+    }
+
+    private void OnOverrideInt(int? directValue, Action<int?> setter)
+    {
+        setter(directValue is >= 0 ? directValue : null);
         Notify();
     }
 
@@ -331,4 +447,106 @@
     }
 
     private void Notify() => OnChange.InvokeAsync();
+
+    private void SaveAndClearTimeEdit()
+    {
+        _editingTimeChipKey = null;
+        Notify();
+    }
+
+    private void HandleTimeChipKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+            _editingTimeChipKey = null;
+    }
+
+    private void StartEditingTimeChip(string key)
+    {
+        // Save any existing edit first
+        _editingTimeChipKey = key;
+        _focusTimeChipPending = true;
+    }
+
+    private void SaveBreakAndClear()
+    {
+        OnOverrideInt(_breakEditValue, v => Order.BreakTimeMinutesOverride = v);
+        _editingBreak = false;
+    }
+
+    private void SaveGapAndClear()
+    {
+        OnOverrideInt(_gapEditValue, v => Order.SoundcheckGapMinutesOverride = v);
+        _editingGap = false;
+    }
+
+    private void StartEditingBreak()
+    {
+        _breakEditValue = Order.BreakTimeMinutesOverride ?? Show.BreakTimeMinutes;
+        _editingBreak = true;
+        _focusBreakPending = true;
+    }
+
+    private void StartEditingGap()
+    {
+        _gapEditValue = Order.SoundcheckGapMinutesOverride ?? Show.SoundcheckGapMinutes;
+        _editingGap = true;
+        _focusGapPending = true;
+    }
+
+    private void HandleBreakKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+            SaveBreakAndClear();
+    }
+
+    private void HandleGapKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+            SaveGapAndClear();
+    }
+
+    private RenderFragment TimeChip(string key, string icon, string label, DateTime? value, string bgColor, Action<DateTime?> onChange) => __builder =>
+    {
+        var timeStr = value?.ToString("HH:mm") ?? string.Empty;
+        var dayOffset = value.HasValue ? (int)(value.Value.Date - BaseDate.Date).TotalDays : 0;
+        var isEditing = _editingTimeChipKey == key;
+        <span class="d-inline-flex align-items-center gap-1 rounded-pill border px-2 py-1"
+              style="background:@bgColor; border-color: rgba(0,0,0,0.12) !important; font-size:13px; white-space:nowrap;">
+            <span>@icon</span>
+            <span class="text-muted fw-semibold">@label</span>
+            <span style="width:4px;"></span>
+            @if (isEditing)
+            {
+                <input type="time" class="fr-inline-edit"
+                       @ref="_timeChipInputRef"
+                       value="@timeStr"
+                       @onchange="e => {
+                           if (e.Value is string s && TimeOnly.TryParse(s, out var t))
+                               onChange(BaseDate.Date.AddDays(dayOffset).Add(t.ToTimeSpan()));
+                           else
+                               onChange(null);
+                           SaveAndClearTimeEdit();
+                       }"
+                       @onblur="SaveAndClearTimeEdit"
+                       @onkeydown="HandleTimeChipKeyDown" />
+            }
+            else
+            {
+                <span class="fw-bold text-dark" style="min-width:36px; text-align:center; cursor:pointer; line-height:1;"
+                      @onclick="() => StartEditingTimeChip(key)">@(value.HasValue ? timeStr : "--:--")</span>
+            }
+            <button type="button" class="btn btn-link p-0 text-muted lh-1"
+                    style="font-size:13px; text-decoration:none; min-width:16px;"
+                    @onclick="() => { if (value.HasValue) onChange(value.Value.AddMinutes(-15)); }"
+                    disabled="@(!value.HasValue)">−</button>
+            <button type="button" class="btn btn-link p-0 text-muted lh-1"
+                    style="font-size:13px; text-decoration:none; min-width:16px;"
+                    @onclick="() => { if (value.HasValue) onChange(value.Value.AddMinutes(15)); }"
+                    disabled="@(!value.HasValue)">+</button>
+            @if (dayOffset > 0)
+            {
+                <span class="badge bg-secondary" style="font-size:9px; padding:2px 5px;">+@dayOffset d</span>
+            }
+        </span>
+    };
 }
