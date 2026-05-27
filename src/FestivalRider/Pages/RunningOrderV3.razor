@@ -2,6 +2,23 @@
 @using RoModel = FestivalRider.Models.RunningOrder
 @using FestivalRider.Components
 @implements IDisposable
+
+<style>
+    .fr-inline-edit {
+        border: none; background: transparent; outline: none;
+        padding: 0; margin: 0; font-size: 13px; line-height: 1; height: 13px;
+        text-align: center; min-width: 36px; width: auto; color: inherit; font-weight: 700;
+        -webkit-appearance: none; -moz-appearance: textfield; appearance: none; box-sizing: content-box;
+    }
+    .fr-inline-edit::-webkit-calendar-picker-indicator { display: none; -webkit-appearance: none; }
+    .fr-inline-edit::-webkit-inner-spin-button, .fr-inline-edit::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    .fr-inline-edit::-webkit-datetime-edit { padding: 0; }
+    .fr-inline-edit::-webkit-datetime-edit-fields-wrapper { padding: 0; }
+    .fr-inline-edit[type="time"] { min-width: 48px; }
+</style>
+@using FestivalRider.Models
+@using FestivalRider.Services
+@using Microsoft.AspNetCore.Components.Web
 @inject IBandService BandService
 @inject ILocalizationService Localization
 @inject IToastService Toasts
@@ -22,13 +39,13 @@
 
 <RiderSection Title="@Localization.T(LocalizationKeys.Page.RunningOrder.VenueDefaults.SectionTitle)">
     <div class="d-flex flex-wrap gap-2 align-items-center">
-        @VenueTimeChip("🟢", Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.VenueOpenLabel), _show.VenueOpenTime, v => _show.VenueOpenTime = v)
-        @VenueTimeChip("🔴", Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.VenueCloseLabel), _show.VenueCloseTime, v => _show.VenueCloseTime = v)
-        @VenueTimeChip("🔧", Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.TechnicalGetInLabel), _show.TechnicalGetInTime, v => _show.TechnicalGetInTime = v)
-        @VenueTimeChip("🚪", Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.DoorsLabel), _show.DoorsOpeningTime, v => _show.DoorsOpeningTime = v)
-        @VenueTimeChip("🎤", Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.FirstShowLabel), _show.FirstShowTime, v => _show.FirstShowTime = v)
-        @VenueTimeChip("🔇", Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.SoundCurfewLabel), _show.SoundCurfewTime, v => _show.SoundCurfewTime = v)
-        @VenueTimeChip("🚫", Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.BackstageCurfewLabel), _show.BackstageCurfewTime, v => _show.BackstageCurfewTime = v)
+        @VenueTimeChip("venue-open", "🟢", Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.VenueOpenLabel), _show.VenueOpenTime, v => _show.VenueOpenTime = v)
+        @VenueTimeChip("venue-close", "🔴", Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.VenueCloseLabel), _show.VenueCloseTime, v => _show.VenueCloseTime = v)
+        @VenueTimeChip("tech-getin", "🔧", Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.TechnicalGetInLabel), _show.TechnicalGetInTime, v => _show.TechnicalGetInTime = v)
+        @VenueTimeChip("doors", "🚪", Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.DoorsLabel), _show.DoorsOpeningTime, v => _show.DoorsOpeningTime = v)
+        @VenueTimeChip("first-show", "🎤", Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.FirstShowLabel), _show.FirstShowTime, v => _show.FirstShowTime = v)
+        @VenueTimeChip("sound-curfew", "🔇", Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.SoundCurfewLabel), _show.SoundCurfewTime, v => _show.SoundCurfewTime = v)
+        @VenueTimeChip("backstage-curfew", "🚫", Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.BackstageCurfewLabel), _show.BackstageCurfewTime, v => _show.BackstageCurfewTime = v)
         <button class="btn btn-sm btn-primary ms-2" @onclick="SaveVenueDefaults">@Localization.T(LocalizationKeys.Page.RunningOrder.VenueDefaults.SaveBtn)</button>
     </div>
 </RiderSection>
@@ -220,22 +237,56 @@ else
         Toasts.Show(Localization.T(LocalizationKeys.Toast.Settings.ShowDetailsSaved), ToastLevel.Success);
     }
 
-    private RenderFragment VenueTimeChip(string icon, string label, DateTime? value, Action<DateTime?> onChange) => __builder =>
+    private string? _editingVenueChipKey;
+    private ElementReference _venueChipInputRef;
+
+    private void HandleVenueChipKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") _editingVenueChipKey = null;
+    }
+
+    private RenderFragment VenueTimeChip(string key, string icon, string label, DateTime? value, Action<DateTime?> onChange) => __builder =>
     {
         var timeStr = value?.ToString("HH:mm") ?? string.Empty;
+        var dayOffset = value.HasValue ? (int)(value.Value.Date - DateTime.Today).TotalDays : 0;
+        var isEditing = _editingVenueChipKey == key;
         <span class="d-inline-flex align-items-center gap-1 rounded-pill border px-2 py-1"
-              style="background:#e9ecef; border-color: rgba(0,0,0,0.12) !important; font-size:13px; white-space:nowrap;">
+              style="background:#e9ecef; border-color: rgba(0,0,0,0.12) !important; font-size:13px; white-space:nowrap; overflow:visible;">
             <span>@icon</span>
             <span class="text-muted fw-semibold">@label</span>
             <span style="width:4px;"></span>
-            <input type="time" class="border-0 bg-transparent fw-bold" style="font-size:13px; width:52px; padding:0;"
-                   value="@timeStr"
-                   @onchange="e => {
-                       if (e.Value is string s && TimeOnly.TryParse(s, out var t))
-                           onChange(DateTime.Today.Add(t.ToTimeSpan()));
-                       else
-                           onChange(null);
-                   }" />
+            @if (isEditing)
+            {
+                <input type="time" class="fr-inline-edit"
+                       @ref="_venueChipInputRef"
+                       value="@timeStr"
+                       @onchange="e => {
+                           if (e.Value is string s && TimeOnly.TryParse(s, out var t))
+                               onChange(DateTime.Today.AddDays(dayOffset).Add(t.ToTimeSpan()));
+                           else
+                               onChange(null);
+                           _editingVenueChipKey = null;
+                       }"
+                       @onblur="() => _editingVenueChipKey = null"
+                       @onkeydown="HandleVenueChipKeyDown" />
+            }
+            else
+            {
+                <span class="fw-bold text-dark" style="min-width:36px; text-align:center; cursor:pointer; line-height:1;"
+                      @onclick="() => _editingVenueChipKey = key">@(value.HasValue ? timeStr : "--:--")</span>
+            }
+            <button type="button" class="btn btn-link p-0 text-muted lh-1"
+                    style="font-size:13px; text-decoration:none; min-width:16px;"
+                    @onclick="() => { if (value.HasValue) onChange(value.Value.AddMinutes(-15)); }"
+                    disabled="@(!value.HasValue)">−</button>
+            <button type="button" class="btn btn-link p-0 text-muted lh-1"
+                    style="font-size:13px; text-decoration:none; min-width:16px;"
+                    @onclick="() => { if (value.HasValue) onChange(value.Value.AddMinutes(15)); }"
+                    disabled="@(!value.HasValue)">+</button>
+            @if (dayOffset > 0)
+            {
+                <span class="badge bg-secondary" style="font-size:9px; padding:2px 5px;">+@dayOffset d</span>
+            }
         </span>
     };
 

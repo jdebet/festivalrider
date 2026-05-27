@@ -231,7 +231,9 @@
     private DateTime? AnchorToBase(DateTime? dt)
     {
         if (dt is null) return null;
-        return BaseDate.Date.Add(dt.Value.TimeOfDay);
+        var t = dt.Value.TimeOfDay;
+        var day = t < TimeSpan.FromHours(12) ? BaseDate.Date.AddDays(1) : BaseDate.Date;
+        return day.Add(t);
     }
 
     private DateTime MinTime => VenueOpenTime is DateTime vo ? vo.AddHours(-1) : EventMinTime;

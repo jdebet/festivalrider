@@ -1100,22 +1100,28 @@ public class RunningOrderScheduler : IRunningOrderScheduler
         }
 
         // Re-anchor a stored DateTime to baseDate, preserving time-of-day.
-        // Handles post-midnight curfews by keeping them on baseDate+1d when the time is earlier than noon.
+        // Times before noon are considered post-midnight (next day) relative to baseDate.
         private static DateTime? Anchor(DateTime? dt, DateTime baseDate)
         {
             if (dt is null) return null;
             var t = dt.Value.TimeOfDay;
-            return baseDate.Date.Add(t);
+            var day = t < TimeSpan.FromHours(12) ? baseDate.Date.AddDays(1) : baseDate.Date;
+            return day.Add(t);
         }
 
         private static TimeSlot? AnchorSlot(TimeSlot? slot, DateTime baseDate)
         {
             if (slot is null) return null;
-            return new TimeSlot
+            var startT = slot.Start.TimeOfDay;
+            var startDay = startT < TimeSpan.FromHours(12) ? baseDate.Date.AddDays(1) : baseDate.Date;
+            DateTime? end = null;
+            if (slot.End is DateTime e)
             {
-                Start = baseDate.Date.Add(slot.Start.TimeOfDay),
-                End = slot.End is DateTime end ? baseDate.Date.Add(end.TimeOfDay) : (DateTime?)null,
-            };
+                var endT = e.TimeOfDay;
+                var endDay = endT < TimeSpan.FromHours(12) ? baseDate.Date.AddDays(1) : baseDate.Date;
+                end = endDay.Add(endT);
+            }
+            return new TimeSlot { Start = startDay.Add(startT), End = end };
         }
     }
 }
