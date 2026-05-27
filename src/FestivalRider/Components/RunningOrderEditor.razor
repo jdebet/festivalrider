@@ -390,12 +390,26 @@
     {
         if (_newSlotBandId == Guid.Empty || Bands.All(b => b.Id != _newSlotBandId)) return;
         var stageId = Stages.Count > 0 ? (_newSlotStageId != 0 ? _newSlotStageId : Stages.First().Id) : 0;
+        var mode = Order.ModeOverride ?? Show.DefaultScheduleMode;
+        DateTime? pinnedTime = null;
+        if (mode == ScheduleMode.Festival)
+        {
+            var rawFirstShow = Order.FirstShowTimeOverride ?? Show.FirstShowTime;
+            var firstShow = rawFirstShow.HasValue
+                ? BaseDate.Date.Add(rawFirstShow.Value.TimeOfDay)
+                : BaseDate.AddHours(20);
+            var stageSlotCount = Order.Slots.Count(s => s.StageId == stageId);
+            var defaultSetLen = Order.VenueOptions?.DefaultSetLengthMinutes ?? 45;
+            pinnedTime = firstShow.AddMinutes(stageSlotCount * (defaultSetLen + 15));
+        }
         Order.Slots.Add(new RunningOrderSlot
         {
             Id = Guid.NewGuid(),
             BandId = _newSlotBandId,
             StageId = stageId,
             SoundcheckOrderIndex = Order.Slots.Count,
+            OnStageTime = pinnedTime,
+            IsOnStagePinned = pinnedTime.HasValue,
         });
         _newSlotBandId = Guid.Empty;
         _newSlotStageId = 0;

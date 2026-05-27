@@ -215,11 +215,17 @@
         }
     }
 
-    private DateTime? VenueOpenTime => Order.VenueOpenTimeOverride ?? Show.VenueOpenTime;
-    private DateTime? VenueCloseTime => Order.VenueCloseTimeOverride ?? Show.VenueCloseTime;
-    private DateTime? EffectiveTechnicalGetIn => Order.TechnicalGetInTimeOverride ?? Show.TechnicalGetInTime;
-    private DateTime? EffectiveSoundCurfew => Order.SoundCurfewTimeOverride ?? Show.SoundCurfewTime;
-    private DateTime? EffectiveBackstageCurfew => Order.BackstageCurfewTimeOverride ?? Show.BackstageCurfewTime;
+    private DateTime? VenueOpenTime => AnchorToBase(Order.VenueOpenTimeOverride ?? Show.VenueOpenTime);
+    private DateTime? VenueCloseTime => AnchorToBase(Order.VenueCloseTimeOverride ?? Show.VenueCloseTime);
+    private DateTime? EffectiveTechnicalGetIn => AnchorToBase(Order.TechnicalGetInTimeOverride ?? Show.TechnicalGetInTime);
+    private DateTime? EffectiveSoundCurfew => AnchorToBase(Order.SoundCurfewTimeOverride ?? Show.SoundCurfewTime);
+    private DateTime? EffectiveBackstageCurfew => AnchorToBase(Order.BackstageCurfewTimeOverride ?? Show.BackstageCurfewTime);
+
+    private DateTime? AnchorToBase(DateTime? dt)
+    {
+        if (dt is null) return null;
+        return BaseDate.Date.Add(dt.Value.TimeOfDay);
+    }
 
     private DateTime MinTime => VenueOpenTime is DateTime vo ? vo.AddHours(-1) : EventMinTime;
 

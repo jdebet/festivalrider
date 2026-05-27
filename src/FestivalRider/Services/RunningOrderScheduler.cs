@@ -1085,18 +1085,37 @@ public class RunningOrderScheduler : IRunningOrderScheduler
             AnchorEvent = order.AnchorEventOverride ?? show.DefaultAnchorEvent;
             if (AnchorEvent == default) AnchorEvent = TimingEventType.ON_STAGE;
             EffectiveVenueOptions = order.VenueOptions ?? new VenueTimingOptions();
-            EffectiveVenueOpen = order.VenueOpenTimeOverride ?? show.VenueOpenTime;
-            EffectiveVenueClose = order.VenueCloseTimeOverride ?? show.VenueCloseTime;
-            EffectiveTechnicalGetIn = order.TechnicalGetInTimeOverride ?? show.TechnicalGetInTime;
-            EffectiveDoors = order.DoorsOpeningTimeOverride ?? show.DoorsOpeningTime;
-            EffectiveFirstShow = order.FirstShowTimeOverride ?? show.FirstShowTime;
-            EffectiveSoundCurfew = order.SoundCurfewTimeOverride ?? show.SoundCurfewTime;
-            EffectiveBackstageCurfew = order.BackstageCurfewTimeOverride ?? show.BackstageCurfewTime;
-            EffectiveBreakfast = order.BreakfastHoursOverride ?? show.BreakfastHours;
-            EffectiveLunch = order.LunchHoursOverride ?? show.LunchHours;
-            EffectiveDinner = order.DinnerHoursOverride ?? show.DinnerHours;
+            EffectiveVenueOpen = Anchor(order.VenueOpenTimeOverride ?? show.VenueOpenTime, BaseDate);
+            EffectiveVenueClose = Anchor(order.VenueCloseTimeOverride ?? show.VenueCloseTime, BaseDate);
+            EffectiveTechnicalGetIn = Anchor(order.TechnicalGetInTimeOverride ?? show.TechnicalGetInTime, BaseDate);
+            EffectiveDoors = Anchor(order.DoorsOpeningTimeOverride ?? show.DoorsOpeningTime, BaseDate);
+            EffectiveFirstShow = Anchor(order.FirstShowTimeOverride ?? show.FirstShowTime, BaseDate);
+            EffectiveSoundCurfew = Anchor(order.SoundCurfewTimeOverride ?? show.SoundCurfewTime, BaseDate);
+            EffectiveBackstageCurfew = Anchor(order.BackstageCurfewTimeOverride ?? show.BackstageCurfewTime, BaseDate);
+            EffectiveBreakfast = AnchorSlot(order.BreakfastHoursOverride ?? show.BreakfastHours, BaseDate);
+            EffectiveLunch = AnchorSlot(order.LunchHoursOverride ?? show.LunchHours, BaseDate);
+            EffectiveDinner = AnchorSlot(order.DinnerHoursOverride ?? show.DinnerHours, BaseDate);
             EffectiveBreakTime = order.BreakTimeMinutesOverride ?? show.BreakTimeMinutes;
             EffectiveSoundcheckGap = order.SoundcheckGapMinutesOverride ?? show.SoundcheckGapMinutes;
+        }
+
+        // Re-anchor a stored DateTime to baseDate, preserving time-of-day.
+        // Handles post-midnight curfews by keeping them on baseDate+1d when the time is earlier than noon.
+        private static DateTime? Anchor(DateTime? dt, DateTime baseDate)
+        {
+            if (dt is null) return null;
+            var t = dt.Value.TimeOfDay;
+            return baseDate.Date.Add(t);
+        }
+
+        private static TimeSlot? AnchorSlot(TimeSlot? slot, DateTime baseDate)
+        {
+            if (slot is null) return null;
+            return new TimeSlot
+            {
+                Start = baseDate.Date.Add(slot.Start.TimeOfDay),
+                End = slot.End is DateTime end ? baseDate.Date.Add(end.TimeOfDay) : (DateTime?)null,
+            };
         }
     }
 }

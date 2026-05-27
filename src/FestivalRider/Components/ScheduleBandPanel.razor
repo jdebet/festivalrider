@@ -10,11 +10,56 @@ else
         <h6 class="m-0 fw-bold">@BandName</h6>
     </div>
 
+    @if (Slot.EarlyChain.Count > 0)
+    {
+        <div class="mb-2">
+            <h6 class="small fw-bold">@EarlyChainHeading</h6>
+            @foreach (var ev in Slot.EarlyChain.OrderBy(e => e.StartTime ?? DateTime.MinValue))
+            {
+                <EventRow Event="ev" BaseDate="BaseDate" GetDefaultDuration="GetDefaultDuration" GetLabel="GetEventLabel" OnChange="NotifyChange" />
+            }
+        </div>
+    }
+
     <div class="mb-2">
-        <h6 class="small fw-bold">@PostShowHeading</h6>
-        @foreach (var ev in Slot.PostShowEvents.OrderBy(e => e.StartTime ?? DateTime.MinValue))
+        <h6 class="small fw-bold">@PreShowHeading</h6>
+        @foreach (var ev in Slot.PreShowEvents.Where(e => e.EventType is not TimingEventType.CHANGEOVER and not TimingEventType.PRESHOW_LINECHECK).OrderByDescending(e => e.StartTime ?? DateTime.MinValue))
         {
             <EventRow Event="ev" BaseDate="BaseDate" GetDefaultDuration="GetDefaultDuration" GetLabel="GetEventLabel" OnChange="NotifyChange" />
+        }
+    </div>
+
+    @if (ChangeoverEvent is not null)
+    {
+        <div class="mb-2">
+            <h6 class="small fw-bold">@GetEventLabel(TimingEventType.CHANGEOVER)</h6>
+            <EventRow Event="ChangeoverEvent" BaseDate="BaseDate" GetDefaultDuration="GetDefaultDuration" GetLabel="GetEventLabel" OnChange="NotifyChange" />
+        </div>
+    }
+
+    @if (PreShowLinecheckEvent is not null)
+    {
+        <div class="mb-2">
+            <h6 class="small fw-bold">@GetEventLabel(TimingEventType.PRESHOW_LINECHECK)</h6>
+            <EventRow Event="PreShowLinecheckEvent" BaseDate="BaseDate" GetDefaultDuration="GetDefaultDuration" GetLabel="GetEventLabel" OnChange="NotifyChange" />
+        </div>
+    }
+
+    <div class="mb-2">
+        <h6 class="small fw-bold">@BackstageRowLabel</h6>
+        @if (Slot.BackstageTime.HasValue)
+        {
+            <div class="d-flex align-items-center gap-2 py-1 px-2 rounded mb-1" style="background:rgba(143,188,143,0.20)">
+                <span class="small fw-bold" style="width: 110px;">@BackstageRowLabel</span>
+                <span class="small text-muted" style="width: 70px;">@FormatTime(Slot.BackstageTime.Value)</span>
+                <div class="flex-grow-1"></div>
+                <div class="form-check m-0">
+                    <input type="checkbox" class="form-check-input" id="pin-backstage-@_id"
+                           checked="@Slot.IsBackstageTimePinned"
+                           @onchange="e => OnBackstagePinnedChanged(e.Value)" />
+                    <label class="form-check-label small" for="pin-backstage-@_id">PIN</label>
+                </div>
+            </div>
         }
     </div>
 
@@ -39,58 +84,13 @@ else
         </div>
     </div>
 
-    @if (PreShowLinecheckEvent is not null)
-    {
-        <div class="mb-2">
-            <h6 class="small fw-bold">@GetEventLabel(TimingEventType.PRESHOW_LINECHECK)</h6>
-            <EventRow Event="PreShowLinecheckEvent" BaseDate="BaseDate" GetDefaultDuration="GetDefaultDuration" GetLabel="GetEventLabel" OnChange="NotifyChange" />
-        </div>
-    }
-
-    @if (ChangeoverEvent is not null)
-    {
-        <div class="mb-2">
-            <h6 class="small fw-bold">@GetEventLabel(TimingEventType.CHANGEOVER)</h6>
-            <EventRow Event="ChangeoverEvent" BaseDate="BaseDate" GetDefaultDuration="GetDefaultDuration" GetLabel="GetEventLabel" OnChange="NotifyChange" />
-        </div>
-    }
-
     <div class="mb-2">
-        <h6 class="small fw-bold">@BackstageRowLabel</h6>
-        @if (Slot.BackstageTime.HasValue)
-        {
-            <div class="d-flex align-items-center gap-2 py-1 px-2 rounded mb-1" style="background:rgba(143,188,143,0.20)">
-                <span class="small fw-bold" style="width: 110px;">@BackstageRowLabel</span>
-                <span class="small text-muted" style="width: 70px;">@FormatTime(Slot.BackstageTime.Value)</span>
-                <div class="flex-grow-1"></div>
-                <div class="form-check m-0">
-                    <input type="checkbox" class="form-check-input" id="pin-backstage-@_id"
-                           checked="@Slot.IsBackstageTimePinned"
-                           @onchange="e => OnBackstagePinnedChanged(e.Value)" />
-                    <label class="form-check-label small" for="pin-backstage-@_id">PIN</label>
-                </div>
-            </div>
-        }
-    </div>
-
-    <div class="mb-2">
-        <h6 class="small fw-bold">@PreShowHeading</h6>
-        @foreach (var ev in Slot.PreShowEvents.Where(e => e.EventType is not TimingEventType.CHANGEOVER and not TimingEventType.PRESHOW_LINECHECK).OrderByDescending(e => e.StartTime ?? DateTime.MinValue))
+        <h6 class="small fw-bold">@PostShowHeading</h6>
+        @foreach (var ev in Slot.PostShowEvents.OrderBy(e => e.StartTime ?? DateTime.MinValue))
         {
             <EventRow Event="ev" BaseDate="BaseDate" GetDefaultDuration="GetDefaultDuration" GetLabel="GetEventLabel" OnChange="NotifyChange" />
         }
     </div>
-
-    @if (Slot.EarlyChain.Count > 0)
-    {
-        <div class="mb-2">
-            <h6 class="small fw-bold">@EarlyChainHeading</h6>
-            @foreach (var ev in Slot.EarlyChain.OrderBy(e => e.StartTime ?? DateTime.MinValue))
-            {
-                <EventRow Event="ev" BaseDate="BaseDate" GetDefaultDuration="GetDefaultDuration" GetLabel="GetEventLabel" OnChange="NotifyChange" />
-            }
-        </div>
-    }
 
     <div class="mb-2">
         <h6 class="small fw-bold">@ConstraintsHeading</h6>
