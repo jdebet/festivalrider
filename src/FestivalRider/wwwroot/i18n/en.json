@@ -590,6 +590,10 @@
 
   "page.runningOrder.venueDefaults.sectionTitle": "Venue defaults",
   "page.runningOrder.venueDefaults.saveBtn": "Save venue defaults",
+  "page.runningOrder.venueDefaults.restoreBtn": "Restore defaults",
+  "confirm.restoreVenueDefaults.title": "Restore venue defaults?",
+  "confirm.restoreVenueDefaults.message": "This will reset all venue times to the application defaults. Any custom times will be lost.",
+  "confirm.restoreVenueDefaults.label": "Restore",
 
   "page.runningOrder.template.title": "Timing template",
   "page.runningOrder.template.addEntryBtn": "+ Add entry",

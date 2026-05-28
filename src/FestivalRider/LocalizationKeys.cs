@@ -232,6 +232,7 @@ public static class LocalizationKeys
             {
                 public const string SectionTitle = "page.runningOrder.venueDefaults.sectionTitle";
                 public const string SaveBtn = "page.runningOrder.venueDefaults.saveBtn";
+                public const string RestoreBtn = "page.runningOrder.venueDefaults.restoreBtn";
             }
             public static class Template
             {
@@ -617,6 +618,12 @@ public static class LocalizationKeys
             public const string Title = "confirm.bundleMerge.title";
             public const string Label = "confirm.bundleMerge.label";
             public const string Message = "confirm.bundleMerge.message";
+        }
+        public static class RestoreVenueDefaults
+        {
+            public const string Title = "confirm.restoreVenueDefaults.title";
+            public const string Message = "confirm.restoreVenueDefaults.message";
+            public const string Label = "confirm.restoreVenueDefaults.label";
         }
     }
 

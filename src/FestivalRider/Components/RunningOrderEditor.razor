@@ -56,20 +56,20 @@
 
         @* ── Row 1: Venue bounds + curfews ── *@
         <div class="d-flex flex-wrap gap-2 align-items-center border-start border-3 ps-2" style="border-color: #198754 !important;">
-            <TimeChipControl Icon="🟢" Label="@VenueOpenLabel" Value="@(Order.VenueOpenTimeOverride ?? Show.VenueOpenTime)" BgColor="#d1e7dd" BaseDate="BaseDate" OnChange="v => { Order.VenueOpenTimeOverride = v; Notify(); }" />
-            <TimeChipControl Icon="🔴" Label="@VenueCloseLabel" Value="@(Order.VenueCloseTimeOverride ?? Show.VenueCloseTime)" BgColor="#f8d7da" BaseDate="BaseDate" OnChange="v => { Order.VenueCloseTimeOverride = v; Notify(); }" />
+            <TimeChipControl Icon="🟢" Label="@VenueOpenLabel" Value="@(Order.VenueOpenTimeOverride ?? Show.VenueOpenTime)" BgColor="#dde9e4" BaseDate="BaseDate" OnChange="v => { Order.VenueOpenTimeOverride = v; Notify(); }" />
+            <TimeChipControl Icon="🔴" Label="@VenueCloseLabel" Value="@(Order.VenueCloseTimeOverride ?? Show.VenueCloseTime)" BgColor="#ede3e4" BaseDate="BaseDate" OnChange="v => { Order.VenueCloseTimeOverride = v; Notify(); }" />
             <span class="text-muted" style="font-size:10px;">│</span>
-            <TimeChipControl Icon="🔇" Label="@SoundCurfewLabel" Value="@(Order.SoundCurfewTimeOverride ?? Show.SoundCurfewTime)" BgColor="#f8d7da" BaseDate="BaseDate" OnChange="v => { Order.SoundCurfewTimeOverride = v; Notify(); }" />
-            <TimeChipControl Icon="🚫" Label="@BackstageCurfewLabel" Value="@(Order.BackstageCurfewTimeOverride ?? Show.BackstageCurfewTime)" BgColor="#f8d7da" BaseDate="BaseDate" OnChange="v => { Order.BackstageCurfewTimeOverride = v; Notify(); }" />
+            <TimeChipControl Icon="🔇" Label="@SoundCurfewLabel" Value="@(Order.SoundCurfewTimeOverride ?? Show.SoundCurfewTime)" BgColor="#ede3e4" BaseDate="BaseDate" OnChange="v => { Order.SoundCurfewTimeOverride = v; Notify(); }" />
+            <TimeChipControl Icon="🚫" Label="@BackstageCurfewLabel" Value="@(Order.BackstageCurfewTimeOverride ?? Show.BackstageCurfewTime)" BgColor="#ede3e4" BaseDate="BaseDate" OnChange="v => { Order.BackstageCurfewTimeOverride = v; Notify(); }" />
         </div>
 
         @* ── Row 2: Schedule anchors + timing scalars ── *@
         <div class="d-flex flex-wrap gap-2 align-items-center border-start border-3 ps-2" style="border-color: #0d6efd !important;">
-            <TimeChipControl Icon="🔧" Label="@TechnicalGetInLabel" Value="@(Order.TechnicalGetInTimeOverride ?? Show.TechnicalGetInTime)" BgColor="#cfe2ff" BaseDate="BaseDate" OnChange="v => { Order.TechnicalGetInTimeOverride = v; Notify(); }" />
-            <TimeChipControl Icon="🚪" Label="@DoorsLabel" Value="@(Order.DoorsOpeningTimeOverride ?? Show.DoorsOpeningTime)" BgColor="#cfe2ff" BaseDate="BaseDate" OnChange="v => { Order.DoorsOpeningTimeOverride = v; Notify(); }" />
-            <TimeChipControl Icon="🎤" Label="@FirstShowLabel" Value="@(Order.FirstShowTimeOverride ?? Show.FirstShowTime)" BgColor="#cfe2ff" BaseDate="BaseDate" OnChange="v => { Order.FirstShowTimeOverride = v; Notify(); }" />
+            <TimeChipControl Icon="🔧" Label="@TechnicalGetInLabel" Value="@(Order.TechnicalGetInTimeOverride ?? Show.TechnicalGetInTime)" BgColor="#dce6f0" BaseDate="BaseDate" OnChange="v => { Order.TechnicalGetInTimeOverride = v; Notify(); }" />
+            <TimeChipControl Icon="🚪" Label="@DoorsLabel" Value="@(Order.DoorsOpeningTimeOverride ?? Show.DoorsOpeningTime)" BgColor="#dce6f0" BaseDate="BaseDate" OnChange="v => { Order.DoorsOpeningTimeOverride = v; Notify(); }" />
+            <TimeChipControl Icon="🎤" Label="@FirstShowLabel" Value="@(Order.FirstShowTimeOverride ?? Show.FirstShowTime)" BgColor="#dce6f0" BaseDate="BaseDate" OnChange="v => { Order.FirstShowTimeOverride = v; Notify(); }" />
             <span class="text-muted" style="font-size:10px;">│</span>
-            <span class="d-inline-flex align-items-center gap-1 rounded-pill border px-2 py-1" style="background:#e7f1ff; border-color:#9ec5fe !important; font-size:13px; white-space:nowrap;">
+            <span class="d-inline-flex align-items-center gap-1 rounded-pill border px-2 py-1" style="background:#dce6f0; border-color:#c3d4e8 !important; font-size:13px; white-space:nowrap;">
                 <span>⏱</span>
                 <span class="text-muted fw-semibold">@BreakLabel</span>
                 <span style="width:4px;"></span>
@@ -92,7 +92,7 @@
                         @onclick="() => OnOverrideInt((Order.BreakTimeMinutesOverride ?? Show.BreakTimeMinutes) + 5, v => Order.BreakTimeMinutesOverride = v)">+</button>
                 <span class="text-muted" style="font-size:11px;">min</span>
             </span>
-            <span class="d-inline-flex align-items-center gap-1 rounded-pill border px-2 py-1" style="background:#e7f1ff; border-color:#9ec5fe !important; font-size:13px; white-space:nowrap;">
+            <span class="d-inline-flex align-items-center gap-1 rounded-pill border px-2 py-1" style="background:#dce6f0; border-color:#c3d4e8 !important; font-size:13px; white-space:nowrap;">
                 <span>↔</span>
                 <span class="text-muted fw-semibold">@GapLabel</span>
                 <span style="width:4px;"></span>
@@ -119,9 +119,9 @@
 
         @* ── Row 3: Catering ── *@
         <div class="d-flex flex-wrap gap-2 align-items-center border-start border-3 ps-2" style="border-color: #6f42c1 !important;">
-            <TimeChipControl Icon="🍳" Label="@BreakfastLabel" Value="@(Order.BreakfastHoursOverride?.Start ?? Show.BreakfastHours?.Start)" BgColor="#e8d5f5" BaseDate="BaseDate" OnChange="v => { Order.BreakfastHoursOverride ??= new TimeSlot(); Order.BreakfastHoursOverride.Start = v ?? BaseDate; Notify(); }" />
-            <TimeChipControl Icon="🥗" Label="@LunchLabel" Value="@(Order.LunchHoursOverride?.Start ?? Show.LunchHours?.Start)" BgColor="#e8d5f5" BaseDate="BaseDate" OnChange="v => { Order.LunchHoursOverride ??= new TimeSlot(); Order.LunchHoursOverride.Start = v ?? BaseDate; Notify(); }" />
-            <TimeChipControl Icon="🍽" Label="@DinnerLabel" Value="@(Order.DinnerHoursOverride?.Start ?? Show.DinnerHours?.Start)" BgColor="#e8d5f5" BaseDate="BaseDate" OnChange="v => { Order.DinnerHoursOverride ??= new TimeSlot(); Order.DinnerHoursOverride.Start = v ?? BaseDate; Notify(); }" />
+            <TimeChipControl Icon="🍳" Label="@BreakfastLabel" Value="@(Order.BreakfastHoursOverride?.Start ?? Show.BreakfastHours?.Start)" BgColor="#e5e0eb" BaseDate="BaseDate" OnChange="v => { Order.BreakfastHoursOverride ??= new TimeSlot(); Order.BreakfastHoursOverride.Start = v ?? BaseDate; Notify(); }" />
+            <TimeChipControl Icon="🥗" Label="@LunchLabel" Value="@(Order.LunchHoursOverride?.Start ?? Show.LunchHours?.Start)" BgColor="#e5e0eb" BaseDate="BaseDate" OnChange="v => { Order.LunchHoursOverride ??= new TimeSlot(); Order.LunchHoursOverride.Start = v ?? BaseDate; Notify(); }" />
+            <TimeChipControl Icon="🍽" Label="@DinnerLabel" Value="@(Order.DinnerHoursOverride?.Start ?? Show.DinnerHours?.Start)" BgColor="#e5e0eb" BaseDate="BaseDate" OnChange="v => { Order.DinnerHoursOverride ??= new TimeSlot(); Order.DinnerHoursOverride.Start = v ?? BaseDate; Notify(); }" />
         </div>
 
     </div>

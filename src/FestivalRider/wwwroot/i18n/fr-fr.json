@@ -590,6 +590,10 @@
 
   "page.runningOrder.venueDefaults.sectionTitle": "Valeurs par défaut de la salle",
   "page.runningOrder.venueDefaults.saveBtn": "Enregistrer les valeurs par défaut",
+  "page.runningOrder.venueDefaults.restoreBtn": "Restaurer les valeurs par défaut",
+  "confirm.restoreVenueDefaults.title": "Restaurer les valeurs par défaut ?",
+  "confirm.restoreVenueDefaults.message": "Cela réinitialisera toutes les heures de salle aux valeurs par défaut de l'application. Toute heure personnalisée sera perdue.",
+  "confirm.restoreVenueDefaults.label": "Restaurer",
 
   "page.runningOrder.template.title": "Modèle de timing",
   "page.runningOrder.template.addEntryBtn": "+ Ajouter entrée",

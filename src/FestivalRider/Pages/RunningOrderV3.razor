@@ -40,20 +40,21 @@
     <div class="d-flex flex-column gap-2">
         @* ── Row 1: Venue bounds + curfews ── *@
         <div class="d-flex flex-wrap gap-2 align-items-center border-start border-3 ps-2" style="border-color: #198754 !important;">
-            <TimeChipControl Icon="🟢" Label="@Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.VenueOpenLabel)" Value="_show.VenueOpenTime" OnChange="v => { _show.VenueOpenTime = v; }" />
-            <TimeChipControl Icon="🔴" Label="@Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.VenueCloseLabel)" Value="_show.VenueCloseTime" OnChange="v => { _show.VenueCloseTime = v; }" />
+            <TimeChipControl Icon="🟢" Label="@Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.VenueOpenLabel)" Value="_show.VenueOpenTime" BgColor="#dde9e4" OnChange="v => { _show.VenueOpenTime = v; }" />
+            <TimeChipControl Icon="🔴" Label="@Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.VenueCloseLabel)" Value="_show.VenueCloseTime" BgColor="#ede3e4" OnChange="v => { _show.VenueCloseTime = v; }" />
             <span class="text-muted" style="font-size:10px;">│</span>
-            <TimeChipControl Icon="🔇" Label="@Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.SoundCurfewLabel)" Value="_show.SoundCurfewTime" OnChange="v => { _show.SoundCurfewTime = v; }" />
-            <TimeChipControl Icon="🚫" Label="@Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.BackstageCurfewLabel)" Value="_show.BackstageCurfewTime" OnChange="v => { _show.BackstageCurfewTime = v; }" />
+            <TimeChipControl Icon="🔇" Label="@Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.SoundCurfewLabel)" Value="_show.SoundCurfewTime" BgColor="#ede3e4" OnChange="v => { _show.SoundCurfewTime = v; }" />
+            <TimeChipControl Icon="🚫" Label="@Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.BackstageCurfewLabel)" Value="_show.BackstageCurfewTime" BgColor="#ede3e4" OnChange="v => { _show.BackstageCurfewTime = v; }" />
         </div>
         @* ── Row 2: Schedule anchors ── *@
         <div class="d-flex flex-wrap gap-2 align-items-center border-start border-3 ps-2" style="border-color: #0d6efd !important;">
-            <TimeChipControl Icon="🔧" Label="@Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.TechnicalGetInLabel)" Value="_show.TechnicalGetInTime" OnChange="v => { _show.TechnicalGetInTime = v; }" />
-            <TimeChipControl Icon="🚪" Label="@Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.DoorsLabel)" Value="_show.DoorsOpeningTime" OnChange="v => { _show.DoorsOpeningTime = v; }" />
-            <TimeChipControl Icon="🎤" Label="@Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.FirstShowLabel)" Value="_show.FirstShowTime" OnChange="v => { _show.FirstShowTime = v; }" />
+            <TimeChipControl Icon="🔧" Label="@Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.TechnicalGetInLabel)" Value="_show.TechnicalGetInTime" BgColor="#dce6f0" OnChange="v => { _show.TechnicalGetInTime = v; }" />
+            <TimeChipControl Icon="🚪" Label="@Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.DoorsLabel)" Value="_show.DoorsOpeningTime" BgColor="#dce6f0" OnChange="v => { _show.DoorsOpeningTime = v; }" />
+            <TimeChipControl Icon="🎤" Label="@Localization.T(LocalizationKeys.Page.RunningOrder.Toolbar.FirstShowLabel)" Value="_show.FirstShowTime" BgColor="#dce6f0" OnChange="v => { _show.FirstShowTime = v; }" />
         </div>
-        <div>
+        <div class="d-flex gap-2">
             <button class="btn btn-sm btn-primary" @onclick="SaveVenueDefaults">@Localization.T(LocalizationKeys.Page.RunningOrder.VenueDefaults.SaveBtn)</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => _showRestoreConfirm = true">@Localization.T(LocalizationKeys.Page.RunningOrder.VenueDefaults.RestoreBtn)</button>
         </div>
     </div>
 </RiderSection>
@@ -121,6 +122,13 @@ else
                         CancelLabel="@Localization.T(LocalizationKeys.Page.RunningOrder.Create.CancelLabel)"
                         CreateLabel="@Localization.T(LocalizationKeys.Page.RunningOrder.Create.CreateLabel)" />
 
+<ConfirmDialog Show="_showRestoreConfirm"
+               Title="@Localization.T(LocalizationKeys.Confirm.RestoreVenueDefaults.Title)"
+               Message="@Localization.T(LocalizationKeys.Confirm.RestoreVenueDefaults.Message)"
+               ConfirmLabel="@Localization.T(LocalizationKeys.Confirm.RestoreVenueDefaults.Label)"
+               OnConfirm="RestoreVenueDefaults"
+               OnCancel="() => _showRestoreConfirm = false" />
+
 <ConfirmDialog Show="_pendingDeleteId.HasValue"
                Title="@Localization.T("confirm.deleteRunningOrder.title")"
                Message="@_deleteMessage"
@@ -131,6 +139,7 @@ else
 @code {
     private ShowData _show = new();
     private bool _showCreateModal;
+    private bool _showRestoreConfirm;
     private Guid? _pendingDeleteId;
     private string _deleteMessage = string.Empty;
 
@@ -241,6 +250,21 @@ else
 
     private void SaveVenueDefaults()
     {
+        BandService.UpdateShow(_show);
+        Toasts.Show(Localization.T(LocalizationKeys.Toast.Settings.ShowDetailsSaved), ToastLevel.Success);
+    }
+
+    private void RestoreVenueDefaults()
+    {
+        var defaults = new ShowData();
+        _show.VenueOpenTime = defaults.VenueOpenTime;
+        _show.VenueCloseTime = defaults.VenueCloseTime;
+        _show.TechnicalGetInTime = defaults.TechnicalGetInTime;
+        _show.DoorsOpeningTime = defaults.DoorsOpeningTime;
+        _show.FirstShowTime = defaults.FirstShowTime;
+        _show.SoundCurfewTime = defaults.SoundCurfewTime;
+        _show.BackstageCurfewTime = defaults.BackstageCurfewTime;
+        _showRestoreConfirm = false;
         BandService.UpdateShow(_show);
         Toasts.Show(Localization.T(LocalizationKeys.Toast.Settings.ShowDetailsSaved), ToastLevel.Success);
     }
