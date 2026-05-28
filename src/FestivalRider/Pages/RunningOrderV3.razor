@@ -271,27 +271,15 @@ else
             <span>@icon</span>
             <span class="text-muted fw-semibold">@label</span>
             <span style="width:4px;"></span>
-            @if (isEditing)
-            {
-                <input type="time" class="fr-inline-edit fw-bold text-dark"
-                       style="min-width:36px; text-align:center; cursor:pointer; line-height:1;"
-                       @ref="_venueChipInputRef"
-                       value="@timeStr"
-                       @onchange="e => {
-                           if (e.Value is string s && TimeOnly.TryParse(s, out var t))
-                               onChange(DateTime.Today.AddDays(dayOffset).Add(t.ToTimeSpan()));
-                           else
-                               onChange(null);
-                           _editingVenueChipKey = null;
-                       }"
-                       @onblur="() => _editingVenueChipKey = null"
-                       @onkeydown="HandleVenueChipKeyDown" />
-            }
-            else
-            {
-                <span class="fw-bold text-dark" style="min-width:36px; text-align:center; cursor:pointer; line-height:1;"
-                      @onclick="() => StartEditingVenueChip(key)">@(value.HasValue ? timeStr : "--:--")</span>
-            }
+            <input type="time" class="fr-inline-edit fw-bold text-dark"
+                   style="min-width:36px; text-align:center; cursor:pointer; line-height:1;"
+                   value="@timeStr"
+                   @onchange="e => {
+                       if (e.Value is string s && TimeOnly.TryParse(s, out var t))
+                           onChange(DateTime.Today.AddDays(dayOffset).Add(t.ToTimeSpan()));
+                       else
+                           onChange(null);
+                   }" />
             <span class="text-muted" style="font-size:10px;margin:0 2px;">·</span>
             <button type="button" class="btn btn-link p-0 text-muted lh-1"
                     style="font-size:13px; text-decoration:none; min-width:16px;"
