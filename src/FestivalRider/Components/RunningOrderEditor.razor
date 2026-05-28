@@ -310,7 +310,6 @@
     private int _breakEditValue;
     private int _gapEditValue;
     private string? _editingTimeChipKey;
-    private string _timeEditValue = string.Empty;
 
     private ElementReference _breakInputRef;
     private ElementReference _gapInputRef;
@@ -557,18 +556,27 @@
             <span>@icon</span>
             <span class="text-muted fw-semibold">@label</span>
             <span style="width:4px;"></span>
-            <input type="time" class="fr-inline-edit fw-bold text-dark"
-                   style="min-width:36px; text-align:center; cursor:pointer; line-height:1;"
-                   @ref="_timeChipInputRef"
-                   value="@timeStr"
-                   @onchange="e => {
-                       if (e.Value is string s && TimeOnly.TryParse(s, out var t))
-                           onChange(BaseDate.Date.AddDays(dayOffset).Add(t.ToTimeSpan()));
-                       else
-                           onChange(null);
-                       SaveAndClearTimeEdit();
-                   }"
-                   @onblur="SaveAndClearTimeEdit" />
+            @if (isEditing)
+            {
+                <input type="time" class="fr-inline-edit fw-bold text-dark"
+                       style="min-width:36px; text-align:center; cursor:pointer; line-height:1;"
+                       @ref="_timeChipInputRef"
+                       value="@timeStr"
+                       @onchange="e => {
+                           if (e.Value is string s && TimeOnly.TryParse(s, out var t))
+                               onChange(BaseDate.Date.AddDays(dayOffset).Add(t.ToTimeSpan()));
+                           else
+                               onChange(null);
+                           SaveAndClearTimeEdit();
+                       }"
+                       @onblur="SaveAndClearTimeEdit"
+                       @onkeydown="HandleTimeChipKeyDown" />
+            }
+            else
+            {
+                <span class="fw-bold text-dark" style="min-width:36px; text-align:center; cursor:pointer; line-height:1;"
+                      @onclick="() => StartEditingTimeChip(key)">@(value.HasValue ? timeStr : "--:--")</span>
+            }
             <span class="text-muted" style="font-size:10px;margin:0 2px;">·</span>
             <button type="button" class="btn btn-link p-0 text-muted lh-1"
                     style="font-size:13px; text-decoration:none; min-width:16px;"
