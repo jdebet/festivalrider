@@ -10,7 +10,7 @@
         text-align: center; min-width: 36px; width: auto; color: inherit; font-weight: 700;
         -webkit-appearance: none; -moz-appearance: textfield; appearance: none; box-sizing: content-box;
     }
-    .fr-inline-edit::-webkit-calendar-picker-indicator { display: none; -webkit-appearance: none; }
+    /* Time picker indicator is now visible for easier editing */
     .fr-inline-edit::-webkit-inner-spin-button, .fr-inline-edit::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
     .fr-inline-edit::-webkit-datetime-edit { padding: 0; }
     .fr-inline-edit::-webkit-datetime-edit-fields-wrapper { padding: 0; }
@@ -239,6 +239,22 @@ else
 
     private string? _editingVenueChipKey;
     private ElementReference _venueChipInputRef;
+    private bool _focusVenueChipPending;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusVenueChipPending)
+        {
+            _focusVenueChipPending = false;
+            try { await _venueChipInputRef.FocusAsync(); } catch { }
+        }
+    }
+
+    private void StartEditingVenueChip(string key)
+    {
+        _editingVenueChipKey = key;
+        _focusVenueChipPending = true;
+    }
 
     private void HandleVenueChipKeyDown(KeyboardEventArgs e)
     {
@@ -255,6 +271,7 @@ else
             <span>@icon</span>
             <span class="text-muted fw-semibold">@label</span>
             <span style="width:4px;"></span>
+            <span class="text-muted" style="cursor:pointer;" @onclick="() => StartEditingVenueChip(key)">🕐</span>
             @if (isEditing)
             {
                 <input type="time" class="fr-inline-edit"
@@ -273,8 +290,9 @@ else
             else
             {
                 <span class="fw-bold text-dark" style="min-width:36px; text-align:center; cursor:pointer; line-height:1;"
-                      @onclick="() => _editingVenueChipKey = key">@(value.HasValue ? timeStr : "--:--")</span>
+                      @onclick="() => StartEditingVenueChip(key)">@(value.HasValue ? timeStr : "--:--")</span>
             }
+            <span class="text-muted" style="font-size:10px;margin:0 2px;">│</span>
             <button type="button" class="btn btn-link p-0 text-muted lh-1"
                     style="font-size:13px; text-decoration:none; min-width:16px;"
                     @onclick="() => { if (value.HasValue) onChange(value.Value.AddMinutes(-15)); }"
