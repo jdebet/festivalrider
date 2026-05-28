@@ -56,18 +56,18 @@
 
         @* ── Row 1: Venue bounds + curfews ── *@
         <div class="d-flex flex-wrap gap-2 align-items-center border-start border-3 ps-2" style="border-color: #198754 !important;">
-            @TimeChip("venue-open", "🟢", VenueOpenLabel, Order.VenueOpenTimeOverride ?? Show.VenueOpenTime, "#d1e7dd", v => { Order.VenueOpenTimeOverride = v; Notify(); })
-            @TimeChip("venue-close", "🔴", VenueCloseLabel, Order.VenueCloseTimeOverride ?? Show.VenueCloseTime, "#f8d7da", v => { Order.VenueCloseTimeOverride = v; Notify(); })
+            <TimeChipControl Icon="🟢" Label="@VenueOpenLabel" Value="@(Order.VenueOpenTimeOverride ?? Show.VenueOpenTime)" BgColor="#d1e7dd" BaseDate="BaseDate" OnChange="v => { Order.VenueOpenTimeOverride = v; Notify(); }" />
+            <TimeChipControl Icon="🔴" Label="@VenueCloseLabel" Value="@(Order.VenueCloseTimeOverride ?? Show.VenueCloseTime)" BgColor="#f8d7da" BaseDate="BaseDate" OnChange="v => { Order.VenueCloseTimeOverride = v; Notify(); }" />
             <span class="text-muted" style="font-size:10px;">│</span>
-            @TimeChip("sound-curfew", "🔇", SoundCurfewLabel, Order.SoundCurfewTimeOverride ?? Show.SoundCurfewTime, "#f8d7da", v => { Order.SoundCurfewTimeOverride = v; Notify(); })
-            @TimeChip("backstage-curfew", "🚫", BackstageCurfewLabel, Order.BackstageCurfewTimeOverride ?? Show.BackstageCurfewTime, "#f8d7da", v => { Order.BackstageCurfewTimeOverride = v; Notify(); })
+            <TimeChipControl Icon="🔇" Label="@SoundCurfewLabel" Value="@(Order.SoundCurfewTimeOverride ?? Show.SoundCurfewTime)" BgColor="#f8d7da" BaseDate="BaseDate" OnChange="v => { Order.SoundCurfewTimeOverride = v; Notify(); }" />
+            <TimeChipControl Icon="🚫" Label="@BackstageCurfewLabel" Value="@(Order.BackstageCurfewTimeOverride ?? Show.BackstageCurfewTime)" BgColor="#f8d7da" BaseDate="BaseDate" OnChange="v => { Order.BackstageCurfewTimeOverride = v; Notify(); }" />
         </div>
 
         @* ── Row 2: Schedule anchors + timing scalars ── *@
         <div class="d-flex flex-wrap gap-2 align-items-center border-start border-3 ps-2" style="border-color: #0d6efd !important;">
-            @TimeChip("tech-getin", "🔧", TechnicalGetInLabel, Order.TechnicalGetInTimeOverride ?? Show.TechnicalGetInTime, "#cfe2ff", v => { Order.TechnicalGetInTimeOverride = v; Notify(); })
-            @TimeChip("doors", "🚪", DoorsLabel, Order.DoorsOpeningTimeOverride ?? Show.DoorsOpeningTime, "#cfe2ff", v => { Order.DoorsOpeningTimeOverride = v; Notify(); })
-            @TimeChip("first-show", "🎤", FirstShowLabel, Order.FirstShowTimeOverride ?? Show.FirstShowTime, "#cfe2ff", v => { Order.FirstShowTimeOverride = v; Notify(); })
+            <TimeChipControl Icon="🔧" Label="@TechnicalGetInLabel" Value="@(Order.TechnicalGetInTimeOverride ?? Show.TechnicalGetInTime)" BgColor="#cfe2ff" BaseDate="BaseDate" OnChange="v => { Order.TechnicalGetInTimeOverride = v; Notify(); }" />
+            <TimeChipControl Icon="🚪" Label="@DoorsLabel" Value="@(Order.DoorsOpeningTimeOverride ?? Show.DoorsOpeningTime)" BgColor="#cfe2ff" BaseDate="BaseDate" OnChange="v => { Order.DoorsOpeningTimeOverride = v; Notify(); }" />
+            <TimeChipControl Icon="🎤" Label="@FirstShowLabel" Value="@(Order.FirstShowTimeOverride ?? Show.FirstShowTime)" BgColor="#cfe2ff" BaseDate="BaseDate" OnChange="v => { Order.FirstShowTimeOverride = v; Notify(); }" />
             <span class="text-muted" style="font-size:10px;">│</span>
             <span class="d-inline-flex align-items-center gap-1 rounded-pill border px-2 py-1" style="background:#e7f1ff; border-color:#9ec5fe !important; font-size:13px; white-space:nowrap;">
                 <span>⏱</span>
@@ -119,9 +119,9 @@
 
         @* ── Row 3: Catering ── *@
         <div class="d-flex flex-wrap gap-2 align-items-center border-start border-3 ps-2" style="border-color: #6f42c1 !important;">
-            @TimeChip("breakfast", "🍳", BreakfastLabel, Order.BreakfastHoursOverride?.Start ?? Show.BreakfastHours?.Start, "#e8d5f5", v => { Order.BreakfastHoursOverride ??= new TimeSlot(); Order.BreakfastHoursOverride.Start = v ?? BaseDate; Notify(); })
-            @TimeChip("lunch", "🥗", LunchLabel, Order.LunchHoursOverride?.Start ?? Show.LunchHours?.Start, "#e8d5f5", v => { Order.LunchHoursOverride ??= new TimeSlot(); Order.LunchHoursOverride.Start = v ?? BaseDate; Notify(); })
-            @TimeChip("dinner", "🍽", DinnerLabel, Order.DinnerHoursOverride?.Start ?? Show.DinnerHours?.Start, "#e8d5f5", v => { Order.DinnerHoursOverride ??= new TimeSlot(); Order.DinnerHoursOverride.Start = v ?? BaseDate; Notify(); })
+            <TimeChipControl Icon="🍳" Label="@BreakfastLabel" Value="@(Order.BreakfastHoursOverride?.Start ?? Show.BreakfastHours?.Start)" BgColor="#e8d5f5" BaseDate="BaseDate" OnChange="v => { Order.BreakfastHoursOverride ??= new TimeSlot(); Order.BreakfastHoursOverride.Start = v ?? BaseDate; Notify(); }" />
+            <TimeChipControl Icon="🥗" Label="@LunchLabel" Value="@(Order.LunchHoursOverride?.Start ?? Show.LunchHours?.Start)" BgColor="#e8d5f5" BaseDate="BaseDate" OnChange="v => { Order.LunchHoursOverride ??= new TimeSlot(); Order.LunchHoursOverride.Start = v ?? BaseDate; Notify(); }" />
+            <TimeChipControl Icon="🍽" Label="@DinnerLabel" Value="@(Order.DinnerHoursOverride?.Start ?? Show.DinnerHours?.Start)" BgColor="#e8d5f5" BaseDate="BaseDate" OnChange="v => { Order.DinnerHoursOverride ??= new TimeSlot(); Order.DinnerHoursOverride.Start = v ?? BaseDate; Notify(); }" />
         </div>
 
     </div>
@@ -309,15 +309,10 @@
     private bool _editingGap = false;
     private int _breakEditValue;
     private int _gapEditValue;
-    private string? _editingTimeChipKey;
-    private string _timeEditValue = string.Empty;
-
     private ElementReference _breakInputRef;
     private ElementReference _gapInputRef;
-    private ElementReference _timeChipInputRef;
     private bool _focusBreakPending;
     private bool _focusGapPending;
-    private bool _focusTimeChipPending;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -330,11 +325,6 @@
         {
             _focusGapPending = false;
             try { await _gapInputRef.FocusAsync(); } catch { /* ref not yet bound */ }
-        }
-        if (_focusTimeChipPending)
-        {
-            _focusTimeChipPending = false;
-            try { await _timeChipInputRef.FocusAsync(); } catch { /* ref not yet bound */ }
         }
     }
 
@@ -490,25 +480,6 @@
 
     private void Notify() => OnChange.InvokeAsync();
 
-    private void SaveAndClearTimeEdit()
-    {
-        _editingTimeChipKey = null;
-        Notify();
-    }
-
-    private void HandleTimeChipKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Escape")
-            _editingTimeChipKey = null;
-    }
-
-    private void StartEditingTimeChip(string key)
-    {
-        // Save any existing edit first
-        _editingTimeChipKey = key;
-        _focusTimeChipPending = true;
-    }
-
     private void SaveBreakAndClear()
     {
         OnOverrideInt(_breakEditValue, v => Order.BreakTimeMinutesOverride = v);
@@ -547,41 +518,4 @@
             SaveGapAndClear();
     }
 
-    private RenderFragment TimeChip(string key, string icon, string label, DateTime? value, string bgColor, Action<DateTime?> onChange) => __builder =>
-    {
-        var timeStr = value?.ToString("HH:mm") ?? string.Empty;
-        var dayOffset = value.HasValue ? (int)(value.Value.Date - BaseDate.Date).TotalDays : 0;
-        var isEditing = _editingTimeChipKey == key;
-        <span class="d-inline-flex align-items-center gap-1 rounded-pill border px-2 py-1"
-              style="background:@bgColor; border-color: rgba(0,0,0,0.12) !important; font-size:13px; white-space:nowrap;">
-            <span>@icon</span>
-            <span class="text-muted fw-semibold">@label</span>
-            <span style="width:4px;"></span>
-            <input type="time" class="fr-inline-edit fw-bold text-dark"
-                   style="min-width:36px; text-align:center; cursor:pointer; line-height:1;"
-                   @ref="_timeChipInputRef"
-                   value="@timeStr"
-                   @onchange="e => {
-                       if (e.Value is string s && TimeOnly.TryParse(s, out var t))
-                           onChange(BaseDate.Date.AddDays(dayOffset).Add(t.ToTimeSpan()));
-                       else
-                           onChange(null);
-                       SaveAndClearTimeEdit();
-                   }"
-                   @onblur="SaveAndClearTimeEdit" />
-            <span class="text-muted" style="font-size:10px;margin:0 2px;">·</span>
-            <button type="button" class="btn btn-link p-0 text-muted lh-1"
-                    style="font-size:13px; text-decoration:none; min-width:16px;"
-                    @onclick="() => { if (value.HasValue) onChange(value.Value.AddMinutes(-15)); }"
-                    disabled="@(!value.HasValue)">−</button>
-            <button type="button" class="btn btn-link p-0 text-muted lh-1"
-                    style="font-size:13px; text-decoration:none; min-width:16px;"
-                    @onclick="() => { if (value.HasValue) onChange(value.Value.AddMinutes(15)); }"
-                    disabled="@(!value.HasValue)">+</button>
-            @if (dayOffset > 0)
-            {
-                <span class="badge bg-secondary" style="font-size:9px; padding:2px 5px;">+@dayOffset d</span>
-            }
-        </span>
-    };
 }

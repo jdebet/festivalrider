@@ -1,0 +1,55 @@
+<span class="d-inline-flex align-items-center gap-1 rounded-pill border px-2 py-1"
+      style="background:@BgColor; border-color: rgba(0,0,0,0.12) !important; font-size:13px; white-space:nowrap; overflow:visible;">
+    <span>@Icon</span>
+    <span class="text-muted fw-semibold">@Label</span>
+    <span style="width:4px;"></span>
+    <input type="time" class="fr-inline-edit fw-bold text-dark"
+           style="min-width:36px; text-align:center; cursor:pointer; line-height:1;"
+           value="@_timeStr"
+           @onchange="OnTimeChanged" />
+    <span class="text-muted" style="font-size:10px;margin:0 2px;">·</span>
+    <button type="button" class="btn btn-link p-0 text-muted lh-1"
+            style="font-size:13px; text-decoration:none; min-width:16px;"
+            @onclick="Decrement"
+            disabled="@(!Value.HasValue)">−</button>
+    <button type="button" class="btn btn-link p-0 text-muted lh-1"
+            style="font-size:13px; text-decoration:none; min-width:16px;"
+            @onclick="Increment"
+            disabled="@(!Value.HasValue)">+</button>
+    @if (_dayOffset > 0)
+    {
+        <span class="badge bg-secondary" style="font-size:9px; padding:2px 5px;">+@_dayOffset d</span>
+    }
+</span>
+
+@code {
+    [Parameter] public string Icon { get; set; } = string.Empty;
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public DateTime? Value { get; set; }
+    [Parameter] public EventCallback<DateTime?> OnChange { get; set; }
+    [Parameter] public string BgColor { get; set; } = "#e9ecef";
+    [Parameter] public DateTime BaseDate { get; set; } = DateTime.Today;
+
+    private string _timeStr => Value?.ToString("HH:mm") ?? string.Empty;
+    private int _dayOffset => Value.HasValue ? (int)(Value.Value.Date - BaseDate.Date).TotalDays : 0;
+
+    private async Task OnTimeChanged(ChangeEventArgs e)
+    {
+        if (e.Value is string s && TimeOnly.TryParse(s, out var t))
+            await OnChange.InvokeAsync(BaseDate.Date.AddDays(_dayOffset).Add(t.ToTimeSpan()));
+        else
+            await OnChange.InvokeAsync(null);
+    }
+
+    private async Task Decrement()
+    {
+        if (Value.HasValue)
+            await OnChange.InvokeAsync(Value.Value.AddMinutes(-15));
+    }
+
+    private async Task Increment()
+    {
+        if (Value.HasValue)
+            await OnChange.InvokeAsync(Value.Value.AddMinutes(15));
+    }
+}
