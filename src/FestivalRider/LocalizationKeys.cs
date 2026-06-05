@@ -67,6 +67,48 @@ public static class LocalizationKeys
             }
         }
 
+        public static class BandsV3
+        {
+            public const string Title = "page.bandsV3.title";
+            public const string FilterPlaceholder = "page.bandsV3.filterPlaceholder";
+            public const string Lock = "page.bandsV3.lock";
+            public const string Unlock = "page.bandsV3.unlock";
+            public const string EditDetail = "page.bandsV3.editDetail";
+            public const string Delete = "page.bandsV3.delete";
+            public static class Sort
+            {
+                public const string Label = "page.bandsV3.sort.label";
+                public const string NameAsc = "page.bandsV3.sort.nameAsc";
+                public const string NameDesc = "page.bandsV3.sort.nameDesc";
+                public const string TravelParty = "page.bandsV3.sort.travelParty";
+                public const string CreatedAt = "page.bandsV3.sort.createdAt";
+                public const string UpdatedAt = "page.bandsV3.sort.updatedAt";
+            }
+            public static class AddRow
+            {
+                public const string SubmitBtn = "page.bandsV3.addRow.submitBtn";
+                public const string NamePlaceholder = "page.bandsV3.addRow.namePlaceholder";
+            }
+            public static class Quickmarks
+            {
+                public const string Heading = "page.bandsV3.quickmarks.heading";
+            }
+            public static class Group
+            {
+                public const string Band = "page.bandsV3.group.band";
+                public const string Contacts = "page.bandsV3.group.contacts";
+                public const string TravelParty = "page.bandsV3.group.travelParty";
+                public const string Cabling = "page.bandsV3.group.cabling";
+                public const string Lighting = "page.bandsV3.group.lighting";
+                public const string Power = "page.bandsV3.group.power";
+                public const string Foh = "page.bandsV3.group.foh";
+                public const string Monitors = "page.bandsV3.group.monitors";
+                public const string Stage = "page.bandsV3.group.stage";
+                public const string TechNotes = "page.bandsV3.group.techNotes";
+                public const string Hospitality = "page.bandsV3.group.hospitality";
+            }
+        }
+
         public static class Editor
         {
             public const string BandNotFound = "page.editor.bandNotFound";

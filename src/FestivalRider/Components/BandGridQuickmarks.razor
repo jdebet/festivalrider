@@ -1,0 +1,19 @@
+@* Vertical fixed quickmark rail for the band grid. No service injection. *@
+
+@if (Groups.Count > 0)
+{
+    <div class="fr-grid-quickmarks" title="@Heading">
+        @foreach (var (anchorId, label) in Groups)
+        {
+            <button type="button" class="fr-grid-quickmark-btn" @onclick="() => OnNavigate.InvokeAsync(anchorId)" title="@label">
+                @label
+            </button>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public List<(string AnchorId, string Label)> Groups { get; set; } = new();
+    [Parameter] public string Heading { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> OnNavigate { get; set; }
+}

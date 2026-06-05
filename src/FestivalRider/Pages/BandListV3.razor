@@ -4,60 +4,182 @@
 @inject ILocalizationService Localization
 @inject IToastService Toasts
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
-<PageTitle>@Localization.T("page.bandsV2.title")</PageTitle>
+<PageTitle>@Localization.T(LocalizationKeys.Page.BandsV3.Title)</PageTitle>
 
+@* Quickmark rail *@
+<BandGridQuickmarks Groups="_groups"
+                    Heading="@Localization.T(LocalizationKeys.Page.BandsV3.Quickmarks.Heading)"
+                    OnNavigate="ScrollToGroup" />
+
+@* Toolbar *@
 <div class="d-flex justify-content-between align-items-center mb-2">
     <h1 class="h4 m-0">@Localization.T("page.bands.heading")</h1>
-    <button class="btn btn-primary btn-sm" @onclick="AddBand">@Localization.T("page.bands.addBand")</button>
 </div>
 
 <div class="d-flex flex-wrap gap-2 mb-2 align-items-center">
     <input type="text"
            class="form-control form-control-sm"
            style="max-width: 220px;"
-           placeholder="@Localization.T(LocalizationKeys.Page.BandsV2.FilterPlaceholder)"
+           placeholder="@Localization.T(LocalizationKeys.Page.BandsV3.FilterPlaceholder)"
            @bind="_filter"
            @bind:event="oninput" />
     <select class="form-select form-select-sm" style="max-width: 160px;" @bind="_sortBy">
-        <option value="">@Localization.T(LocalizationKeys.Page.BandsV2.Sort.Label)</option>
-        <option value="nameAsc">@Localization.T(LocalizationKeys.Page.BandsV2.Sort.NameAsc)</option>
-        <option value="nameDesc">@Localization.T(LocalizationKeys.Page.BandsV2.Sort.NameDesc)</option>
-        <option value="travelParty">@Localization.T(LocalizationKeys.Page.BandsV2.Sort.TravelParty)</option>
-        <option value="createdAt">@Localization.T(LocalizationKeys.Page.BandsV2.Sort.CreatedAt)</option>
-        <option value="updatedAt">@Localization.T(LocalizationKeys.Page.BandsV2.Sort.UpdatedAt)</option>
+        <option value="">@Localization.T(LocalizationKeys.Page.BandsV3.Sort.Label)</option>
+        <option value="nameAsc">@Localization.T(LocalizationKeys.Page.BandsV3.Sort.NameAsc)</option>
+        <option value="nameDesc">@Localization.T(LocalizationKeys.Page.BandsV3.Sort.NameDesc)</option>
+        <option value="travelParty">@Localization.T(LocalizationKeys.Page.BandsV3.Sort.TravelParty)</option>
+        <option value="createdAt">@Localization.T(LocalizationKeys.Page.BandsV3.Sort.CreatedAt)</option>
+        <option value="updatedAt">@Localization.T(LocalizationKeys.Page.BandsV3.Sort.UpdatedAt)</option>
     </select>
 </div>
 
-@if (FilteredBands.Count == 0)
-{
-    <p class="text-muted small">@Localization.T("page.bands.empty", Localization.T("page.bands.addBand"))</p>
-}
-else
-{
-    <div class="table-responsive">
-        <table class="table table-sm table-hover fr-table-dense align-middle">
-            <thead>
-                <tr>
-                    <th>@Localization.T("field.name")</th>
-                    <th class="text-center" style="width: 100px;">@Localization.T("section.contacts.title")</th>
-                    <th class="text-center" style="width: 120px;">@Localization.T("section.travelParty.title")</th>
-                    <th style="width: 140px;"></th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var band in FilteredBands)
-                {
-                    <BandTableRow Band="band"
-                                  OnEdit="EditBand"
-                                  OnDelete="RequestDelete"
-                                  EditLabel="@Localization.T("page.bands.card.edit")"
-                                  DeleteLabel="@Localization.T("page.bands.card.delete")" />
-                }
-            </tbody>
-        </table>
+@* Grid outer scroll container *@
+<div class="fr-grid-outer" id="fr-band-grid-outer">
+
+    @* CSS grid — column widths must mirror BandGridRow and BandGridNewRow exactly *@
+    <div class="fr-grid" style="grid-template-columns:
+        2.2rem 11rem 6.5rem
+        14rem
+        9rem 8rem 11rem 8rem
+        8rem 7rem 8rem
+        8rem 8rem 7rem 6rem 5rem 5rem 6rem
+        9rem 5rem 5rem 14rem
+        7rem 7rem 11rem
+        9rem 7rem 7rem 10rem 4rem 4rem 4.5rem 4.5rem 10rem 12rem
+        8rem 9rem 8rem 16rem 16rem 12rem
+        18rem 14rem 16rem 5rem 12rem
+        14rem
+        12rem 12rem 10rem 4rem 4rem 12rem 12rem;">
+
+        @* ════ HEADER ROW 1 — Group labels ════ *@
+        @* frozen *@
+        <div class="fr-grid-group-cell fr-grid-cell-frozen" style="left:0; top:0;" id="@AnchorId("band")"></div>
+        <div class="fr-grid-group-cell fr-grid-cell-frozen" style="left:2.2rem; top:0;"></div>
+        <div class="fr-grid-group-cell fr-grid-cell-frozen fr-grid-cell-group-end" style="left:13.2rem; top:0;"></div>
+        @* Band *@
+        <div class="fr-grid-group-cell fr-grid-cell-group-end" style="top:0;">@_labels.GroupBand</div>
+        @* Contacts — spans 4 *@
+        <div class="fr-grid-group-cell" style="top:0; grid-column: span 3;" id="@AnchorId("contacts")">@_labels.GroupContacts</div>
+        <div class="fr-grid-group-cell fr-grid-cell-group-end" style="top:0;"></div>
+        @* Travel Party — spans 3 *@
+        <div class="fr-grid-group-cell" style="top:0; grid-column: span 2;" id="@AnchorId("travelParty")">@_labels.GroupTravelParty</div>
+        <div class="fr-grid-group-cell fr-grid-cell-group-end" style="top:0;"></div>
+        @* Cabling — spans 7 *@
+        <div class="fr-grid-group-cell" style="top:0; grid-column: span 6;" id="@AnchorId("cabling")">@_labels.GroupCabling</div>
+        <div class="fr-grid-group-cell fr-grid-cell-group-end" style="top:0;"></div>
+        @* Lighting — spans 4 *@
+        <div class="fr-grid-group-cell" style="top:0; grid-column: span 3;" id="@AnchorId("lighting")">@_labels.GroupLighting</div>
+        <div class="fr-grid-group-cell fr-grid-cell-group-end" style="top:0;"></div>
+        @* Power — spans 3 *@
+        <div class="fr-grid-group-cell" style="top:0; grid-column: span 2;" id="@AnchorId("power")">@_labels.GroupPower</div>
+        <div class="fr-grid-group-cell fr-grid-cell-group-end" style="top:0;"></div>
+        @* FOH — spans 10 *@
+        <div class="fr-grid-group-cell" style="top:0; grid-column: span 9;" id="@AnchorId("foh")">@_labels.GroupFoh</div>
+        <div class="fr-grid-group-cell fr-grid-cell-group-end" style="top:0;"></div>
+        @* Monitors — spans 6 *@
+        <div class="fr-grid-group-cell" style="top:0; grid-column: span 5;" id="@AnchorId("monitors")">@_labels.GroupMonitors</div>
+        <div class="fr-grid-group-cell fr-grid-cell-group-end" style="top:0;"></div>
+        @* Stage — spans 5 *@
+        <div class="fr-grid-group-cell" style="top:0; grid-column: span 4;" id="@AnchorId("stage")">@_labels.GroupStage</div>
+        <div class="fr-grid-group-cell fr-grid-cell-group-end" style="top:0;"></div>
+        @* Tech Notes *@
+        <div class="fr-grid-group-cell fr-grid-cell-group-end" style="top:0;" id="@AnchorId("techNotes")">@_labels.GroupTechNotes</div>
+        @* Hospitality — spans 7 *@
+        <div class="fr-grid-group-cell" style="top:0; grid-column: span 6;" id="@AnchorId("hospitality")">@_labels.GroupHospitality</div>
+        <div class="fr-grid-group-cell fr-grid-cell-group-end" style="top:0;"></div>
+
+        @* ════ HEADER ROW 2 — Field labels ════ *@
+        @* frozen *@
+        <div class="fr-grid-field-cell fr-grid-cell-frozen" style="left:0; top:28px;"></div>
+        <div class="fr-grid-field-cell fr-grid-cell-frozen" style="left:2.2rem; top:28px;">@_labels.FieldName</div>
+        <div class="fr-grid-field-cell fr-grid-cell-frozen fr-grid-cell-group-end" style="left:13.2rem; top:28px;"></div>
+        @* Band *@
+        <div class="fr-grid-field-cell fr-grid-cell-group-end">@_labels.FieldNotes</div>
+        @* Contacts *@
+        <div class="fr-grid-field-cell">@_labels.FieldRole</div>
+        <div class="fr-grid-field-cell">@_labels.FieldName</div>
+        <div class="fr-grid-field-cell">@_labels.FieldEmail</div>
+        <div class="fr-grid-field-cell fr-grid-cell-group-end">@_labels.FieldPhone</div>
+        @* Travel Party *@
+        <div class="fr-grid-field-cell">@_labels.FieldType</div>
+        <div class="fr-grid-field-cell">@_labels.FieldRole</div>
+        <div class="fr-grid-field-cell fr-grid-cell-group-end">@_labels.FieldName</div>
+        @* Cabling *@
+        <div class="fr-grid-field-cell">@_labels.FieldCableSource</div>
+        <div class="fr-grid-field-cell">@_labels.FieldCableTarget</div>
+        <div class="fr-grid-field-cell">@_labels.FieldCableType</div>
+        <div class="fr-grid-field-cell">@_labels.FieldSpec</div>
+        <div class="fr-grid-field-cell">@_labels.FieldCableMinLength</div>
+        <div class="fr-grid-field-cell">@_labels.FieldCableMaxLength</div>
+        <div class="fr-grid-field-cell fr-grid-cell-group-end">@_labels.FieldProvider</div>
+        @* Lighting *@
+        <div class="fr-grid-field-cell">@_labels.FieldLightingOwnConsole</div>
+        <div class="fr-grid-field-cell">@_labels.FieldLightingBackdropWidth</div>
+        <div class="fr-grid-field-cell">@_labels.FieldLightingBackdropHeight</div>
+        <div class="fr-grid-field-cell fr-grid-cell-group-end">@_labels.FieldLightingFloorMachines</div>
+        @* Power *@
+        <div class="fr-grid-field-cell">@_labels.FieldPowerAmperage</div>
+        <div class="fr-grid-field-cell">@_labels.FieldPowerPhase</div>
+        <div class="fr-grid-field-cell fr-grid-cell-group-end">@_labels.FieldPowerAdapterNotes</div>
+        @* FOH *@
+        <div class="fr-grid-field-cell">@_labels.FieldFohOwnConsole</div>
+        <div class="fr-grid-field-cell">@_labels.FieldFohOutputProtocol</div>
+        <div class="fr-grid-field-cell">@_labels.FieldFohOutputLocation</div>
+        <div class="fr-grid-field-cell">@_labels.FieldFohOutputNotes</div>
+        <div class="fr-grid-field-cell">@_labels.FieldFohStageToFohSends</div>
+        <div class="fr-grid-field-cell">@_labels.FieldFohRoundTripCount</div>
+        <div class="fr-grid-field-cell">@_labels.FieldFohFootprintWidth</div>
+        <div class="fr-grid-field-cell">@_labels.FieldFohFootprintLength</div>
+        <div class="fr-grid-field-cell">@_labels.FieldFohAdditionalHardware</div>
+        <div class="fr-grid-field-cell fr-grid-cell-group-end">@_labels.FieldNotes</div>
+        @* Monitors *@
+        <div class="fr-grid-field-cell">@_labels.FieldMonitorsSourceMode</div>
+        <div class="fr-grid-field-cell">@_labels.FieldMonitorsOwnConsole</div>
+        <div class="fr-grid-field-cell">@_labels.FieldMonitorsConsoleLocation</div>
+        <div class="fr-grid-field-cell">@_labels.FieldMonitorsWedges</div>
+        <div class="fr-grid-field-cell">@_labels.FieldMonitorsInEars</div>
+        <div class="fr-grid-field-cell fr-grid-cell-group-end">@_labels.FieldNotes</div>
+        @* Stage *@
+        <div class="fr-grid-field-cell">@_labels.FieldStageRisers</div>
+        <div class="fr-grid-field-cell">@_labels.FieldStageOtherRisers</div>
+        <div class="fr-grid-field-cell">@_labels.FieldStageWirelessMics</div>
+        <div class="fr-grid-field-cell">@_labels.FieldStageBringsOwnMics</div>
+        <div class="fr-grid-field-cell fr-grid-cell-group-end">@_labels.FieldNotes</div>
+        @* Tech Notes *@
+        <div class="fr-grid-field-cell fr-grid-cell-group-end">@_labels.FieldNotes</div>
+        @* Hospitality *@
+        <div class="fr-grid-field-cell">@_labels.FieldHospitalityDressingRoom</div>
+        <div class="fr-grid-field-cell">@_labels.FieldHospitalityCatering</div>
+        <div class="fr-grid-field-cell">@_labels.FieldHospitalityDietaryRestrictions</div>
+        <div class="fr-grid-field-cell">@_labels.FieldHospitalityTowelCount</div>
+        <div class="fr-grid-field-cell">@_labels.FieldHospitalityParkingSpaces</div>
+        <div class="fr-grid-field-cell">@_labels.FieldHospitalityAccommodations</div>
+        <div class="fr-grid-field-cell fr-grid-cell-group-end">@_labels.FieldHospitalityDrinks</div>
+
+        @* ════ BAND ROWS ════ *@
+        @{ var alt = false; }
+        @foreach (var band in FilteredBands)
+        {
+            var b = band;
+            var isAlt = alt;
+            alt = !alt;
+            <BandGridRow Band="b"
+                         Labels="_labels"
+                         Locked="@(!_unlocked.Contains(b.Id))"
+                         Alternate="isAlt"
+                         OnCommit="@(() => CommitBand(b))"
+                         OnToggleLock="@(() => ToggleLock(b.Id))"
+                         OnEditDetail="@(() => EditBandDetail(b.Id))"
+                         OnDelete="@(() => RequestDelete(b.Id))" />
+        }
+
+        @* ════ ADD BAND ROW ════ *@
+        <BandGridNewRow Labels="_labels" OnAdd="HandleAddBand" />
+
     </div>
-}
+</div>
 
 <ConfirmDialog Show="_pendingDeleteId.HasValue"
                Title="@Localization.T("confirm.deleteBand.title")"
@@ -71,30 +193,46 @@ else
     private string _deleteMessage = string.Empty;
     private string _filter = string.Empty;
     private string _sortBy = string.Empty;
+    private readonly HashSet<Guid> _unlocked = new();
+    private BandGridLabels _labels = new();
+
+    private static readonly (string Id, string LabelKey)[] GroupDefs =
+    [
+        ("band",        LocalizationKeys.Page.BandsV3.Group.Band),
+        ("contacts",    LocalizationKeys.Page.BandsV3.Group.Contacts),
+        ("travelParty", LocalizationKeys.Page.BandsV3.Group.TravelParty),
+        ("cabling",     LocalizationKeys.Page.BandsV3.Group.Cabling),
+        ("lighting",    LocalizationKeys.Page.BandsV3.Group.Lighting),
+        ("power",       LocalizationKeys.Page.BandsV3.Group.Power),
+        ("foh",         LocalizationKeys.Page.BandsV3.Group.Foh),
+        ("monitors",    LocalizationKeys.Page.BandsV3.Group.Monitors),
+        ("stage",       LocalizationKeys.Page.BandsV3.Group.Stage),
+        ("techNotes",   LocalizationKeys.Page.BandsV3.Group.TechNotes),
+        ("hospitality", LocalizationKeys.Page.BandsV3.Group.Hospitality),
+    ];
+
+    private List<(string AnchorId, string Label)> _groups = new();
+
+    private static string AnchorId(string groupId) => $"fr-bg-{groupId}";
 
     private IReadOnlyList<Band> FilteredBands
     {
         get
         {
             var query = BandService.Bands.AsEnumerable();
-
             if (!string.IsNullOrWhiteSpace(_filter))
-            {
                 query = query.Where(b =>
                     b.Name.Contains(_filter, StringComparison.OrdinalIgnoreCase) ||
                     (!string.IsNullOrWhiteSpace(b.Notes) && b.Notes.Contains(_filter, StringComparison.OrdinalIgnoreCase)));
-            }
-
             query = _sortBy switch
             {
-                "nameAsc" => query.OrderBy(b => b.Name),
-                "nameDesc" => query.OrderByDescending(b => b.Name),
+                "nameAsc"     => query.OrderBy(b => b.Name),
+                "nameDesc"    => query.OrderByDescending(b => b.Name),
                 "travelParty" => query.OrderByDescending(b => b.TravelParty.Members.Count).ThenBy(b => b.Name),
-                "createdAt" => query.OrderByDescending(b => b.CreatedAt),
-                "updatedAt" => query.OrderByDescending(b => b.UpdatedAt),
-                _ => query.OrderBy(b => b.Name)
+                "createdAt"   => query.OrderByDescending(b => b.CreatedAt),
+                "updatedAt"   => query.OrderByDescending(b => b.UpdatedAt),
+                _             => query.OrderBy(b => b.Name)
             };
-
             return query.ToList();
         }
     }
@@ -102,20 +240,132 @@ else
     protected override void OnInitialized()
     {
         BandService.OnChange += HandleChange;
-        Localization.OnLocaleChanged += HandleChange;
+        Localization.OnLocaleChanged += HandleLocaleChanged;
+        RebuildLabels();
     }
 
     private void HandleChange() => InvokeAsync(StateHasChanged);
 
-    private void AddBand()
+    private void HandleLocaleChanged()
     {
-        var band = new Band { Name = Localization.T("page.bands.newBandDefault") };
-        BandService.AddBand(band);
-        Toasts.Show(Localization.T(LocalizationKeys.Toast.Bands.Created, band.Name), ToastLevel.Success);
-        Nav.NavigateTo($"/band-v3/{band.Id}");
+        RebuildLabels();
+        InvokeAsync(StateHasChanged);
     }
 
-    private void EditBand(Guid id) => Nav.NavigateTo($"/band-v3/{id}");
+    private void RebuildLabels()
+    {
+        _labels = new BandGridLabels
+        {
+            Lock                           = Localization.T(LocalizationKeys.Page.BandsV3.Lock),
+            Unlock                         = Localization.T(LocalizationKeys.Page.BandsV3.Unlock),
+            EditDetail                     = Localization.T(LocalizationKeys.Page.BandsV3.EditDetail),
+            Delete                         = Localization.T(LocalizationKeys.Page.BandsV3.Delete),
+            AddRowSubmitBtn                = Localization.T(LocalizationKeys.Page.BandsV3.AddRow.SubmitBtn),
+            AddRowNamePlaceholder          = Localization.T(LocalizationKeys.Page.BandsV3.AddRow.NamePlaceholder),
+            QuickmarksHeading              = Localization.T(LocalizationKeys.Page.BandsV3.Quickmarks.Heading),
+            GroupBand                      = Localization.T(LocalizationKeys.Page.BandsV3.Group.Band),
+            GroupContacts                  = Localization.T(LocalizationKeys.Page.BandsV3.Group.Contacts),
+            GroupTravelParty               = Localization.T(LocalizationKeys.Page.BandsV3.Group.TravelParty),
+            GroupCabling                   = Localization.T(LocalizationKeys.Page.BandsV3.Group.Cabling),
+            GroupLighting                  = Localization.T(LocalizationKeys.Page.BandsV3.Group.Lighting),
+            GroupPower                     = Localization.T(LocalizationKeys.Page.BandsV3.Group.Power),
+            GroupFoh                       = Localization.T(LocalizationKeys.Page.BandsV3.Group.Foh),
+            GroupMonitors                  = Localization.T(LocalizationKeys.Page.BandsV3.Group.Monitors),
+            GroupStage                     = Localization.T(LocalizationKeys.Page.BandsV3.Group.Stage),
+            GroupTechNotes                 = Localization.T(LocalizationKeys.Page.BandsV3.Group.TechNotes),
+            GroupHospitality               = Localization.T(LocalizationKeys.Page.BandsV3.Group.Hospitality),
+            FieldName                      = Localization.T("field.name"),
+            FieldNotes                     = Localization.T("field.notes"),
+            FieldRole                      = Localization.T("field.role"),
+            FieldEmail                     = Localization.T("field.email"),
+            FieldPhone                     = Localization.T("field.phone"),
+            FieldType                      = Localization.T("field.type"),
+            FieldWhere                     = Localization.T("field.where"),
+            FieldCount                     = Localization.T("field.count"),
+            FieldProvider                  = Localization.T("field.provider"),
+            FieldSpec                      = Localization.T("field.spec"),
+            FieldModel                     = Localization.T("field.model"),
+            FieldFrequency                 = Localization.T("field.frequency"),
+            FieldDescription               = Localization.T("field.description"),
+            FieldCableSource               = Localization.T("field.cable.source"),
+            FieldCableTarget               = Localization.T("field.cable.target"),
+            FieldCableType                 = Localization.T("field.cable.type"),
+            FieldCableMinLength            = Localization.T("field.cable.minLength"),
+            FieldCableMaxLength            = Localization.T("field.cable.maxLength"),
+            FieldLightingOwnConsole        = Localization.T("field.lighting.ownConsole"),
+            FieldLightingBackdropWidth     = Localization.T("field.lighting.backdropWidth"),
+            FieldLightingBackdropHeight    = Localization.T("field.lighting.backdropHeight"),
+            FieldLightingFloorMachines     = Localization.T("field.lighting.floorMachines"),
+            FieldLightingModelOrType       = Localization.T("field.lighting.modelOrType"),
+            FieldLightingLocation          = Localization.T("field.lighting.location"),
+            FieldPowerAmperage             = Localization.T("field.power.amperage"),
+            FieldPowerPhase                = Localization.T("field.power.phase"),
+            FieldPowerAdapterNotes         = Localization.T("field.power.adapterNotes"),
+            FieldFohOwnConsole             = Localization.T("field.foh.ownConsole"),
+            FieldFohOutputProtocol         = Localization.T("field.foh.outputProtocol"),
+            FieldFohOutputLocation         = Localization.T("field.foh.outputLocation"),
+            FieldFohOutputNotes            = Localization.T("field.foh.outputNotes"),
+            FieldFohAdditionalHardware     = Localization.T("field.foh.additionalHardware"),
+            FieldFohStageToFohSends        = Localization.T("field.foh.stageToFohSends"),
+            FieldFohRoundTripCount         = Localization.T("field.foh.roundTripCount"),
+            FieldFohFootprintWidth         = Localization.T("field.foh.footprintWidth"),
+            FieldFohFootprintLength        = Localization.T("field.foh.footprintLength"),
+            FieldMonitorsSourceMode        = Localization.T("field.monitors.sourceMode"),
+            FieldMonitorsOwnConsole        = Localization.T("field.monitors.ownConsole"),
+            FieldMonitorsConsoleLocation   = Localization.T("field.monitors.consoleLocation"),
+            FieldMonitorsWedges            = Localization.T("field.monitors.wedges"),
+            FieldMonitorsDual              = Localization.T("field.monitors.dual"),
+            FieldMonitorsStereo            = Localization.T("field.monitors.stereo"),
+            FieldMonitorsDrumfill          = Localization.T("field.monitors.drumfill"),
+            FieldMonitorsInEars            = Localization.T("field.monitors.inEars"),
+            FieldMonitorsWireless          = Localization.T("field.monitors.wireless"),
+            FieldStageRisers               = Localization.T("field.stage.risers"),
+            FieldStageRiserWidth           = Localization.T("field.stage.riserWidth"),
+            FieldStageRiserLength          = Localization.T("field.stage.riserLength"),
+            FieldStageRiserHeight          = Localization.T("field.stage.riserHeight"),
+            FieldStageOtherRisers          = Localization.T("field.stage.otherRisers"),
+            FieldStageWirelessMics         = Localization.T("field.stage.wirelessMics"),
+            FieldStageBringsOwnMics        = Localization.T("field.stage.bringsOwnMics"),
+            FieldHospitalityDressingRoom   = Localization.T("field.hospitality.dressingRoom"),
+            FieldHospitalityCatering       = Localization.T("field.hospitality.catering"),
+            FieldHospitalityDietaryRestrictions = Localization.T("field.hospitality.dietaryRestrictions"),
+            FieldHospitalityTowelCount     = Localization.T("field.hospitality.towelCount"),
+            FieldHospitalityParkingSpaces  = Localization.T("field.hospitality.parkingSpaces"),
+            FieldHospitalityAccommodations = Localization.T("field.hospitality.accommodations"),
+            FieldHospitalityDrinks         = Localization.T("field.hospitality.drinks"),
+        };
+        _groups = GroupDefs
+            .Select(g => (AnchorId(g.Id), Localization.T(g.LabelKey)))
+            .ToList();
+    }
+
+    private void CommitBand(Band band)
+    {
+        BandService.UpdateBand(band);
+    }
+
+    private void ToggleLock(Guid id)
+    {
+        if (_unlocked.Contains(id))
+        {
+            _unlocked.Remove(id);
+            var band = BandService.FindBand(id);
+            if (band is not null)
+                CommitBand(band);
+        }
+        else
+        {
+            _unlocked.Add(id);
+        }
+    }
+
+    private void EditBandDetail(Guid id) => Nav.NavigateTo($"/band-v3/{id}");
+
+    private void HandleAddBand(Band band)
+    {
+        BandService.AddBand(band);
+        Toasts.Show(Localization.T(LocalizationKeys.Toast.Bands.Created, band.Name), ToastLevel.Success);
+    }
 
     private void RequestDelete(Guid id)
     {
@@ -129,6 +379,7 @@ else
         if (_pendingDeleteId is { } id)
         {
             BandService.DeleteBand(id);
+            _unlocked.Remove(id);
             Toasts.Show(Localization.T(LocalizationKeys.Toast.Bands.Deleted), ToastLevel.Info);
         }
         _pendingDeleteId = null;
@@ -136,9 +387,14 @@ else
 
     private void CancelDelete() => _pendingDeleteId = null;
 
+    private async Task ScrollToGroup(string anchorId)
+    {
+        await JS.InvokeVoidAsync("bandGrid.scrollToGroup", "#fr-band-grid-outer", anchorId);
+    }
+
     public void Dispose()
     {
         BandService.OnChange -= HandleChange;
-        Localization.OnLocaleChanged -= HandleChange;
+        Localization.OnLocaleChanged -= HandleLocaleChanged;
     }
 }

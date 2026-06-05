@@ -1,0 +1,96 @@
+@* Add-band entry row for the band grid. No service injection. *@
+@using FestivalRider.Models
+
+<EditForm Model="_newBand" OnValidSubmit="HandleSubmit" class="fr-grid-band-row fr-grid-add-row">
+    <DataAnnotationsValidator />
+
+    @* Frozen: lock placeholder + name input + submit *@
+    <div class="fr-grid-cell fr-grid-cell-frozen" style="left:0; width:2.2rem; min-width:2.2rem; z-index:3;">
+        <span style="font-size:0.9rem;">➕</span>
+    </div>
+    <div class="fr-grid-cell fr-grid-cell-frozen fr-grid-cell-group-end" style="left:2.2rem; width:11rem; min-width:11rem; z-index:3;">
+        <InputText class="form-control form-control-sm fr-form-ultra-sm w-100"
+                   placeholder="@Labels.AddRowNamePlaceholder"
+                   @bind-Value="_newBand.Name" />
+        <ValidationMessage For="@(() => _newBand.Name)" class="small text-danger" />
+    </div>
+    <div class="fr-grid-cell fr-grid-cell-frozen fr-grid-cell-group-end" style="left:13.2rem; width:6.5rem; min-width:6.5rem; z-index:3;">
+        <button type="submit" class="btn btn-xs btn-primary fr-form-ultra-sm w-100">@Labels.AddRowSubmitBtn</button>
+    </div>
+
+    @* Empty filler cells aligned to each column so the add-row looks like part of the grid *@
+    <div class="fr-grid-cell fr-grid-cell-group-end" style="width:14rem; min-width:14rem;"></div>
+    @* Contacts *@
+    <div class="fr-grid-cell" style="width:9rem;"></div>
+    <div class="fr-grid-cell" style="width:8rem;"></div>
+    <div class="fr-grid-cell" style="width:11rem;"></div>
+    <div class="fr-grid-cell fr-grid-cell-group-end" style="width:8rem;"></div>
+    @* Travel party *@
+    <div class="fr-grid-cell" style="width:8rem;"></div>
+    <div class="fr-grid-cell" style="width:7rem;"></div>
+    <div class="fr-grid-cell fr-grid-cell-group-end" style="width:8rem;"></div>
+    @* Cabling *@
+    <div class="fr-grid-cell" style="width:8rem;"></div>
+    <div class="fr-grid-cell" style="width:8rem;"></div>
+    <div class="fr-grid-cell" style="width:7rem;"></div>
+    <div class="fr-grid-cell" style="width:6rem;"></div>
+    <div class="fr-grid-cell" style="width:5rem;"></div>
+    <div class="fr-grid-cell" style="width:5rem;"></div>
+    <div class="fr-grid-cell fr-grid-cell-group-end" style="width:6rem;"></div>
+    @* Lighting *@
+    <div class="fr-grid-cell" style="width:9rem;"></div>
+    <div class="fr-grid-cell" style="width:5rem;"></div>
+    <div class="fr-grid-cell" style="width:5rem;"></div>
+    <div class="fr-grid-cell fr-grid-cell-group-end" style="width:14rem;"></div>
+    @* Power *@
+    <div class="fr-grid-cell" style="width:7rem;"></div>
+    <div class="fr-grid-cell" style="width:7rem;"></div>
+    <div class="fr-grid-cell fr-grid-cell-group-end" style="width:11rem;"></div>
+    @* FOH *@
+    <div class="fr-grid-cell" style="width:9rem;"></div>
+    <div class="fr-grid-cell" style="width:7rem;"></div>
+    <div class="fr-grid-cell" style="width:7rem;"></div>
+    <div class="fr-grid-cell" style="width:10rem;"></div>
+    <div class="fr-grid-cell" style="width:4rem;"></div>
+    <div class="fr-grid-cell" style="width:4rem;"></div>
+    <div class="fr-grid-cell" style="width:4.5rem;"></div>
+    <div class="fr-grid-cell" style="width:4.5rem;"></div>
+    <div class="fr-grid-cell" style="width:10rem;"></div>
+    <div class="fr-grid-cell fr-grid-cell-group-end" style="width:12rem;"></div>
+    @* Monitors *@
+    <div class="fr-grid-cell" style="width:8rem;"></div>
+    <div class="fr-grid-cell" style="width:9rem;"></div>
+    <div class="fr-grid-cell" style="width:8rem;"></div>
+    <div class="fr-grid-cell" style="width:16rem;"></div>
+    <div class="fr-grid-cell" style="width:16rem;"></div>
+    <div class="fr-grid-cell fr-grid-cell-group-end" style="width:12rem;"></div>
+    @* Stage *@
+    <div class="fr-grid-cell" style="width:18rem;"></div>
+    <div class="fr-grid-cell" style="width:14rem;"></div>
+    <div class="fr-grid-cell" style="width:16rem;"></div>
+    <div class="fr-grid-cell" style="width:5rem;"></div>
+    <div class="fr-grid-cell fr-grid-cell-group-end" style="width:12rem;"></div>
+    @* Tech notes *@
+    <div class="fr-grid-cell fr-grid-cell-group-end" style="width:14rem;"></div>
+    @* Hospitality *@
+    <div class="fr-grid-cell" style="width:12rem;"></div>
+    <div class="fr-grid-cell" style="width:12rem;"></div>
+    <div class="fr-grid-cell" style="width:10rem;"></div>
+    <div class="fr-grid-cell" style="width:4rem;"></div>
+    <div class="fr-grid-cell" style="width:4rem;"></div>
+    <div class="fr-grid-cell" style="width:12rem;"></div>
+    <div class="fr-grid-cell fr-grid-cell-group-end" style="width:12rem;"></div>
+</EditForm>
+
+@code {
+    [Parameter, EditorRequired] public BandGridLabels Labels { get; set; } = default!;
+    [Parameter] public EventCallback<Band> OnAdd { get; set; }
+
+    private Band _newBand = new();
+
+    private async Task HandleSubmit()
+    {
+        await OnAdd.InvokeAsync(_newBand);
+        _newBand = new();
+    }
+}

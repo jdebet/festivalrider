@@ -144,6 +144,187 @@ code {
     font-weight: normal;
 }
 
+/* Band grid (plan 021) */
+.fr-grid-outer {
+    position: relative;
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: calc(100vh - 140px);
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.375rem;
+}
+
+.fr-grid {
+    display: grid;
+    min-width: max-content;
+    border-collapse: collapse;
+}
+
+/* Sticky two-row header */
+.fr-grid-header {
+    display: contents;
+}
+
+.fr-grid-group-row,
+.fr-grid-field-row {
+    display: contents;
+}
+
+.fr-grid-group-cell,
+.fr-grid-field-cell {
+    position: sticky;
+    background: var(--bs-body-bg, #fff);
+    z-index: 2;
+    padding: 0.25rem 0.5rem;
+    border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.fr-grid-group-cell {
+    top: 0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--bs-secondary-color, #6c757d);
+    border-right: 1px solid var(--bs-border-color, #dee2e6);
+    background: var(--bs-tertiary-bg, #f8f9fa);
+}
+
+.fr-grid-field-cell {
+    top: 28px;
+    font-weight: 500;
+    color: var(--bs-body-color, #212529);
+    border-right: 1px solid var(--bs-border-color, #dee2e6);
+}
+
+/* Frozen left columns */
+.fr-grid-cell-frozen {
+    position: sticky;
+    background: var(--bs-body-bg, #fff);
+    z-index: 3;
+}
+
+.fr-grid-group-cell.fr-grid-cell-frozen,
+.fr-grid-field-cell.fr-grid-cell-frozen {
+    z-index: 4;
+    background: var(--bs-tertiary-bg, #f8f9fa);
+}
+
+/* Band row blocks */
+.fr-grid-band-row {
+    display: contents;
+}
+
+.fr-grid-cell {
+    padding: 0.2rem 0.4rem;
+    border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+    border-right: 1px solid transparent;
+    font-size: 0.8125rem;
+    vertical-align: top;
+    min-height: 2rem;
+}
+
+.fr-grid-cell.fr-grid-cell-frozen {
+    border-right: 1px solid var(--bs-border-color, #dee2e6);
+}
+
+.fr-grid-cell-group-end {
+    border-right: 1px solid var(--bs-border-color, #dee2e6) !important;
+}
+
+/* Alternating band block shading — applied via .fr-grid-band-alt */
+.fr-grid-band-alt .fr-grid-cell,
+.fr-grid-band-alt .fr-grid-cell.fr-grid-cell-frozen {
+    background: var(--bs-tertiary-bg, #f8f9fa);
+}
+
+/* Locked row: input+select disabled look without graying the whole cell */
+.fr-grid-locked input,
+.fr-grid-locked select,
+.fr-grid-locked textarea {
+    pointer-events: none;
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    padding-left: 0;
+}
+
+.fr-grid-locked button.fr-grid-action-minor {
+    display: none;
+}
+
+/* Sub-entry stacks inside list cells */
+.fr-grid-list-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.fr-grid-sub-entry {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+}
+
+/* Lock button */
+.fr-grid-lock-btn {
+    background: none;
+    border: none;
+    padding: 0.1rem 0.2rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+    color: var(--bs-secondary-color, #6c757d);
+    line-height: 1;
+}
+
+.fr-grid-lock-btn:hover {
+    color: var(--bs-body-color, #212529);
+}
+
+/* Add-row */
+.fr-grid-add-row .fr-grid-cell {
+    background: #f0f7ff;
+}
+
+/* Quickmark rail */
+.fr-grid-quickmarks {
+    position: fixed;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 1050;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    background: rgba(255,255,255,0.9);
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.5rem;
+    padding: 0.35rem 0.25rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+}
+
+.fr-grid-quickmark-btn {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    font-size: 0.7rem;
+    padding: 0.3rem 0.15rem;
+    border: none;
+    background: none;
+    color: var(--bs-secondary-color, #6c757d);
+    cursor: pointer;
+    white-space: nowrap;
+    border-radius: 0.25rem;
+    transition: background 0.15s, color 0.15s;
+}
+
+.fr-grid-quickmark-btn:hover {
+    background: var(--bs-primary, #1b6ec2);
+    color: #fff;
+}
+
 /* Toast animations */
 @keyframes toast-slide-in {
     from {
