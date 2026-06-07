@@ -16,11 +16,12 @@ This change adds NuGet-free model/persistence changes and bumps the schema, whic
 ## Model changes (`src/FestivalRider/Models`, one concept per file)
 
 - **`LightingRig.cs`** — add `bool HasBackdrop`. When `false`, the editor hides/zeroes `BackdropWidthMeters`/`BackdropHeightMeters`. Migration sets `HasBackdrop = true` when either dimension is non-null/non-zero.
-- **`PartyType.cs`** — append `Artist`, `LightingEngineer` (append only; never reorder, preserves enum ordinals). Ship `enum.PartyType.Artist` / `enum.PartyType.LightingEngineer` keys.
+- **`ContactRole.cs`** — append `Artist`, `LightEngineer`, `Production` (append after the existing `Other`; never reorder the survivors). **Remove `BackingTech`**; existing `BackingTech` data maps to `Other` in migration (see Persistence). Ship `enum.ContactRole.Artist` / `enum.ContactRole.LightEngineer` / `enum.ContactRole.Production` keys. The orphaned `enum.ContactRole.BackingTech` localization key (and its `LocalizationKeys` constant) MUST stay in the catalog — released keys are never removed.
 - **`Band.cs`** — add `int DayPlaying { get; set; } = 1;`. Bounded `>= 1` and `<= owning ShowData.ShowDayCount` via a custom validator surfaced in the page/editor (not a static attribute, since the cap is dynamic).
 - **`StageSetup.cs`** — add `string? PowerOutlets` (free text: outlet count, plug type, voltage…).
 - **`AmbianceMics.cs`** — NEW model: `bool Present`, `int Count`, `CableProvider Provider`. Mutable `class` (UI-bound). Added to `MonitorSetup.cs` as `AmbianceMics AmbianceMics { get; set; } = new();`.
-- **`InEarMonitor.cs`** — add `string? InputType`. Editor shows `InputType` when `IsWireless == false`; keeps `Model`/`Frequency` for the wireless case.
+- **`InEarInputType.cs`** — NEW `[Flags]` `enum` (multi-select): `None = 0`, `XLR = 1`, `Jack635 = 2` (Jack 6.35 mm), `MiniJack35 = 4` (mini-jack 3.5 mm), `RCA = 8`, `Other = 16`. Explicit power-of-two values so several connectors can be selected at once. Ship `enum.InEarInputType.*` keys (no key for `None`).
+- **`InEarMonitor.cs`** — replace the planned `string? InputType` with `InEarInputType InputType { get; set; }` as a **multi-select flags** field (**always visible/editable**, independent of `IsWireless`; several connectors may be combined). Add `string? InputTypeOther` (paired override, round-tripped when the `Other` flag is set) and `bool IsStereo` (true = stereo, false = mono). `Model`/`Frequency` remain for the wireless case.
 - **`TimingEventType.cs`** — append `SETUP_BACKSTAGE` alongside `SETUP_ON_STAGE`. Ship `enum.TimingEventType.SETUP_BACKSTAGE`. Wire it into `RunningOrderScheduler`/`TemplateEditor` parallel to `SETUP_ON_STAGE` (selectable timing event; same fixed-duration treatment).
 
 All additions are auto-property defaults per Models AGENTS rules; models stay data-only.
@@ -29,7 +30,7 @@ All additions are auto-property defaults per Models AGENTS rules; models stay da
 
 - **`AppState.cs`** — bump default `SchemaVersion` to `7`.
 - **`StorageService.cs`** — bump `CurrentSchemaVersion` to `7` (constant only; debounce untouched).
-- **`Migrators/V6ToV7Migrator.cs`** — NEW, `IStateMigrator` (pure `JsonNode`, no Models types). Per band: set `dayPlaying` default `1`; add `stage.powerOutlets` (null); add `monitors.ambianceMics` (`{present:false,count:0,provider:Venue}`); set `lighting.hasBackdrop` from existing backdrop dims; leave new enum members/`inputType` to default deserialization. Register in `Program.cs`.
+- **`Migrators/V6ToV7Migrator.cs`** — NEW, `IStateMigrator` (pure `JsonNode`, no Models types). Per band: set `dayPlaying` default `1`; add `stage.powerOutlets` (null); add `monitors.ambianceMics` (`{present:false,count:0,provider:Venue}`); set `lighting.hasBackdrop` from existing backdrop dims; remap every contact `role == "BackingTech"` to `"Other"`; default each in-ear `inputType` to `""` (no flags set / `None`), `inputTypeOther` to `null`, and `isStereo` to `false`; leave the new `ContactRole` members to default deserialization. Register in `Program.cs`.
 - **`BundleMigrators/V6ToV7BundleMigrator.cs`** — NEW, `IBundleMigrator`, mirrors the per-band CSV additions on the bundle scratch (adds the new rows/columns). Bump `BundleService` manifest `SchemaVersion` to `7`. Register in `Program.cs`.
 - Released migrator files are frozen; these are new files only.
 
@@ -40,8 +41,8 @@ Add writer + reader + tests together for each:
 - `Tech.Lighting`: `HasBackdrop` (emit in declaration order, before backdrop dims).
 - `Tech.Stage`: `PowerOutlets`.
 - `Tech.Monitors.AmbianceMics`: new keys `Present`, `Count`, `Provider`.
-- `Tech.MonitorInEar`: `InputType`.
-- New `PartyType`/`TimingEventType` members round-trip via existing `ParseEnum` (verify in tests).
+- `Tech.InEar`: `InputType` (flags enum — round-trips as a comma-joined name list via the existing `FormatFlags`/`ParseFlags` helpers) + paired `InputTypeOther` override (round-trip the override only when the `Other` flag is set) + `IsStereo`.
+- New `ContactRole`/`InEarInputType`/`TimingEventType` members round-trip via existing `ParseEnum` (verify in tests). Verify legacy `BackingTech` strings no longer appear in fresh exports (already remapped to `Other` by the migrator).
 - Running-order CSV columns are unchanged by the new timing event (still enum string in existing column).
 
 ## UI — reusable read-only pop-up
@@ -54,7 +55,7 @@ Per-section behavior. "Tally" cells are always read-only; an expand button opens
 
 - **Notes columns (all groups):** render a 2-line clamped, ellipsised read-only view when locked (`-webkit-line-clamp:2`); the editable textarea appears when the row is unlocked. Applies to Band, FOH, Monitors, Stage, and Tech notes cells.
 - **Contacts:** column shows only the first contact (role + name); expand → all contacts in pop-up. Read-only.
-- **Travel Party:** one column per `PartyType` value (incl. new Artist, LightingEngineer) showing the count tally; expand → full member list in pop-up.
+- **Travel Party:** one column per existing `PartyType` value (`BandMember`, `Tech`, `Production` — unchanged; the new roles live on `ContactRole`, not `PartyType`) showing the count tally; expand → full member list in pop-up.
 - **Cabling:** one column per `CableType` value showing tally as `X` or `X + Y` where `Y` is the provider-`Brought` count rendered in red and the venue/standard count in default color; expand → full cable list.
 - **Lighting:** Floor machines becomes a Yes/No glance (any machines?); expand → machine details. Backdrop shows the new Yes/No (`HasBackdrop`) and width/height inline-editable only when backdrop is on.
 - **Power:** single glance cell rendering e.g. `16A` or `16 + 32T + 64T` (T suffix = three-phase); expand → amperage/phase/adapter/power-outlet detail. (Amperage/Phase currently a single value pair — render compactly; full breakdown in pop-up.)
@@ -62,7 +63,7 @@ Per-section behavior. "Tally" cells are always read-only; an expand button opens
   - Wedge column: number of wedge entries, counting `DualLinked` or `Stereo` entries as 2; separate column for drumfill count.
   - IEM: two columns — number brought (`Provider == Brought`) and number needed/venue (`Provider == Venue`).
   - Ambiance mics surfaced in the Monitors pop-up (and a compact Yes/No glance).
-  - Expand → full wedge/IEM/ambiance detail incl. per-IEM wireless vs `InputType`.
+  - Expand → full wedge/IEM/ambiance detail incl. per-IEM `InputType` (the full set of selected connectors + `Other` override) and stereo/mono, plus the wireless `Model`/`Frequency`.
 - **Stage:** tally columns for Risers, Other Risers, Wireless Mics (counts); each expandable to its own pop-up detail. `PowerOutlets` (text) + `BringsOwnMics` (Yes/No) remain inline-editable.
 
 Add the new add/remove handlers only where inline editing remains; remove inline editors for the now read-only sections (Contacts, Travel Party, Cabling list, Lighting floor machines, Monitors lists, Risers lists). Track expanded pop-up state with private fields (allowed transient UI state).
@@ -75,11 +76,11 @@ Add the new add/remove handlers only where inline editing remains; remove inline
 
 ## UI — `Components/BandGridLabels.cs`
 
-Add label fields for: new `PartyType` members, per-`CableType` headers, Power glance, Backdrop Yes/No, Monitors split columns (brought/needed/drumfill), Ambiance mics, Stage tally headers, `PowerOutlets`, `InputType`, `DayPlaying`, and pop-up titles/section headings. Populate in `RebuildLabels()`.
+Add label fields for: new `ContactRole` members, `InEarInputType` members, per-`CableType` headers, Power glance, Backdrop Yes/No, Monitors split columns (brought/needed/drumfill), Ambiance mics, Stage tally headers, `PowerOutlets`, `InputType`, `DayPlaying`, and pop-up titles/section headings. Populate in `RebuildLabels()`.
 
 ## Editor — `Pages/RiderEditorV3.razor`
 
-Surface every new field for full editing (since pop-ups are read-only): `DayPlaying`, `HasBackdrop` toggle gating backdrop dims, `PowerOutlets`, Ambiance mics (present/count/provider), per-IEM `InputType` (shown when non-wireless), and the new `PartyType` options. Use `EditForm` + `DataAnnotationsValidator` + `ValidationSummary`.
+Surface every new field for full editing (since pop-ups are read-only): `DayPlaying`, `HasBackdrop` toggle gating backdrop dims, `PowerOutlets`, Ambiance mics (present/count/provider), per-IEM `InputType` (always-visible `InEarInputType` multi-select / checkbox group + `Other` override) and stereo/mono toggle, and the new `ContactRole` options. Use `EditForm` + `DataAnnotationsValidator` + `ValidationSummary`.
 
 ## Scheduler / Running order
 
@@ -87,12 +88,12 @@ Surface every new field for full editing (since pop-ups are read-only): `DayPlay
 
 ## Localization (`wwwroot/i18n/en.json` + `LocalizationKeys.cs`)
 
-Add keys (and 1:1 `LocalizationKeys` constants, plus `fr-fr.json` parity) for: new enum members (`enum.PartyType.*`, `enum.TimingEventType.SETUP_BACKSTAGE`), new field labels (`field.lighting.hasBackdrop`, `field.stage.powerOutlets`, `field.band.dayPlaying`, `field.monitors.ambianceMics*`, `field.monitors.inEarInputType`, `field.monitors.wedgeCount`/`drumfill`/`iemBrought`/`iemNeeded`, cable-type/power glance headers), pop-up titles, and the expand/close button labels. Never remove or renumber existing keys. `LocalizationCatalogTests` must stay green.
+Add keys (and 1:1 `LocalizationKeys` constants, plus `fr-fr.json` parity) for: new enum members (`enum.ContactRole.Artist`/`LightEngineer`/`Production`, `enum.InEarInputType.*`, `enum.TimingEventType.SETUP_BACKSTAGE`), new field labels (`field.lighting.hasBackdrop`, `field.stage.powerOutlets`, `field.band.dayPlaying`, `field.monitors.ambianceMics*`, `field.monitors.inEarInputType`, `field.monitors.inEarStereo`, `field.monitors.wedgeCount`/`drumfill`/`iemBrought`/`iemNeeded`, cable-type/power glance headers), pop-up titles, and the expand/close button labels. Never remove or renumber existing keys — the orphaned `enum.ContactRole.BackingTech` key stays (its enum member is gone, but released keys are never removed). `LocalizationCatalogTests` must stay green.
 
 ## Tests (`tests/FestivalRider.Tests/`)
 
 - `ExportServiceTests` — round-trip all new CSV keys + new enum members (byte-stable).
-- New migrator tests — `V6ToV7Migrator` (state) and `V6ToV7BundleMigrator` (bundle) default/derive correctly; full v6→v7 chain reaches current version.
+- New migrator tests — `V6ToV7Migrator` (state) and `V6ToV7BundleMigrator` (bundle) default/derive correctly (incl. `BackingTech → Other` contact-role remap and the `inputType`/`isStereo` IEM defaults); full v6→v7 chain reaches current version.
 - `LocalizationCatalogTests` — parity for new keys.
 - Service tests via interfaces only; fake `IJSRuntime`/time; never touch real storage.
 
@@ -108,6 +109,6 @@ Add keys (and 1:1 `LocalizationKeys` constants, plus `fr-fr.json` parity) for: n
 
 - **Grid column template drift** — header `span`s, `grid-template-columns`, and `BandGridRow` cell order must stay byte-aligned; change them in lockstep.
 - **DayPlaying dynamic cap** — can't be a static attribute; validate in page/editor and re-validate when `ShowDayCount` shrinks.
-- **Enum ordinal stability** — only append new enum members; never reorder (CSV/JSON store names, but keep ordinals stable for safety).
+- **Enum ordinal stability** — append new members (`ContactRole.Artist`/`LightEngineer`/`Production`, `InEarInputType.*`) rather than reordering survivors. Removing `ContactRole.BackingTech` shifts the ordinals after it, but CSV/JSON store names and the `V6ToV7Migrator` remaps `BackingTech → Other`, so persisted data is safe; never reorder the remaining members.
 - **Migrator coverage** — without `V6ToV7` (state) and bundle migrators, existing v6 data falls back to backup-and-reset / refused import. Both are mandatory in wave 1/2.
 - **Notes clamp vs edit** — clamp only the locked read-only view; reveal the textarea on unlock to preserve inline editing.
