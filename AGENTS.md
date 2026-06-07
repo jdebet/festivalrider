@@ -99,3 +99,10 @@
 
 - Every commit MUST leave the app compiling and runnable.
 - ALWAYS implement waves in order per the `Active` plan's `## Implementation cadence`.
+
+## IDE intelligence
+
+- For C# symbol navigation, type hierarchy, call chains, and safe rename, prefer the `resharper` MCP server over `grep` or manual file reads.
+- For running tests, builds, or debug sessions, prefer the `rider` MCP server over raw `dotnet` shell commands.
+- **For C# code, compiler-aware discovery is the default; `grep` is only for text, not symbols.**
+- Fallback to file/shell tools when MCP servers are unavailable or the task is purely textual (e.g., string literals in Razor, JSON, CSS).
