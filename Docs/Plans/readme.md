@@ -31,6 +31,7 @@ Versioned design documents for FestivalRider. Each plan captures locked decision
 | 018 | [Export and Save pages](./018-export-save-pages.md) | Active | New `/export` page centralizes running order CSV exports, stage/band/role prints, and band prints. New `/save` page centralizes show CSV, bands CSV, bundle export/import, and storage status. Settings trimmed to shows, show details, and a collapsed Danger Zone card. |
 | 019 | [Show-scoped bands and running orders](./019-show-scoped-bands.md) | Active | Successor to 006 (partial). Moves `Bands` and `RunningOrders` from `AppState` into `ShowData`. Standard bundles become single-show; adds master bundle. Renames `/settings` to `/shows`. Introduces implicit single stage. Schema bump 4 → 5. |
 | 020 | [Running order schedule refactor](./020-running-order-schedule-refactor.md) | Draft | Dual-mode running order: Traditional (venue) and Festival (template-based event chains). Replaces `RunningOrderSlot` record with mutable `class`. Adds `IRunningOrderScheduler`, Gantt chart, side-panel editor, and per-band early soundcheck chains. Schema bump 5 → 6. |
+| 021 | [Bands V3 refactor — glanceable grid, model extensions, auto-save](./021-bands-v3-refactor.md) | Active | Refactors `/bands-v3` to read-only tally columns with expandable detail pop-ups; extends models (Backdrop, AmbianceMics, DayPlaying, PowerOutlets, IEM InputType, SETUP_BACKSTAGE); bumps schema 6 → 7; adds 5s UI auto-commit. |
 
 ## Template
 
